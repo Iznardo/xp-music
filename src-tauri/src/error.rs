@@ -22,7 +22,7 @@ pub enum ErrorCode {
     Internal,
 }
 
-#[derive(thiserror::Error, Serialize, Type, Clone, Debug)]
+#[derive(thiserror::Error, Serialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[error("{message}")]
 pub struct AppError {

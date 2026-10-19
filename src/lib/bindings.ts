@@ -10,10 +10,39 @@ export const commands = {
 	settingsGet: () => typedError<Settings, AppError>(__TAURI_INVOKE("settings_get")),
 	/**  Sustituye los ajustes completos y avisa a todas las ventanas. */
 	settingsSet: (settings: Settings) => typedError<Settings, AppError>(__TAURI_INVOKE("settings_set", { settings })),
+	playerGetState: () => __TAURI_INVOKE<PlayerState>("player_get_state"),
+	playerPlay: () => __TAURI_INVOKE<void>("player_play"),
+	playerPause: () => __TAURI_INVOKE<void>("player_pause"),
+	playerToggle: () => __TAURI_INVOKE<void>("player_toggle"),
+	playerStop: () => __TAURI_INVOKE<void>("player_stop"),
+	playerNext: () => __TAURI_INVOKE<void>("player_next"),
+	playerPrevious: () => __TAURI_INVOKE<void>("player_previous"),
+	playerSeek: (positionMs: number) => __TAURI_INVOKE<void>("player_seek", { positionMs }),
+	/**  `volume` entre 0 y 1. */
+	playerSetVolume: (volume: number | null) => __TAURI_INVOKE<void>("player_set_volume", { volume }),
+	playerSetMuted: (muted: boolean) => __TAURI_INVOKE<void>("player_set_muted", { muted }),
+	playerSetShuffle: (enabled: boolean) => __TAURI_INVOKE<void>("player_set_shuffle", { enabled }),
+	playerSetRepeat: (mode: RepeatMode) => __TAURI_INVOKE<void>("player_set_repeat", { mode }),
+	playerListDevices: () => __TAURI_INVOKE<AudioDevice[]>("player_list_devices"),
+	/**  `None` = dispositivo predeterminado. */
+	playerSetDevice: (id: string | null) => typedError<null, AppError>(__TAURI_INVOKE("player_set_device", { id })),
+	queueGet: () => __TAURI_INVOKE<QueueSnapshot>("queue_get"),
+	/**  Sustituye la cola y empieza a sonar `start_index` (índice en `tracks`). */
+	queueSet: (tracks: Track[], startIndex: number, source: QueueSource) => typedError<null, AppError>(__TAURI_INVOKE("queue_set", { tracks, startIndex, source })),
+	queuePlayIndex: (index: number) => typedError<null, AppError>(__TAURI_INVOKE("queue_play_index", { index })),
+	queueAdd: (tracks: Track[], position: InsertPosition) => __TAURI_INVOKE<void>("queue_add", { tracks, position }),
+	queueRemove: (index: number) => __TAURI_INVOKE<void>("queue_remove", { index }),
+	queueMove: (from: number, to: number) => __TAURI_INVOKE<void>("queue_move", { from, to }),
+	queueClear: () => __TAURI_INVOKE<void>("queue_clear"),
+	queueSetAutoplay: (enabled: boolean) => __TAURI_INVOKE<void>("queue_set_autoplay", { enabled }),
 };
 
 /** Events */
 export const events = {
+	playerError: makeEvent<PlayerError>("player://error"),
+	playerPosition: makeEvent<PositionUpdate>("player://position"),
+	playerState: makeEvent<PlayerState>("player://state"),
+	queueChanged: makeEvent<QueueSnapshot>("queue://changed"),
 	settingsChanged: makeEvent<Settings>("settings://changed"),
 };
 
@@ -34,6 +63,12 @@ export type ArtistRef = {
 	name: string,
 };
 
+export type AudioDevice = {
+	id: string,
+	name: string,
+	isDefault: boolean,
+};
+
 export type AudioQuality = 
 /**  itag 140 */
 "Aac128";
@@ -43,7 +78,25 @@ export type BrowseId = string;
 
 export type ErrorCode = "NotAuthenticated" | "AuthExpired" | "Network" | "RateLimited" | "ResolveFailed" | "StreamExpired" | "Decode" | "AudioDevice" | "NotFound" | "InvalidInput" | "Storage" | "Internal";
 
+export type InsertPosition = "Next" | "End";
+
 export type LikeStatus = "Like" | "Dislike" | "Indifferent";
+
+export type PlaybackStatus = "Idle" | "Loading" | "Buffering" | "Playing" | "Paused" | "Error";
+
+export type PlayerError = AppError;
+
+export type PlayerState = {
+	status: PlaybackStatus,
+	track: Track | null,
+	positionMs: number,
+	durationMs: number | null,
+	volume: number | null,
+	muted: boolean,
+	shuffle: boolean,
+	repeat: RepeatMode,
+	error: AppError | null,
+};
 
 /**  Id de playlist tal como lo devuelve la biblioteca (con prefijo `VL`). */
 export type PlaylistId = string;
@@ -55,6 +108,26 @@ export type PlaylistSummary = {
 	trackCount: number | null,
 	thumbnails: Thumbnail[],
 };
+
+export type PositionUpdate = {
+	positionMs: number,
+	bufferedMs: number,
+};
+
+export type QueueSnapshot = {
+	/**  En orden de reproducción efectivo (ya barajado si `shuffle`). */
+	tracks: Track[],
+	currentIndex: number | null,
+	source: QueueSource | null,
+	autoplay: boolean,
+	shuffle: boolean,
+	repeat: RepeatMode,
+};
+
+/**  De dónde salió la cola (para el autoplay y la UI). */
+export type QueueSource = ({ Playlist: PlaylistId }) & { Album?: never; Radio?: never; Search?: never } | ({ Album: BrowseId }) & { Playlist?: never; Radio?: never; Search?: never } | ({ Radio: TrackId }) & { Album?: never; Playlist?: never; Search?: never } | ({ Search: string }) & { Album?: never; Playlist?: never; Radio?: never } | "Library" | "Manual";
+
+export type RepeatMode = "Off" | "All" | "One";
 
 export type Settings = {
 	theme: Theme,

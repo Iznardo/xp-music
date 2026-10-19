@@ -31,6 +31,13 @@ tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 specta-typescript = "=0.0.12"
+cpal = "0.18"
+rubato = "5"
+audioadapter-buffers = "5"
+ringbuf = "0.5"
+crossbeam-channel = "0.5.17"
+symphonia = { version = "0.6", default-features = false, features = ["aac", "isomp4"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 
 [profile.release]
 codegen-units = 1

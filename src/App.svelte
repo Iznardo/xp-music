@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import TitleBar from "./lib/components/xp/TitleBar.svelte";
+  import DebugPlayer from "./lib/components/DebugPlayer.svelte";
+  import { player } from "./lib/stores/player.svelte";
   import { settings } from "./lib/stores/settings.svelte";
   import { t } from "./lib/strings";
   import type { Theme } from "./lib/bindings";
@@ -18,6 +20,7 @@
   onMount(() => {
     const win = getCurrentWindow();
     settings.init();
+    player.init();
     const sync = async () => (maximized = await win.isMaximized());
     sync();
     const unlisteners = [win.onResized(sync), win.onFocusChanged((e) => (active = e.payload))];
@@ -36,6 +39,8 @@
 
   <main class="content">
     <p class="placeholder">{t.placeholder}</p>
+
+    <DebugPlayer />
 
     <fieldset>
       <legend>{t.themes.title}</legend>
@@ -93,6 +98,7 @@
   }
   .content {
     flex: 1;
+    overflow: auto;
     padding: 14px;
     display: flex;
     flex-direction: column;

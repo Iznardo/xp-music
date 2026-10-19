@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use crate::storage::Db;
 
 pub struct AppState {
-    pub db: Db,
+    pub db: std::sync::Arc<Db>,
 }
 
 /// Carpetas de la app según specs/001: datos en `%APPDATA%\xp-music`, logs en

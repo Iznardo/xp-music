@@ -13,6 +13,12 @@ fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
         // 0001 · ajustes (001)
         M::up("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);"),
+        // 0002 · cola persistida y caché de resoluciones (002)
+        M::up(
+            "CREATE TABLE queue_state (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+             CREATE TABLE resolve_cache (track_id TEXT NOT NULL, itag INTEGER NOT NULL, json TEXT NOT NULL,
+                                         expires_at INTEGER NOT NULL, PRIMARY KEY (track_id, itag));",
+        ),
     ])
 }
 
