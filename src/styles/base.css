@@ -1,0 +1,46 @@
+/* La ventana es transparente y sin decoración: el marco lo dibuja la app. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+button {
+  font: inherit;
+}
+
+input[type="radio"] {
+  accent-color: var(--selection);
+  margin: 0 4px 0 0;
+}
+
+fieldset {
+  border: 1px solid #d0d0bf;
+  border-radius: 3px;
+  padding: 6px 10px 8px;
+  margin: 0;
+}
+
+legend {
+  color: #0046d5;
+  padding: 0 3px;
+}

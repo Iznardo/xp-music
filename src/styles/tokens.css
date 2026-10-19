@@ -1,0 +1,80 @@
+/* Variables de los temas Luna de Windows XP. El tema activo va en <html data-theme="...">. */
+
+:root,
+:root[data-theme="blue"] {
+  --title-grad: linear-gradient(
+    to bottom,
+    #0997ff 0%,
+    #0053ee 8%,
+    #0050ee 40%,
+    #0066ff 88%,
+    #0066ff 93%,
+    #005bff 95%,
+    #003dd7 96%,
+    #003dd7 100%
+  );
+  --title-grad-inactive: linear-gradient(to bottom, #7697e7 0%, #7e9ee3 8%, #94afe8 40%, #97b4e9 88%, #82a5e4 95%, #7c9fd3 100%);
+  --frame: #0831d9;
+  --frame-inactive: #7a96df;
+  --title-text: #fff;
+  --title-text-shadow: 1px 1px #0f1089;
+  --btn-grad: linear-gradient(135deg, #5a8cff 0%, #2663ff 50%, #1a4fe0 100%);
+  --btn-border: #fff;
+  --close-grad: linear-gradient(135deg, #e7a28d 0%, #d75c32 40%, #c23f12 100%);
+  --selection: #316ac5;
+  --accent: #0a246a;
+}
+
+:root[data-theme="olive"] {
+  --title-grad: linear-gradient(
+    to bottom,
+    #b3c68d 0%,
+    #8ea05f 8%,
+    #96a865 40%,
+    #a4b77a 88%,
+    #92a568 95%,
+    #6d7f3f 100%
+  );
+  --title-grad-inactive: linear-gradient(to bottom, #c9d3ac 0%, #c0cb9e 40%, #c5cfa5 88%, #b2be8c 100%);
+  --frame: #8ba169;
+  --frame-inactive: #c0cb9e;
+  --title-text: #fff;
+  --title-text-shadow: 1px 1px #4b5a28;
+  --btn-grad: linear-gradient(135deg, #c3d19e 0%, #93a661 50%, #7b8f4a 100%);
+  --btn-border: #fff;
+  --close-grad: linear-gradient(135deg, #e7a28d 0%, #d75c32 40%, #c23f12 100%);
+  --selection: #93a070;
+  --accent: #5b6c3b;
+}
+
+:root[data-theme="silver"] {
+  --title-grad: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    #e3e4ec 8%,
+    #cfd1dc 40%,
+    #c4c6d3 88%,
+    #b6b8c6 95%,
+    #a0a2b0 100%
+  );
+  --title-grad-inactive: linear-gradient(to bottom, #f6f6f9 0%, #ebebf0 40%, #e2e3ea 88%, #d6d7df 100%);
+  --frame: #a8a9bd;
+  --frame-inactive: #d6d7df;
+  --title-text: #0e1010;
+  --title-text-shadow: none;
+  --btn-grad: linear-gradient(135deg, #ffffff 0%, #dcdde6 50%, #c3c5d2 100%);
+  --btn-border: #fff;
+  --close-grad: linear-gradient(135deg, #e7a28d 0%, #d75c32 40%, #c23f12 100%);
+  --selection: #b2b4bf;
+  --accent: #3a3d4d;
+}
+
+:root {
+  --surface: #ece9d8;
+  --surface-light: #fbfaf6;
+  --border-dark: #aca899;
+  --text: #000;
+  --text-muted: #555;
+  --font-ui: Tahoma, "Segoe UI", sans-serif;
+  --font-title: "Trebuchet MS", Tahoma, sans-serif;
+}

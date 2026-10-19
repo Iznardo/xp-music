@@ -25,3 +25,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Frontend / Tauri
+dist/
+src-tauri/gen/schemas/

@@ -1,0 +1,39 @@
+[package]
+name = "xp-music"
+version = "0.1.0"
+description = "Reproductor de YouTube Music con estética Windows Media Player / XP"
+authors = ["iznardo"]
+edition = "2024"
+publish = false
+
+[lib]
+# El sufijo `_lib` evita el choque de nombres entre lib y bin en Windows
+# (https://github.com/rust-lang/cargo/issues/8519).
+name = "xp_music_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-single-instance = "2.5.4"
+tauri-plugin-window-state = "2.5.0"
+thiserror = "2.0.21"
+dirs = "7.0.0"
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+rusqlite_migration = "2.6.0"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+specta-typescript = "=0.0.12"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+opt-level = 3
+strip = true

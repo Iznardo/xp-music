@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "XP Music",
+  "version": "0.1.0",
+  "identifier": "com.iznardo.xpmusic",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "XP Music",
+        "width": 960,
+        "height": 640,
+        "minWidth": 640,
+        "minHeight": 420,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "resizable": true,
+        "center": true,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --in-process-gpu --disable-background-networking --disable-component-update --disable-sync --no-pings --disable-breakpad"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data: https://*.googleusercontent.com https://i.ytimg.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
