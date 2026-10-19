@@ -38,9 +38,17 @@ ringbuf = "0.5"
 crossbeam-channel = "0.5.17"
 symphonia = { version = "0.6", default-features = false, features = ["aac", "isomp4"] }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+ytmapi-rs = { version = "0.3.3", default-features = false, features = ["rustls", "simplified-queries"] }
+tokio = { version = "1.54.0", features = ["sync", "time", "macros", "rt"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
+rand = "0.9"
 
 [profile.release]
 codegen-units = 1
 lto = "thin"
 opt-level = 3
 strip = true
+
+[patch.crates-io]
+ytmapi-rs = { path = "../vendor/ytmapi-rs" }
+

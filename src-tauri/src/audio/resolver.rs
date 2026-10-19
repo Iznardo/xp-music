@@ -103,9 +103,11 @@ impl ToolPaths {
 
 pub struct YtDlpResolver {
     tools: ToolPaths,
-    /// Cookies en formato Netscape, solo para el reintento (NFR-002-05).
-    cookies: Option<PathBuf>,
+    /// Da las cookies de la sesión (formato Netscape), solo para el reintento (NFR-002-05).
+    cookies: Option<CookieProvider>,
 }
+
+pub type CookieProvider = Box<dyn Fn() -> Option<String> + Send + Sync>;
 
 #[derive(Deserialize)]
 struct YtDlpInfo {
@@ -118,7 +120,7 @@ struct YtDlpInfo {
 }
 
 impl YtDlpResolver {
-    pub fn new(tools: ToolPaths, cookies: Option<PathBuf>) -> Self {
+    pub fn new(tools: ToolPaths, cookies: Option<CookieProvider>) -> Self {
         Self { tools, cookies }
     }
 
@@ -255,13 +257,16 @@ impl StreamResolver for YtDlpResolver {
         match self.run(id, pref, None) {
             Ok(s) => Ok(s),
             Err(first) => {
-                let Some(cookies) = self.cookies.as_deref().filter(|p| p.is_file()) else {
+                let Some(netscape) = self.cookies.as_ref().and_then(|f| f()) else {
                     return Err(first);
                 };
-                // yt-dlp reescribe el fichero de cookies: se le pasa una copia.
-                let tmp = std::env::temp_dir()
-                    .join(format!("xp-music-cookies-{}.txt", std::process::id()));
-                std::fs::copy(cookies, &tmp).map_err(|e| AppError::internal(e.to_string()))?;
+                // Fichero temporal (yt-dlp lo reescribe); se borra al terminar.
+                let tmp = std::env::temp_dir().join(format!(
+                    "xp-music-cookies-{}-{}.txt",
+                    std::process::id(),
+                    rand::random::<u32>()
+                ));
+                std::fs::write(&tmp, netscape).map_err(|e| AppError::internal(e.to_string()))?;
                 tracing::info!(track = %id.0, "reintentando yt-dlp con sesión");
                 let res = self.run(id, pref, Some(&tmp));
                 let _ = std::fs::remove_file(&tmp);

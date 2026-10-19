@@ -40,7 +40,7 @@ const PREFETCH_AHEAD: usize = 3;
 
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
-/// Más canciones cuando se acaba la cola (implementación real en 003).
+/// Más canciones cuando se acaba la cola (implementado en `yt::playback`).
 pub trait RadioProvider: Send + Sync {
     fn continue_radio(
         &self,
@@ -49,21 +49,9 @@ pub trait RadioProvider: Send + Sync {
     ) -> BoxFuture<AppResult<Vec<Track>>>;
 }
 
-/// Registro de escuchas en el historial (implementación real en 003).
+/// Registro de escuchas en el historial (implementado en `yt::playback`).
 pub trait PlaybackReporter: Send + Sync {
     fn on_track_started(&self, id: TrackId);
-}
-
-pub struct NullRadio;
-impl RadioProvider for NullRadio {
-    fn continue_radio(&self, _: TrackId, _: Vec<TrackId>) -> BoxFuture<AppResult<Vec<Track>>> {
-        Box::pin(async { Ok(Vec::new()) })
-    }
-}
-
-pub struct NullReporter;
-impl PlaybackReporter for NullReporter {
-    fn on_track_started(&self, _: TrackId) {}
 }
 
 #[derive(Serialize, Deserialize)]
@@ -461,6 +449,11 @@ impl PlayerService {
         self.emit_queue();
         self.prefetch_upcoming();
         self.emit_state();
+    }
+
+    /// Ganancia de normalización de la pista actual (003, `loudnessDb`).
+    pub fn set_gain_db(&self, db: f32) {
+        self.engine.send(EngineCmd::SetGainDb(db));
     }
 
     pub fn set_device(&self, id: Option<String>) -> AppResult<()> {

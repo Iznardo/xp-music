@@ -35,21 +35,87 @@ export const commands = {
 	queueMove: (from: number, to: number) => __TAURI_INVOKE<void>("queue_move", { from, to }),
 	queueClear: () => __TAURI_INVOKE<void>("queue_clear"),
 	queueSetAutoplay: (enabled: boolean) => __TAURI_INVOKE<void>("queue_set_autoplay", { enabled }),
+	authStatus: () => __TAURI_INVOKE<AuthStatus>("auth_status"),
+	/**  Perfiles de navegadores basados en Firefox (Zen, Firefox, LibreWolf…). */
+	authDetectBrowsers: () => __TAURI_INVOKE<BrowserProfile[]>("auth_detect_browsers"),
+	/**  Cuentas de YouTube con sesión en ese perfil (todas sus sesiones/contenedores). */
+	authScanBrowser: (profile: string) => typedError<SessionAccount[], AppError>(__TAURI_INVOKE("auth_scan_browser", { profile })),
+	/**  Cuentas en una cabecera `Cookie` pegada a mano. */
+	authScanCookie: (cookie: string) => typedError<SessionAccount[], AppError>(__TAURI_INVOKE("auth_scan_cookie", { cookie })),
+	authSelectAccount: (account: SessionAccount) => typedError<AuthStatus, AppError>(__TAURI_INVOKE("auth_select_account", { account })),
+	authLogout: () => typedError<null, AppError>(__TAURI_INVOKE("auth_logout")),
+	ytHome: (continuation: string | null) => typedError<Page<Section>, AppError>(__TAURI_INVOKE("yt_home", { continuation })),
+	ytLibraryPlaylists: () => typedError<PlaylistSummary[], AppError>(__TAURI_INVOKE("yt_library_playlists")),
+	ytLibraryAlbums: () => typedError<AlbumSummary[], AppError>(__TAURI_INVOKE("yt_library_albums")),
+	ytLibraryArtists: () => typedError<ArtistSummary[], AppError>(__TAURI_INVOKE("yt_library_artists")),
+	ytLibrarySongs: () => typedError<Page<Track>, AppError>(__TAURI_INVOKE("yt_library_songs")),
+	ytLikedSongs: () => typedError<Page<Track>, AppError>(__TAURI_INVOKE("yt_liked_songs")),
+	ytHistory: () => typedError<Section[], AppError>(__TAURI_INVOKE("yt_history")),
+	/**  Siguiente página de canciones (playlist, me gusta, canciones de la biblioteca). */
+	ytMoreTracks: (continuation: string) => typedError<Page<Track>, AppError>(__TAURI_INVOKE("yt_more_tracks", { continuation })),
+	ytPlaylist: (id: PlaylistId) => typedError<PlaylistDetail, AppError>(__TAURI_INVOKE("yt_playlist", { id })),
+	ytAlbum: (id: BrowseId) => typedError<AlbumDetail, AppError>(__TAURI_INVOKE("yt_album", { id })),
+	ytArtist: (id: BrowseId) => typedError<ArtistDetail, AppError>(__TAURI_INVOKE("yt_artist", { id })),
+	ytSearch: (query: string, filter: SearchFilter) => typedError<Page<MediaItem>, AppError>(__TAURI_INVOKE("yt_search", { query, filter })),
+	ytSearchMore: (continuation: string, filter: SearchFilter) => typedError<Page<MediaItem>, AppError>(__TAURI_INVOKE("yt_search_more", { continuation, filter })),
+	ytSearchSuggestions: (query: string) => typedError<string[], AppError>(__TAURI_INVOKE("yt_search_suggestions", { query })),
+	/**  Canciones de la radio de `seed` (la semilla primero). */
+	ytRadio: (seed: TrackId) => typedError<Track[], AppError>(__TAURI_INVOKE("yt_radio", { seed })),
+	ytRate: (id: TrackId, status: LikeStatus) => typedError<null, AppError>(__TAURI_INVOKE("yt_rate", { id, status })),
+	ytAddToPlaylist: (playlist: PlaylistId, tracks: TrackId[]) => typedError<null, AppError>(__TAURI_INVOKE("yt_add_to_playlist", { playlist, tracks })),
+	ytCreatePlaylist: (title: string, description: string | null, privacy: Privacy) => typedError<PlaylistId, AppError>(__TAURI_INVOKE("yt_create_playlist", { title, description, privacy })),
 };
 
 /** Events */
 export const events = {
+	authChanged: makeEvent<AuthStatus>("auth://changed"),
 	playerError: makeEvent<PlayerError>("player://error"),
 	playerPosition: makeEvent<PositionUpdate>("player://position"),
 	playerState: makeEvent<PlayerState>("player://state"),
 	queueChanged: makeEvent<QueueSnapshot>("queue://changed"),
 	settingsChanged: makeEvent<Settings>("settings://changed"),
+	ytCacheUpdated: makeEvent<CacheUpdated>("yt://cache-updated"),
 };
 
 /* Types */
+export type AccountInfo = {
+	name: string,
+	handle: string | null,
+	photo: string | null,
+};
+
+/**  De dónde viene una cuenta candidata al importar. */
+export type AccountSource = 
+/**  Perfil del navegador + contenedor (`originAttributes`). */
+{ Browser: {
+	profile: string,
+	container: string,
+	containerName: string,
+} } | 
+/**  Cookie pegada a mano (queda en memoria hasta elegir cuenta). */
+"Pasted";
+
+export type AlbumDetail = {
+	summary: AlbumSummary,
+	/**  Playlist con las pistas del álbum (para reproducirlo entero). */
+	playlistId: PlaylistId | null,
+	stats: string | null,
+	description: string | null,
+	tracks: Track[],
+};
+
 export type AlbumRef = {
 	id: BrowseId | null,
 	name: string,
+};
+
+export type AlbumSummary = {
+	id: BrowseId,
+	title: string,
+	artists: ArtistRef[],
+	/**  Año o tipo ("2002", "Single • 2019"), tal como lo da YouTube. */
+	subtitle: string | null,
+	thumbnails: Thumbnail[],
 };
 
 export type AppError = {
@@ -58,9 +124,26 @@ export type AppError = {
 	recoverable: boolean,
 };
 
+export type ArtistDetail = {
+	summary: ArtistSummary,
+	description: string | null,
+	topSongs: Track[],
+	/**  Álbumes, singles, vídeos, artistas similares… en el orden de YouTube. */
+	sections: Section[],
+	/**  Canción con la que empezar la radio del artista. */
+	radioSeed: TrackId | null,
+};
+
 export type ArtistRef = {
 	id: BrowseId | null,
 	name: string,
+};
+
+export type ArtistSummary = {
+	id: BrowseId,
+	name: string,
+	subtitle: string | null,
+	thumbnails: Thumbnail[],
 };
 
 export type AudioDevice = {
@@ -73,14 +156,36 @@ export type AudioQuality =
 /**  itag 140 */
 "Aac128";
 
+export type AuthStatus = "SignedOut" | ({ SignedIn: AccountInfo }) & { Expired?: never } | 
+/**  La sesión caducó y no se pudo renovar sola. */
+({ Expired: string | null }) & { SignedIn?: never };
+
 /**  `browseId` de álbum o artista. */
 export type BrowseId = string;
+
+export type BrowserProfile = {
+	browser: string,
+	name: string,
+	path: string,
+};
+
+export type CacheUpdated = {
+	key: string,
+};
 
 export type ErrorCode = "NotAuthenticated" | "AuthExpired" | "Network" | "RateLimited" | "ResolveFailed" | "StreamExpired" | "Decode" | "AudioDevice" | "NotFound" | "InvalidInput" | "Storage" | "Internal";
 
 export type InsertPosition = "Next" | "End";
 
 export type LikeStatus = "Like" | "Dislike" | "Indifferent";
+
+/**  Elemento de una sección de Inicio, de artista o de búsqueda. */
+export type MediaItem = ({ Track: Track }) & { Album?: never; Artist?: never; Playlist?: never } | ({ Playlist: PlaylistSummary }) & { Album?: never; Artist?: never; Track?: never } | ({ Album: AlbumSummary }) & { Artist?: never; Playlist?: never; Track?: never } | ({ Artist: ArtistSummary }) & { Album?: never; Playlist?: never; Track?: never };
+
+export type Page<T> = {
+	items: T[],
+	continuation: string | null,
+};
 
 export type PlaybackStatus = "Idle" | "Loading" | "Buffering" | "Playing" | "Paused" | "Error";
 
@@ -96,6 +201,15 @@ export type PlayerState = {
 	shuffle: boolean,
 	repeat: RepeatMode,
 	error: AppError | null,
+};
+
+export type PlaylistDetail = {
+	summary: PlaylistSummary,
+	description: string | null,
+	/**  "103 views • 41 tracks • 2 hours, 46 minutes" */
+	stats: string | null,
+	owned: boolean,
+	tracks: Page<Track>,
 };
 
 /**  Id de playlist tal como lo devuelve la biblioteca (con prefijo `VL`). */
@@ -114,6 +228,8 @@ export type PositionUpdate = {
 	bufferedMs: number,
 };
 
+export type Privacy = "Private" | "Unlisted" | "Public";
+
 export type QueueSnapshot = {
 	/**  En orden de reproducción efectivo (ya barajado si `shuffle`). */
 	tracks: Track[],
@@ -128,6 +244,22 @@ export type QueueSnapshot = {
 export type QueueSource = ({ Playlist: PlaylistId }) & { Album?: never; Radio?: never; Search?: never } | ({ Album: BrowseId }) & { Playlist?: never; Radio?: never; Search?: never } | ({ Radio: TrackId }) & { Album?: never; Playlist?: never; Search?: never } | ({ Search: string }) & { Album?: never; Playlist?: never; Radio?: never } | "Library" | "Manual";
 
 export type RepeatMode = "Off" | "All" | "One";
+
+export type SearchFilter = "All" | "Songs" | "Videos" | "Albums" | "Artists" | "Playlists";
+
+export type Section = {
+	title: string,
+	items: MediaItem[],
+};
+
+export type SessionAccount = {
+	source: AccountSource,
+	/**  Índice dentro de la sesión (`X-Goog-AuthUser`). */
+	index: number,
+	name: string,
+	handle: string | null,
+	photo: string | null,
+};
 
 export type Settings = {
 	theme: Theme,

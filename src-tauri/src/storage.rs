@@ -19,6 +19,12 @@ fn migrations() -> Migrations<'static> {
              CREATE TABLE resolve_cache (track_id TEXT NOT NULL, itag INTEGER NOT NULL, json TEXT NOT NULL,
                                          expires_at INTEGER NOT NULL, PRIMARY KEY (track_id, itag));",
         ),
+        // 0003 · caché de la API de YouTube Music y de portadas (003)
+        M::up(
+            "CREATE TABLE api_cache (key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL);
+             CREATE TABLE thumb_index (name TEXT PRIMARY KEY, url TEXT NOT NULL, mime TEXT NOT NULL,
+                                       bytes INTEGER NOT NULL, last_access INTEGER NOT NULL);",
+        ),
     ])
 }
 

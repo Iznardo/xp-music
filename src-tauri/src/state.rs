@@ -13,6 +13,7 @@ pub struct AppState {
 pub struct AppDirs {
     pub data: PathBuf,
     pub logs: PathBuf,
+    pub thumbs: PathBuf,
 }
 
 impl AppDirs {
@@ -23,6 +24,9 @@ impl AppDirs {
         let dirs = Self {
             data: base(dirs::config_dir())?.join("xp-music"),
             logs: base(dirs::data_local_dir())?.join("xp-music").join("logs"),
+            thumbs: base(dirs::data_local_dir())?
+                .join("xp-music")
+                .join("thumbs"),
         };
         std::fs::create_dir_all(&dirs.data)?;
         std::fs::create_dir_all(&dirs.logs)?;

@@ -7,6 +7,7 @@ mod player;
 mod settings;
 mod state;
 mod storage;
+mod yt;
 
 use std::sync::Arc;
 
@@ -16,8 +17,11 @@ use tauri_specta::{Builder, collect_commands, collect_events};
 use crate::audio::resolver::{
     CachedResolver, MissingTools, StreamResolver, ToolPaths, YtDlpResolver,
 };
-use crate::player::service::{NullRadio, NullReporter, PlayerService};
+use crate::player::service::PlayerService;
 use crate::state::{AppDirs, AppState};
+use crate::yt::playback::{YtRadio, YtReporter};
+use crate::yt::service::YtService;
+use crate::yt::thumbs::ThumbCache;
 
 /// Ruta del archivo de bindings TS, relativa a `src-tauri/`.
 const BINDINGS_PATH: &str = "../src/lib/bindings.ts";
@@ -50,6 +54,30 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::queue_move,
             commands::queue_clear,
             commands::queue_set_autoplay,
+            commands::auth_status,
+            commands::auth_detect_browsers,
+            commands::auth_scan_browser,
+            commands::auth_scan_cookie,
+            commands::auth_select_account,
+            commands::auth_logout,
+            commands::yt_home,
+            commands::yt_library_playlists,
+            commands::yt_library_albums,
+            commands::yt_library_artists,
+            commands::yt_library_songs,
+            commands::yt_liked_songs,
+            commands::yt_history,
+            commands::yt_more_tracks,
+            commands::yt_playlist,
+            commands::yt_album,
+            commands::yt_artist,
+            commands::yt_search,
+            commands::yt_search_more,
+            commands::yt_search_suggestions,
+            commands::yt_radio,
+            commands::yt_rate,
+            commands::yt_add_to_playlist,
+            commands::yt_create_playlist,
         ])
         .events(collect_events![
             settings::Settings,
@@ -57,9 +85,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
             player::types::PositionUpdate,
             player::types::QueueSnapshot,
             player::types::PlayerError,
+            yt::service::AuthStatus,
+            yt::service::CacheUpdated,
         ])
-        // Tipos de dominio aún sin comando que los use (se exportan igualmente).
-        .typ::<domain::PlaylistSummary>()
         .typ::<error::AppError>()
 }
 
@@ -74,14 +102,12 @@ fn export_bindings(builder: &Builder<tauri::Wry>) {
 }
 
 /// yt-dlp con caché; si faltan las herramientas, un resolvedor que lo explica.
-fn build_resolver(db: Arc<storage::Db>) -> Arc<dyn StreamResolver> {
+fn build_resolver(db: Arc<storage::Db>, yt: Arc<YtService>) -> Arc<dyn StreamResolver> {
     match ToolPaths::locate() {
         Some(tools) => {
             tracing::info!(yt_dlp = %tools.yt_dlp.display(), "herramientas encontradas");
-            // Cookies opcionales para el reintento (003 las moverá al Administrador de credenciales).
-            let cookies =
-                dirs::home_dir().map(|h| h.join(".xp-music").join("cookies-netscape.txt"));
-            let cached = CachedResolver::new(YtDlpResolver::new(tools, cookies), db);
+            let cookies = Box::new(move || yt.netscape_cookies());
+            let cached = CachedResolver::new(YtDlpResolver::new(tools, Some(cookies)), db);
             cached.purge_expired();
             Arc::new(cached)
         }
@@ -110,6 +136,8 @@ pub fn run() {
         Ok(s) => tracing::info!(theme = ?s.theme, volume = s.volume, "ajustes cargados"),
         Err(e) => tracing::warn!(error = %e, "no se pudieron cargar los ajustes"),
     }
+    let thumbs = ThumbCache::new(dirs.thumbs.clone(), Arc::clone(&db));
+    let data_dir = dirs.data.clone();
 
     let app = tauri::Builder::default()
         // Debe ir primero: una segunda instancia solo enfoca la ventana existente.
@@ -121,19 +149,28 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Portadas: http://thumb.localhost/<url codificada>
+        .register_asynchronous_uri_scheme_protocol("thumb", move |_ctx, request, responder| {
+            let thumbs = Arc::clone(&thumbs);
+            std::thread::spawn(move || responder.respond(thumbs.handle(&request)));
+        })
         .manage(AppState {
             db: Arc::clone(&db),
         })
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
+            let yt = YtService::new(Some(app.handle().clone()), Arc::clone(&db), data_dir);
+            let reporter = YtReporter::new(Arc::clone(&yt), Arc::clone(&db));
             let player = PlayerService::start(
                 app.handle().clone(),
                 Arc::clone(&db),
-                build_resolver(Arc::clone(&db)),
-                Arc::new(NullRadio),
-                Arc::new(NullReporter),
+                build_resolver(Arc::clone(&db), Arc::clone(&yt)),
+                Arc::new(YtRadio(Arc::clone(&yt))),
+                Arc::new(reporter.clone()),
             );
+            reporter.attach(&player);
+            app.manage(yt);
             app.manage(player);
             Ok(())
         })

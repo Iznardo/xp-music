@@ -6,7 +6,10 @@ use tauri::State;
 use tauri_specta::Event;
 
 use crate::audio::output::list_devices;
-use crate::domain::Track;
+use crate::domain::{
+    AlbumDetail, AlbumSummary, ArtistDetail, ArtistSummary, BrowseId, LikeStatus, MediaItem, Page,
+    PlaylistDetail, PlaylistId, PlaylistSummary, Privacy, SearchFilter, Section, Track, TrackId,
+};
 use crate::error::AppResult;
 use crate::player::service::PlayerService;
 use crate::player::types::{
@@ -14,6 +17,8 @@ use crate::player::types::{
 };
 use crate::settings::Settings;
 use crate::state::AppState;
+use crate::yt::service::{AuthStatus, SessionAccount, YtService};
+use crate::yt::session::BrowserProfile;
 
 type Player<'a> = State<'a, Arc<PlayerService>>;
 
@@ -182,4 +187,182 @@ pub fn queue_clear(player: Player<'_>) {
 #[specta::specta]
 pub fn queue_set_autoplay(player: Player<'_>, enabled: bool) {
     player.queue_set_autoplay(enabled);
+}
+
+// ---------------------------------------------------------------- sesión de YouTube Music
+
+type YtState<'a> = State<'a, Arc<YtService>>;
+
+#[tauri::command]
+#[specta::specta]
+pub fn auth_status(yt: YtState<'_>) -> AuthStatus {
+    yt.status()
+}
+
+/// Perfiles de navegadores basados en Firefox (Zen, Firefox, LibreWolf…).
+#[tauri::command]
+#[specta::specta]
+pub fn auth_detect_browsers(yt: YtState<'_>) -> Vec<BrowserProfile> {
+    yt.detect_browsers()
+}
+
+/// Cuentas de YouTube con sesión en ese perfil (todas sus sesiones/contenedores).
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_scan_browser(yt: YtState<'_>, profile: String) -> AppResult<Vec<SessionAccount>> {
+    yt.scan_browser(profile).await
+}
+
+/// Cuentas en una cabecera `Cookie` pegada a mano.
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_scan_cookie(yt: YtState<'_>, cookie: String) -> AppResult<Vec<SessionAccount>> {
+    yt.scan_pasted(cookie).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_select_account(
+    yt: YtState<'_>,
+    account: SessionAccount,
+) -> AppResult<AuthStatus> {
+    yt.select_account(account).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_logout(yt: YtState<'_>) -> AppResult<()> {
+    yt.logout().await;
+    Ok(())
+}
+
+// ---------------------------------------------------------------- YouTube Music: lectura
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_home(yt: YtState<'_>, continuation: Option<String>) -> AppResult<Page<Section>> {
+    yt.inner().home(continuation).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_library_playlists(yt: YtState<'_>) -> AppResult<Vec<PlaylistSummary>> {
+    yt.inner().library_playlists().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_library_albums(yt: YtState<'_>) -> AppResult<Vec<AlbumSummary>> {
+    yt.inner().library_albums().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_library_artists(yt: YtState<'_>) -> AppResult<Vec<ArtistSummary>> {
+    yt.inner().library_artists().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_library_songs(yt: YtState<'_>) -> AppResult<Page<Track>> {
+    yt.inner().library_songs().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_liked_songs(yt: YtState<'_>) -> AppResult<Page<Track>> {
+    yt.inner().liked_songs().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_history(yt: YtState<'_>) -> AppResult<Vec<Section>> {
+    yt.inner().history().await
+}
+
+/// Siguiente página de canciones (playlist, me gusta, canciones de la biblioteca).
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_more_tracks(yt: YtState<'_>, continuation: String) -> AppResult<Page<Track>> {
+    yt.more_tracks(continuation).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_playlist(yt: YtState<'_>, id: PlaylistId) -> AppResult<PlaylistDetail> {
+    yt.inner().playlist(id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_album(yt: YtState<'_>, id: BrowseId) -> AppResult<AlbumDetail> {
+    yt.inner().album(id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_artist(yt: YtState<'_>, id: BrowseId) -> AppResult<ArtistDetail> {
+    yt.inner().artist(id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_search(
+    yt: YtState<'_>,
+    query: String,
+    filter: SearchFilter,
+) -> AppResult<Page<MediaItem>> {
+    yt.search(query, filter).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_search_more(
+    yt: YtState<'_>,
+    continuation: String,
+    filter: SearchFilter,
+) -> AppResult<Page<MediaItem>> {
+    yt.more_search(continuation, filter).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_search_suggestions(yt: YtState<'_>, query: String) -> AppResult<Vec<String>> {
+    yt.suggestions(query).await
+}
+
+/// Canciones de la radio de `seed` (la semilla primero).
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_radio(yt: YtState<'_>, seed: TrackId) -> AppResult<Vec<Track>> {
+    yt.radio(seed).await
+}
+
+// ---------------------------------------------------------------- YouTube Music: escritura
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_rate(yt: YtState<'_>, id: TrackId, status: LikeStatus) -> AppResult<()> {
+    yt.rate(id, status).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_add_to_playlist(
+    yt: YtState<'_>,
+    playlist: PlaylistId,
+    tracks: Vec<TrackId>,
+) -> AppResult<()> {
+    yt.add_to_playlist(playlist, tracks).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn yt_create_playlist(
+    yt: YtState<'_>,
+    title: String,
+    description: Option<String>,
+    privacy: Privacy,
+) -> AppResult<PlaylistId> {
+    yt.create_playlist(title, description, privacy).await
 }

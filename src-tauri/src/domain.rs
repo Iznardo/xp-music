@@ -71,12 +71,98 @@ pub struct PlaylistSummary {
     pub thumbnails: Vec<Thumbnail>,
 }
 
-#[allow(dead_code)] // Se usa a partir de 003 (paginación).
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Page<T> {
     pub items: Vec<T>,
     pub continuation: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumSummary {
+    pub id: BrowseId,
+    pub title: String,
+    pub artists: Vec<ArtistRef>,
+    /// Año o tipo ("2002", "Single • 2019"), tal como lo da YouTube.
+    pub subtitle: Option<String>,
+    pub thumbnails: Vec<Thumbnail>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtistSummary {
+    pub id: BrowseId,
+    pub name: String,
+    pub subtitle: Option<String>,
+    pub thumbnails: Vec<Thumbnail>,
+}
+
+/// Elemento de una sección de Inicio, de artista o de búsqueda.
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+pub enum MediaItem {
+    Track(Track),
+    Playlist(PlaylistSummary),
+    Album(AlbumSummary),
+    Artist(ArtistSummary),
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Section {
+    pub title: String,
+    pub items: Vec<MediaItem>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistDetail {
+    pub summary: PlaylistSummary,
+    pub description: Option<String>,
+    /// "103 views • 41 tracks • 2 hours, 46 minutes"
+    pub stats: Option<String>,
+    pub owned: bool,
+    pub tracks: Page<Track>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumDetail {
+    pub summary: AlbumSummary,
+    /// Playlist con las pistas del álbum (para reproducirlo entero).
+    pub playlist_id: Option<PlaylistId>,
+    pub stats: Option<String>,
+    pub description: Option<String>,
+    pub tracks: Vec<Track>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtistDetail {
+    pub summary: ArtistSummary,
+    pub description: Option<String>,
+    pub top_songs: Vec<Track>,
+    /// Álbumes, singles, vídeos, artistas similares… en el orden de YouTube.
+    pub sections: Vec<Section>,
+    /// Canción con la que empezar la radio del artista.
+    pub radio_seed: Option<TrackId>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SearchFilter {
+    All,
+    Songs,
+    Videos,
+    Albums,
+    Artists,
+    Playlists,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Privacy {
+    Private,
+    Unlisted,
+    Public,
 }
 
 #[cfg(test)]

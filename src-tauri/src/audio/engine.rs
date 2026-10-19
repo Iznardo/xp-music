@@ -43,7 +43,7 @@ pub enum EngineCmd {
         volume: f32,
         muted: bool,
     },
-    #[allow(dead_code)] // Normalización con loudnessDb (003).
+
     SetGainDb(f32),
     SetDevice(Option<String>),
     #[allow(dead_code)] // Analizador de visualizaciones (005).

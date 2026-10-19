@@ -3,6 +3,7 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import TitleBar from "./lib/components/xp/TitleBar.svelte";
   import DebugPlayer from "./lib/components/DebugPlayer.svelte";
+  import DebugLibrary from "./lib/components/DebugLibrary.svelte";
   import { player } from "./lib/stores/player.svelte";
   import { settings } from "./lib/stores/settings.svelte";
   import { t } from "./lib/strings";
@@ -40,6 +41,7 @@
   <main class="content">
     <p class="placeholder">{t.placeholder}</p>
 
+    <DebugLibrary />
     <DebugPlayer />
 
     <fieldset>
