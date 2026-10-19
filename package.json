@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "vite --mode mock",
     "build": "vite build",
     "tauri": "tauri",
     "gen:bindings": "cargo test --manifest-path src-tauri/Cargo.toml --lib export_bindings",

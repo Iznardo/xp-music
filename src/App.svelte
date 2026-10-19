@@ -1,17 +1,36 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
   import TitleBar from "./lib/components/xp/TitleBar.svelte";
-  import DebugPlayer from "./lib/components/DebugPlayer.svelte";
-  import DebugLibrary from "./lib/components/DebugLibrary.svelte";
+  import MenuBar from "./lib/components/xp/MenuBar.svelte";
+  import ContextMenu from "./lib/components/xp/ContextMenu.svelte";
+  import Dialogs from "./lib/components/xp/Dialogs.svelte";
+  import DialogFrame from "./lib/components/xp/DialogFrame.svelte";
+  import TaskBar from "./lib/components/wmp/TaskBar.svelte";
+  import TransportBar from "./lib/components/wmp/TransportBar.svelte";
+  import LibraryView from "./lib/views/LibraryView.svelte";
+  import HomeView from "./lib/views/HomeView.svelte";
+  import SearchView from "./lib/views/SearchView.svelte";
+  import NowPlayingView from "./lib/views/NowPlayingView.svelte";
+  import OptionsDialog from "./lib/views/OptionsDialog.svelte";
+  import LoginView from "./lib/views/LoginView.svelte";
+  import CompactPlayer from "./lib/views/CompactPlayer.svelte";
+  import { commands } from "./lib/bindings";
   import { player } from "./lib/stores/player.svelte";
   import { settings } from "./lib/stores/settings.svelte";
+  import { auth } from "./lib/stores/auth.svelte";
+  import { library } from "./lib/stores/library.svelte";
+  import { ui } from "./lib/stores/ui.svelte";
+  import { router } from "./lib/router.svelte";
+  import { handleShortcut } from "./lib/menus";
+  import { appWindow } from "./lib/platform";
   import { t } from "./lib/strings";
-  import type { Theme } from "./lib/bindings";
+  import type { SearchFilter } from "./lib/bindings";
 
-  const themes: Theme[] = ["Blue", "Olive", "Silver"];
   let maximized = $state(false);
   let active = $state(true);
+
+  // Como WMP: "Título - XP Music" mientras suena algo.
+  const title = $derived(player.state?.track ? `${player.state.track.title} - ${t.appName}` : t.appName);
 
   // El tema se aplica en <html> para que lo vean todas las variables CSS.
   $effect(() => {
@@ -19,53 +38,73 @@
   });
 
   onMount(() => {
-    const win = getCurrentWindow();
-    settings.init();
-    player.init();
+    void router.restore();
+    void commands.windowIsCompact().then((c) => (ui.compact = c));
+    void settings.init();
+    void player.init();
+    void library.init();
+    void auth.init().then(() => {
+      if (!auth.signedIn) ui.loginOpen = true;
+      else void library.refresh();
+    });
+    const win = appWindow();
+    if (!win) return;
     const sync = async () => (maximized = await win.isMaximized());
-    sync();
+    void sync();
     const unlisteners = [win.onResized(sync), win.onFocusChanged((e) => (active = e.payload))];
     return () => unlisteners.forEach((p) => p.then((off) => off()));
   });
+
+  // Si la sesión caduca y no se puede renovar sola, se ofrece reconectar.
+  $effect(() => {
+    if (auth.status && typeof auth.status === "object" && "Expired" in auth.status) ui.loginOpen = true;
+  });
 </script>
 
+<svelte:window onkeydown={handleShortcut} />
+
+{#if ui.compact}
+  <CompactPlayer />
+{:else}
 <div class="window" class:maximized class:inactive={!active}>
-  <TitleBar title={t.appName} {maximized} {active} />
+  <TitleBar {title} {maximized} {active} />
+  <MenuBar />
+  <TaskBar />
 
-  <nav class="menubar">
-    {#each Object.values(t.menu) as label}
-      <span class="menu-item">{label}</span>
-    {/each}
-  </nav>
-
-  <main class="content">
-    <p class="placeholder">{t.placeholder}</p>
-
-    <DebugLibrary />
-    <DebugPlayer />
-
-    <fieldset>
-      <legend>{t.themes.title}</legend>
-      {#each themes as theme}
-        <label class="radio">
-          <input
-            type="radio"
-            name="theme"
-            value={theme}
-            checked={settings.current?.theme === theme}
-            disabled={!settings.current}
-            onchange={() => settings.update({ theme })}
-          />
-          {t.themes[theme]}
-        </label>
-      {/each}
-    </fieldset>
+  <main class="main">
+    {#if router.route.name === "now"}
+      <NowPlayingView />
+    {:else if router.route.name === "home"}
+      <HomeView />
+    {:else if router.route.name === "search"}
+      {#key `${router.route.filter}|${router.route.query}`}
+        <SearchView query={router.route.query} filter={router.route.filter as SearchFilter} />
+      {/key}
+    {:else}
+      <LibraryView />
+    {/if}
   </main>
 
-  <footer class="statusbar">
-    {settings.error ? t.status.loadError : t.status.ready}
-  </footer>
+  <TransportBar />
 </div>
+{/if}
+
+<ContextMenu />
+<Dialogs />
+{#if ui.optionsOpen}<OptionsDialog />{/if}
+{#if ui.loginOpen}<LoginView />{/if}
+{#if ui.aboutOpen}
+  <DialogFrame title={t.menuBar.about} onclose={() => (ui.aboutOpen = false)}>
+    <div class="about">
+      <svg viewBox="0 0 16 16" width="40" height="40"><circle cx="8" cy="8" r="7" fill="#f4f4f4" stroke="#1d4ec4" /><path d="M6 4.5v7l5.5-3.5z" fill="#1d9b2c" /></svg>
+      <div>
+        <b>{t.appName}</b> 0.1.0
+        <p>{t.dialogs.aboutText}</p>
+      </div>
+    </div>
+    <div class="about-buttons"><button class="xp-btn" onclick={() => (ui.aboutOpen = false)}>{t.dialogs.ok}</button></div>
+  </DialogFrame>
+{/if}
 
 <style>
   .window {
@@ -85,42 +124,24 @@
     border-width: 0;
     border-radius: 0;
   }
-  .menubar {
-    display: flex;
-    padding: 1px 2px;
-    border-bottom: 1px solid #fff;
-    box-shadow: 0 1px var(--border-dark);
-  }
-  .menu-item {
-    padding: 3px 7px;
-  }
-  .menu-item:hover {
-    background: var(--selection);
-    color: #fff;
-  }
-  .content {
+  .main {
     flex: 1;
-    overflow: auto;
-    padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
+    min-height: 0;
   }
-  .placeholder {
-    margin: 0;
-    color: var(--text-muted);
-  }
-  .radio {
+  .about {
     display: flex;
-    align-items: center;
-    padding: 2px 0;
+    gap: 12px;
+    width: 300px;
   }
-  .statusbar {
-    height: 22px;
-    padding: 4px 8px;
-    border-top: 1px solid var(--border-dark);
-    background: var(--surface);
-    box-shadow: inset 0 1px #fff;
+  .about p {
+    white-space: pre-line;
+    margin: 6px 0 0;
+  }
+  .about-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
   }
 </style>

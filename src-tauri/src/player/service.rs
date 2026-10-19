@@ -451,6 +451,11 @@ impl PlayerService {
         self.emit_state();
     }
 
+    /// Sonido de la interfaz (004), mezclado sobre la salida.
+    pub fn play_sound(&self, s: crate::audio::sounds::UiSound) {
+        self.engine.send(EngineCmd::PlaySound(s));
+    }
+
     /// Ganancia de normalización de la pista actual (003, `loudnessDb`).
     pub fn set_gain_db(&self, db: f32) {
         self.engine.send(EngineCmd::SetGainDb(db));

@@ -44,3 +44,72 @@ legend {
   color: #0046d5;
   padding: 0 3px;
 }
+
+/* Botón XP (Luna): bordes redondeados, degradado claro, halo naranja al pasar. */
+.xp-btn {
+  min-width: 75px;
+  height: 23px;
+  padding: 0 10px;
+  border: 1px solid #003c74;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #ffffff 0%, #ecebe6 86%, #d6d0c5 100%);
+  color: #000;
+  font: inherit;
+  cursor: pointer;
+}
+.xp-btn:hover:not(:disabled) {
+  box-shadow: inset 1px 1px #fff0cf, inset -1px -1px #f9b03b, inset 2px 2px #fdd889, inset -2px -2px #f5ad3b;
+}
+.xp-btn:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+  box-shadow: inset 1px 1px #cee7ff, inset -1px -1px #98b8ea, inset 2px 2px #bcd4f6, inset -2px -2px #89ade4;
+}
+.xp-btn:active:not(:disabled) {
+  background: linear-gradient(to bottom, #cdcac3, #e3e3db 8%, #f2f1ec);
+}
+.xp-btn:disabled {
+  color: #aca899;
+  border-color: #c9c7ba;
+}
+
+.xp-input {
+  height: 21px;
+  padding: 1px 4px;
+  border: 1px solid #7f9db9;
+  background: #fff;
+  font: inherit;
+  outline: none;
+}
+.xp-input:focus {
+  border-color: #3c7fb1;
+}
+
+/* Barras de desplazamiento al estilo XP (azul Luna). */
+::-webkit-scrollbar {
+  width: 17px;
+  height: 17px;
+}
+::-webkit-scrollbar-track {
+  background: linear-gradient(to right, #eeede5, #f3f1e8);
+}
+::-webkit-scrollbar-thumb {
+  border: 1px solid #fff;
+  border-radius: 3px;
+  background: linear-gradient(to right, #c8d6fb, #b9cbf3 50%, #a9bfed);
+  box-shadow: inset 0 0 0 1px #9eb4e6;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to right, #d9e4fd, #cbdaf8 50%, #bccdf3);
+}
+::-webkit-scrollbar-button:single-button {
+  height: 17px;
+  width: 17px;
+  border: 1px solid #fff;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #c8d6fb, #a9bfed);
+  box-shadow: inset 0 0 0 1px #9eb4e6;
+}
+::-webkit-scrollbar-corner {
+  background: #ece9d8;
+}

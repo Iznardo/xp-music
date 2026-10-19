@@ -48,6 +48,7 @@ pub enum EngineCmd {
     SetDevice(Option<String>),
     #[allow(dead_code)] // Analizador de visualizaciones (005).
     SetTap(bool),
+    PlaySound(super::sounds::UiSound),
     Shutdown,
 }
 
@@ -312,6 +313,14 @@ impl Engine {
             EngineCmd::SetDevice(id) => {
                 self.device_id = id;
                 self.reopen_output();
+            }
+            EngineCmd::PlaySound(s) => {
+                if self.ensure_output()
+                    && let Some(o) = self.output.as_mut()
+                {
+                    let samples = super::sounds::synth(s, o.rate, o.channels);
+                    o.play_fx(&samples);
+                }
             }
             EngineCmd::SetTap(on) => {
                 self.tap_enabled = on;

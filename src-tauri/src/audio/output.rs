@@ -78,6 +78,8 @@ pub struct PcmTap {
 pub struct Output {
     _stream: cpal::Stream,
     prod: HeapProd<f32>,
+    /// Sonidos de la interfaz: se suman a la música (o al silencio si está en pausa).
+    fx: HeapProd<f32>,
     pub shared: Arc<OutputShared>,
     pub rate: u32,
     pub channels: u16,
@@ -127,6 +129,7 @@ impl Output {
         let (prod, mut cons) = HeapRb::<f32>::new(ring_len).split();
         let (mut tap_prod, tap_cons) =
             HeapRb::<f32>::new(((rate as f32 * TAP_SECONDS) as usize * ch).max(1024)).split();
+        let (fx, mut fx_cons) = HeapRb::<f32>::new((rate as usize * ch).max(1024)).split();
 
         let shared = Arc::new(OutputShared::new());
         let cb = Arc::clone(&shared);
@@ -141,11 +144,11 @@ impl Output {
                             .store(cb.pushed_frames.load(Ordering::Acquire), Ordering::Release);
                         cb.flush_requested.store(false, Ordering::Release);
                     }
-                    if cb.paused.load(Ordering::Relaxed) {
-                        data.fill(0.0);
-                        return;
-                    }
-                    let n = cons.pop_slice(data);
+                    let n = if cb.paused.load(Ordering::Relaxed) {
+                        0
+                    } else {
+                        cons.pop_slice(data)
+                    };
                     let amp = cb.amplitude();
                     if amp != 1.0 {
                         for s in &mut data[..n] {
@@ -162,6 +165,13 @@ impl Output {
                     }
                     if n < data.len() && n > 0 {
                         cb.underruns.fetch_add(1, Ordering::Relaxed);
+                    }
+                    // Efectos de la interfaz, sin pasar por el volumen de la música.
+                    for s in data.iter_mut() {
+                        match fx_cons.try_pop() {
+                            Some(x) => *s += x,
+                            None => break,
+                        }
                     }
                 },
                 move |err| {
@@ -199,6 +209,7 @@ impl Output {
         Ok(Self {
             _stream: stream,
             prod,
+            fx,
             shared,
             rate,
             channels,
@@ -213,6 +224,11 @@ impl Output {
     /// Muestras pendientes de sonar en el ring.
     pub fn queued_samples(&self) -> usize {
         self.prod.occupied_len()
+    }
+
+    /// Encola un sonido de la interfaz (ya en el formato de la salida). Si no cabe, se recorta.
+    pub fn play_fx(&mut self, samples: &[f32]) {
+        self.fx.push_slice(samples);
     }
 
     /// Escribe lo que quepa y devuelve cuántas muestras se escribieron.

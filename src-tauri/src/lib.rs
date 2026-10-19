@@ -7,6 +7,7 @@ mod player;
 mod settings;
 mod state;
 mod storage;
+mod ui_state;
 mod yt;
 
 use std::sync::Arc;
@@ -78,6 +79,11 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::yt_rate,
             commands::yt_add_to_playlist,
             commands::yt_create_playlist,
+            ui_state::ui_play_sound,
+            ui_state::ui_get_last_route,
+            ui_state::ui_set_last_route,
+            ui_state::window_is_compact,
+            ui_state::window_set_compact,
         ])
         .events(collect_events![
             settings::Settings,

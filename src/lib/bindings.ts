@@ -64,6 +64,12 @@ export const commands = {
 	ytRate: (id: TrackId, status: LikeStatus) => typedError<null, AppError>(__TAURI_INVOKE("yt_rate", { id, status })),
 	ytAddToPlaylist: (playlist: PlaylistId, tracks: TrackId[]) => typedError<null, AppError>(__TAURI_INVOKE("yt_add_to_playlist", { playlist, tracks })),
 	ytCreatePlaylist: (title: string, description: string | null, privacy: Privacy) => typedError<PlaylistId, AppError>(__TAURI_INVOKE("yt_create_playlist", { title, description, privacy })),
+	uiPlaySound: (sound: UiSound) => __TAURI_INVOKE<void>("ui_play_sound", { sound }),
+	uiGetLastRoute: () => __TAURI_INVOKE<string | null>("ui_get_last_route"),
+	uiSetLastRoute: (route: string) => __TAURI_INVOKE<void>("ui_set_last_route", { route }),
+	windowIsCompact: () => __TAURI_INVOKE<boolean>("window_is_compact"),
+	/**  Cambia entre modo completo y compacto (FR-004-13). */
+	windowSetCompact: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("window_set_compact", { enabled })),
 };
 
 /** Events */
@@ -302,6 +308,16 @@ export type Track = {
 
 /**  `videoId` de YouTube (11 caracteres). */
 export type TrackId = string;
+
+export type UiSound = 
+/**  Clic al navegar. */
+"Navigate" | 
+/**  Aviso suave (mensajes informativos). */
+"Notify" | 
+/**  Error. */
+"Error" | 
+/**  Pregunta / advertencia. */
+"Exclamation";
 
 export type VizPreset = "Bars" | "Waves" | "Ambience" | "Battery" | "Cover";
 

@@ -1,9 +1,11 @@
 // Portadas servidas por el protocolo `thumb` (caché en disco del backend).
 
 import type { Thumbnail } from "./bindings";
+import { isTauri } from "./platform";
 
-/// URL local para una imagen de Google/YouTube.
+/// URL local para una imagen de Google/YouTube (en la vista previa, la original).
 export function thumbUrl(url: string): string {
+  if (!isTauri || url.startsWith("data:")) return url;
   return `http://thumb.localhost/${encodeURIComponent(url)}`;
 }
 

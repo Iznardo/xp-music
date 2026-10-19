@@ -1,13 +1,13 @@
 <script lang="ts">
   // Barra de título Luna dibujada por la app (la ventana no tiene decoración nativa).
   // `data-tauri-drag-region` permite arrastrar y maximizar con doble clic.
-  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { appWindow } from "../../platform";
   import { t } from "../../strings";
 
   let { title, maximized = false, active = true }: { title: string; maximized?: boolean; active?: boolean } =
     $props();
 
-  const win = getCurrentWindow();
+  const win = appWindow();
 </script>
 
 <header class="titlebar" class:inactive={!active} data-tauri-drag-region>
@@ -18,14 +18,14 @@
   <span class="title" data-tauri-drag-region>{title}</span>
 
   <div class="buttons">
-    <button class="btn" title={t.window.minimize} aria-label={t.window.minimize} onclick={() => win.minimize()}>
+    <button class="btn" title={t.window.minimize} aria-label={t.window.minimize} onclick={() => win?.minimize()}>
       <svg viewBox="0 0 11 11"><rect x="2" y="7" width="6" height="2" fill="currentColor" /></svg>
     </button>
     <button
       class="btn"
       title={maximized ? t.window.restore : t.window.maximize}
       aria-label={maximized ? t.window.restore : t.window.maximize}
-      onclick={() => win.toggleMaximize()}
+      onclick={() => win?.toggleMaximize()}
     >
       {#if maximized}
         <svg viewBox="0 0 11 11">
@@ -39,7 +39,7 @@
         </svg>
       {/if}
     </button>
-    <button class="btn close" title={t.window.close} aria-label={t.window.close} onclick={() => win.close()}>
+    <button class="btn close" title={t.window.close} aria-label={t.window.close} onclick={() => win?.close()}>
       <svg viewBox="0 0 11 11"><path d="M2 2l7 7M9 2l-7 7" stroke="currentColor" stroke-width="1.8" /></svg>
     </button>
   </div>
