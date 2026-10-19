@@ -11,6 +11,7 @@ src-tauri/binaries/*.exe
 browser.json
 headers_auth.json
 cookies*.txt
+cookie*.txt
 *.key
 *.pfx
 *.cer
