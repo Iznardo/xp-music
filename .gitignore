@@ -1,0 +1,26 @@
+# Build
+target/
+node_modules/
+dist/
+
+# Herramientas descargadas y sidecars
+tools/
+src-tauri/binaries/*.exe
+
+# Credenciales y secretos (nunca al repo)
+browser.json
+headers_auth.json
+cookies*.txt
+*.key
+*.pfx
+*.cer
+src-tauri/signing.local.json
+.env
+.env.*
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
