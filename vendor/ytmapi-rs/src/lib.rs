@@ -71,6 +71,8 @@
 //! - **reqwest**: Enables some interoperability functions with `reqwest`.
 // For feature specific documentation.
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// xp-music: copia local; sus avisos no deben romper `clippy -D warnings` de la app.
+#![allow(deprecated, unused_imports, clippy::all)]
 #[cfg(not(any(feature = "rustls", feature = "native-tls", feature = "default-tls")))]
 compile_error!("One of the TLS features must be enabled for this crate");
 use auth::browser::BrowserToken;
