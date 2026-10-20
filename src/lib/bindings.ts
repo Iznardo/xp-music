@@ -186,6 +186,13 @@ export type CacheUpdated = {
 
 export type ErrorCode = "NotAuthenticated" | "AuthExpired" | "Network" | "RateLimited" | "ResolveFailed" | "StreamExpired" | "Decode" | "AudioDevice" | "NotFound" | "InvalidInput" | "Storage" | "Internal";
 
+export type HotkeySettings = {
+	playPause: string | null,
+	next: string | null,
+	previous: string | null,
+	show: string | null,
+};
+
 export type InsertPosition = "Next" | "End";
 
 export type LikeStatus = "Like" | "Dislike" | "Indifferent";
@@ -288,6 +295,10 @@ export type Settings = {
 	visualization: VizPreset | null,
 	xpSounds: boolean,
 	notifications: boolean,
+	/**  Pausar al bloquear la sesión de Windows (006). */
+	pauseOnLock: boolean,
+	/**  Atajos globales (006). Formato `Ctrl+Alt+P`; `None` = sin atajo. */
+	hotkeys: HotkeySettings,
 };
 
 export type Theme = "Blue" | "Olive" | "Silver";

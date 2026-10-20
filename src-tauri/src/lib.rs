@@ -3,6 +3,7 @@ mod commands;
 mod domain;
 mod error;
 mod logging;
+mod os;
 mod player;
 mod settings;
 mod state;
@@ -150,15 +151,17 @@ pub fn run() {
     let data_dir = dirs.data.clone();
 
     let app = tauri::Builder::default()
-        // Debe ir primero: una segunda instancia solo enfoca la ventana existente.
+        // Debe ir primero: una segunda instancia solo muestra la ventana existente (o la recrea).
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
+            os::show_main(app)
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // Portadas: http://thumb.localhost/<url codificada>
         .register_asynchronous_uri_scheme_protocol("thumb", move |_ctx, request, responder| {
             let thumbs = Arc::clone(&thumbs);
@@ -168,37 +171,122 @@ pub fn run() {
             db: Arc::clone(&db),
         })
         .manage(ui_state::UiState::default())
+        .manage(os::OsState::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
-            let yt = YtService::new(Some(app.handle().clone()), Arc::clone(&db), data_dir);
+            let handle = app.handle().clone();
+            let yt = YtService::new(Some(handle.clone()), Arc::clone(&db), data_dir);
             let reporter = YtReporter::new(Arc::clone(&yt), Arc::clone(&db));
             let player = PlayerService::start(
-                app.handle().clone(),
+                handle.clone(),
                 Arc::clone(&db),
                 build_resolver(Arc::clone(&db), Arc::clone(&yt)),
                 Arc::new(YtRadio(Arc::clone(&yt))),
                 Arc::new(reporter.clone()),
             );
             reporter.attach(&player);
-            app.manage(viz::VizService::new(
-                app.handle().clone(),
-                Arc::clone(&player),
-            ));
-            app.manage(yt);
-            app.manage(player);
+            app.manage(viz::VizService::new(handle.clone(), Arc::clone(&player)));
+            app.manage(Arc::clone(&yt));
+            app.manage(Arc::clone(&player));
+
+            // --- Integración con Windows (006) ---
+            if let Err(e) = os::tray::create(&handle, Arc::clone(&player), Arc::clone(&yt)) {
+                tracing::error!(error = %e, "no se pudo crear el icono de la bandeja");
+            }
+            let lock_db = Arc::clone(&db);
+            let media = os::media::start(Arc::clone(&player), move || {
+                settings::Settings::load(&lock_db)
+                    .map(|s| s.pause_on_lock)
+                    .unwrap_or(false)
+            });
+            let tb_player = Arc::clone(&player);
+            os::taskbar::set_handler(move |id| match id {
+                os::taskbar::BTN_PREV => tb_player.previous(),
+                os::taskbar::BTN_TOGGLE => tb_player.toggle(),
+                os::taskbar::BTN_NEXT => tb_player.next(),
+                _ => {}
+            });
+            let obs_app = handle.clone();
+            let obs_db = Arc::clone(&db);
+            let last_track = std::sync::Mutex::new(None::<String>);
+            player.observe(Box::new(move |s| {
+                let _ = media.send(os::media::MediaMsg::State(Box::new(s.clone())));
+                let playing = matches!(
+                    s.status,
+                    player::types::PlaybackStatus::Playing
+                        | player::types::PlaybackStatus::Buffering
+                );
+                let _ = obs_app.run_on_main_thread(move || os::taskbar::set_playing(playing));
+                // "Reproduciendo ahora" si la ventana no está a la vista (FR-006-07).
+                let id = s.track.as_ref().map(|t| t.id.0.clone());
+                let mut last = last_track.lock().unwrap();
+                if id.is_some() && id != *last {
+                    let first = last.is_none();
+                    *last = id;
+                    let wants = settings::Settings::load(&obs_db)
+                        .map(|x| x.notifications)
+                        .unwrap_or(true);
+                    if !first
+                        && wants
+                        && !os::main_visible(&obs_app)
+                        && let Some(t) = &s.track
+                    {
+                        use tauri_plugin_notification::NotificationExt;
+                        let artist = t
+                            .artists
+                            .iter()
+                            .map(|a| a.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let _ = obs_app
+                            .notification()
+                            .builder()
+                            .title(&t.title)
+                            .body(artist)
+                            .show();
+                    }
+                }
+            }));
+
+            let s = settings::Settings::load(&db).unwrap_or_default();
+            os::apply_settings(&handle, &s);
+            let minimized = s.start_minimized || std::env::args().any(|a| a == "--minimized");
+            if minimized {
+                tracing::info!("arranque minimizado en la bandeja");
+            } else {
+                os::show_main(&handle);
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error al construir la aplicación");
 
-    app.run(|app, event| {
-        if let tauri::RunEvent::Exit = event {
+    app.run(|app, event| match event {
+        // Cerrar la ventana no cierra la app si se sigue en la bandeja (FR-006-03).
+        tauri::RunEvent::ExitRequested {
+            api, code: None, ..
+        } => {
+            let quitting = app
+                .try_state::<os::OsState>()
+                .is_some_and(|o| o.quitting.load(std::sync::atomic::Ordering::Acquire));
+            let to_tray = app
+                .try_state::<AppState>()
+                .and_then(|s| settings::Settings::load(&s.db).ok())
+                .map(|s| s.close_to_tray)
+                .unwrap_or(true);
+            if to_tray && !quitting {
+                api.prevent_exit();
+                tracing::info!("ventana cerrada: sigue en la bandeja");
+            }
+        }
+        tauri::RunEvent::Exit => {
             if let Some(player) = app.try_state::<Arc<PlayerService>>() {
                 player.shutdown();
             }
             tracing::info!("XP Music cerrado");
         }
+        _ => {}
     });
 }
 

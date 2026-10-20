@@ -57,6 +57,19 @@ pub struct Settings {
     pub visualization: Option<VizPreset>,
     pub xp_sounds: bool,
     pub notifications: bool,
+    /// Pausar al bloquear la sesión de Windows (006).
+    pub pause_on_lock: bool,
+    /// Atajos globales (006). Formato `Ctrl+Alt+P`; `None` = sin atajo.
+    pub hotkeys: HotkeySettings,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HotkeySettings {
+    pub play_pause: Option<String>,
+    pub next: Option<String>,
+    pub previous: Option<String>,
+    pub show: Option<String>,
 }
 
 impl Default for Settings {
@@ -74,6 +87,8 @@ impl Default for Settings {
             visualization: Some(VizPreset::Bars),
             xp_sounds: true,
             notifications: true,
+            pause_on_lock: false,
+            hotkeys: HotkeySettings::default(),
         }
     }
 }

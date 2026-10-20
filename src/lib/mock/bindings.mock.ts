@@ -144,6 +144,8 @@ let settings: Settings = {
   visualization: "Bars",
   xpSounds: true,
   notifications: true,
+  pauseOnLock: false,
+  hotkeys: { playPause: null, next: null, previous: null, show: null },
 };
 
 let queue: QueueSnapshot = { tracks: allTracks.slice(0, 12), currentIndex: 2, source: "Manual", autoplay: true, shuffle: false, repeat: "Off" };

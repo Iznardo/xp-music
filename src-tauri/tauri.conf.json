@@ -23,6 +23,7 @@
         "shadow": true,
         "resizable": true,
         "center": true,
+        "create": false,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --in-process-gpu --disable-background-networking --disable-component-update --disable-sync --no-pings --disable-breakpad"
       }
     ],

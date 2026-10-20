@@ -7,7 +7,25 @@
   import { t } from "../strings";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
 
-  type Tab = "player" | "audio" | "account" | "viz";
+  type Tab = "player" | "audio" | "keys" | "account" | "viz";
+  type HotkeyName = keyof Settings["hotkeys"];
+  const hotkeyNames: HotkeyName[] = ["playPause", "next", "previous", "show"];
+
+  /// Convierte la pulsación en un acelerador ("Ctrl+Alt+P"). Supr/Retroceso lo quitan.
+  function captureHotkey(name: HotkeyName, e: KeyboardEvent) {
+    e.preventDefault();
+    if (!draft) return;
+    if (e.key === "Delete" || e.key === "Backspace") {
+      draft.hotkeys[name] = null;
+      return;
+    }
+    if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return;
+    const key = e.code.startsWith("Key") ? e.code.slice(3) : e.code.startsWith("Digit") ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    const mods = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super"].filter(Boolean);
+    // Sin modificador solo se aceptan teclas F (si no, cualquier letra quedaría secuestrada).
+    if (!mods.length && !/^F\d+$/.test(key)) return;
+    draft.hotkeys[name] = [...mods, key].join("+");
+  }
   let tab = $state<Tab>("player");
   let draft = $state<Settings | null>(settings.current ? { ...settings.current } : null);
   let devices = $state<AudioDevice[]>([]);
@@ -57,6 +75,19 @@
           <label><input type="checkbox" bind:checked={draft.launchAtLogin} /> {t.options.launchAtLogin}</label>
           <label><input type="checkbox" bind:checked={draft.notifications} /> {t.options.notifications}</label>
           <label><input type="checkbox" bind:checked={draft.xpSounds} /> {t.options.xpSounds}</label>
+          <label><input type="checkbox" bind:checked={draft.pauseOnLock} /> {t.options.pauseOnLock}</label>
+        </fieldset>
+      {:else if tab === "keys"}
+        <fieldset>
+          <legend>{t.options.hotkeys}</legend>
+          {#each hotkeyNames as name}
+            <label class="hk">
+              <span>{t.options.hotkeyNames[name]}</span>
+              <input class="xp-input" readonly value={draft.hotkeys[name] ?? ""} placeholder="—" onkeydown={(e) => captureHotkey(name, e)} />
+            </label>
+          {/each}
+          <p class="hint">{t.options.hotkeyHint}</p>
+          <p class="hint">{t.options.mediaKeysNote}</p>
         </fieldset>
       {:else if tab === "audio"}
         <fieldset>
@@ -142,6 +173,16 @@
   }
   .wide {
     width: 100%;
+  }
+  .hk {
+    justify-content: space-between;
+  }
+  .hk input {
+    width: 150px;
+  }
+  .hint {
+    margin: 6px 0 0;
+    color: #555;
   }
   .row {
     display: flex;

@@ -39,6 +39,7 @@ pub fn settings_set(
     settings: Settings,
 ) -> AppResult<Settings> {
     let saved = settings.save(&state.db)?;
+    crate::os::apply_settings(&app, &saved);
     if let Err(e) = saved.clone().emit(&app) {
         tracing::warn!(error = %e, "no se pudo emitir settings://changed");
     }

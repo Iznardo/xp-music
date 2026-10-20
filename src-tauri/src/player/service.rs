@@ -40,6 +40,8 @@ const PREFETCH_AHEAD: usize = 3;
 
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
+pub type StateObserver = Box<dyn Fn(&PlayerState) + Send + Sync>;
+
 /// Más canciones cuando se acaba la cola (implementado en `yt::playback`).
 pub trait RadioProvider: Send + Sync {
     fn continue_radio(
@@ -85,6 +87,9 @@ pub struct PlayerService {
     reporter: Arc<dyn PlaybackReporter>,
     inner: Mutex<Inner>,
     dirty: AtomicBool,
+    /// Quien quiera enterarse de cada cambio de estado sin depender de la WebView
+    /// (bandeja, controles multimedia de Windows, notificaciones).
+    observers: Mutex<Vec<StateObserver>>,
     prefetch_tx: Sender<Vec<TrackId>>,
 }
 
@@ -138,6 +143,7 @@ impl PlayerService {
                 last_saved_position: position_ms,
             }),
             dirty: AtomicBool::new(false),
+            observers: Mutex::new(Vec::new()),
             prefetch_tx,
         });
 
@@ -189,7 +195,16 @@ impl PlayerService {
     }
 
     fn emit_state(&self) {
-        if let Err(e) = self.state().emit(&self.app) {
+        let state = self.state();
+        for f in self
+            .observers
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .iter()
+        {
+            f(&state);
+        }
+        if let Err(e) = state.emit(&self.app) {
             tracing::warn!(error = %e, "no se pudo emitir player://state");
         }
     }
@@ -449,6 +464,15 @@ impl PlayerService {
         self.emit_queue();
         self.prefetch_upcoming();
         self.emit_state();
+    }
+
+    /// Registra un observador de estado (006) y le pasa el estado actual.
+    pub fn observe(&self, f: StateObserver) {
+        f(&self.state());
+        self.observers
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push(f);
     }
 
     /// Activa o desactiva la copia de PCM para el analizador (005).

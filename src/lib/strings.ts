@@ -146,7 +146,12 @@ export const t = {
   },
   options: {
     title: "Opciones",
-    tabs: { player: "Reproductor", audio: "Audio", account: "Cuenta", viz: "Visualización" },
+    tabs: { player: "Reproductor", audio: "Audio", keys: "Teclado", account: "Cuenta", viz: "Visualización" },
+    pauseOnLock: "Pausar al bloquear el equipo",
+    hotkeys: "Atajos globales (funcionan aunque XP Music esté en segundo plano)",
+    hotkeyNames: { playPause: "Reproducir/Pausa", next: "Siguiente", previous: "Anterior", show: "Mostrar XP Music" },
+    hotkeyHint: "Haz clic en un campo y pulsa la combinación (por ejemplo Ctrl+Alt+P). Supr la quita.",
+    mediaKeysNote: "Las teclas multimedia del teclado funcionan siempre, sin configurar nada.",
     theme: "Combinación de colores",
     themes: { Blue: "Azul (predeterminado)", Olive: "Verde oliva", Silver: "Plateado" },
     xpSounds: "Reproducir sonidos del sistema",
