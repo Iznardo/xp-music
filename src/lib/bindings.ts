@@ -396,6 +396,10 @@ export type VizFrame = {
 	wave: (number | null)[],
 	/**  Nivel RMS suavizado 0..1. */
 	level: number | null,
+	/**  Pulso de ritmo 0..1 (1 en cada golpe de graves, cae en ~0,2 s). */
+	beat: number | null,
+	/**  Graves normalizados a la canción 0..1. */
+	bass: number | null,
 };
 
 export type VizPreset = "Bars" | "Waves" | "Ambience" | "Battery" | 

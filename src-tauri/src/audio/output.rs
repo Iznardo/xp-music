@@ -148,6 +148,11 @@ impl Output {
                     } else {
                         cons.pop_slice(data)
                     };
+                    // La visualización ve la señal antes del volumen: así reacciona
+                    // igual de fuerte con el volumen bajo (o silenciado).
+                    if n > 0 && cb.tap_enabled.load(Ordering::Relaxed) {
+                        tap_prod.push_slice(&data[..n]);
+                    }
                     let amp = cb.amplitude();
                     if amp != 1.0 {
                         for s in &mut data[..n] {
@@ -158,9 +163,6 @@ impl Output {
                     if n > 0 {
                         cb.played_frames
                             .fetch_add((n / ch) as u64, Ordering::AcqRel);
-                        if cb.tap_enabled.load(Ordering::Relaxed) {
-                            tap_prod.push_slice(&data[..n]);
-                        }
                     }
                     if n < data.len() && n > 0 {
                         cb.underruns.fetch_add(1, Ordering::Relaxed);

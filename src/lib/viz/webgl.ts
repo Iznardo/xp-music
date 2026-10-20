@@ -22,6 +22,9 @@ out vec4 o;
 uniform sampler2D prev;
 uniform float bands[64];
 uniform float level;
+// Pulso de ritmo (1 en cada golpe de graves) y graves normalizados a la canción.
+uniform float beat;
+uniform float bass;
 uniform float time;
 uniform vec2 res;
 vec3 hsv(float h, float s, float v) {
@@ -46,8 +49,8 @@ void main() {
   float r = length(c);
   float a = atan(c.y, c.x);
   float petals = abs(sin(a * 3.0 + time * 0.4));
-  float radius = 0.16 + 0.22 * band(petals * 0.7) + 0.05 * sin(a * 6.0 - time);
-  float ring = smoothstep(0.018, 0.0, abs(r - radius)) * (0.6 + level * 1.6);
+  float radius = 0.16 + 0.22 * band(petals * 0.7) + 0.05 * sin(a * 6.0 - time) + beat * 0.08;
+  float ring = smoothstep(0.018 + beat * 0.01, 0.0, abs(r - radius)) * (0.6 + level * 1.6 + beat);
   float core = smoothstep(0.09 + avg(0, 6) * 0.08, 0.0, r) * avg(0, 6);
   vec3 col = hsv(fract(time * 0.03 + r * 0.6 + petals * 0.1), 0.75, 1.0) * ring + vec3(0.6, 0.8, 1.0) * core;
   o = vec4(max(trail, col), 1.0);
@@ -65,7 +68,7 @@ void main() {
   a = abs(a - seg * 0.5);
   vec2 k = vec2(cos(a), sin(a)) * r;
   // Túnel: lo anterior se acerca y gira.
-  float zoom = 0.94 - avg(0, 8) * 0.06;
+  float zoom = 0.94 - bass * 0.04 - beat * 0.06;
   float ang = 0.03 * sin(time * 0.3) + level * 0.04;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
   vec2 q = rot * k * zoom;
@@ -91,12 +94,11 @@ void main() {
   vec2 c = uv - 0.5;
   float asp = res.x / res.y;
   c.x *= asp;
-  float bass = avg(0, 6);
   float mid = avg(8, 30);
   // Rastro: lo anterior se expande desde el centro, gira despacio y ondula.
   float ang = 0.004 + 0.008 * sin(time * 0.21);
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
-  vec2 q = rot * c * (0.955 - bass * 0.035);
+  vec2 q = rot * c * (0.96 - bass * 0.025 - beat * 0.06);
   q += 0.0035 * vec2(sin(c.y * 28.0 + time * 2.1), cos(c.x * 28.0 + time * 1.7));
   q.x /= asp;
   // Se apaga restando además un poco: sin esto el fondo acaba en neblina gris.
@@ -108,11 +110,11 @@ void main() {
   float fa = abs(fract(a / 6.2831853 + 0.5) * 2.0 - 1.0);
   float b = band(fa);
   float spike = pow(abs(cos(a * 14.0 + time * 0.35)), 24.0);
-  float len = 0.06 + b * 0.5;
+  float len = 0.06 + b * 0.45 + beat * 0.2;
   float ray = spike * smoothstep(len, 0.0, r) * (0.4 + b * 2.2);
-  float core = smoothstep(0.035 + bass * 0.09, 0.0, r);
+  float core = smoothstep(0.03 + bass * 0.05 + beat * 0.08, 0.0, r);
   vec3 pal = hsv(0.33 + 0.1 * sin(time * 0.05) + r * 0.25, 0.85, 1.0);
-  vec3 col = pal * ray + vec3(0.8, 1.0, 0.85) * core * (0.3 + bass * 1.4);
+  vec3 col = pal * ray * (1.0 + beat) + vec3(0.8, 1.0, 0.85) * core * (0.3 + bass + beat);
   o = vec4(clamp(trail + col, 0.0, 1.0), 1.0);
 }`;
 
@@ -121,25 +123,24 @@ void main() {
   vec2 c = uv - 0.5;
   float asp = res.x / res.y;
   c.x *= asp;
-  float bass = avg(0, 6);
   float mid = avg(6, 24);
   // Plasma con deformación de dominio: el bajo retuerce, los medios aceleran.
   vec2 p = c * 3.2;
   float t = time * (0.3 + mid * 0.4);
   for (int i = 1; i < 6; i++) {
     float fi = float(i);
-    p += vec2(0.7 / fi * sin(fi * p.y + t + 0.3 * fi) + bass * 0.25, 0.7 / fi * cos(fi * p.x + t * 1.13 + 0.5 * fi));
+    p += vec2(0.7 / fi * sin(fi * p.y + t + 0.3 * fi) + bass * 0.2 + beat * 0.35, 0.7 / fi * cos(fi * p.x + t * 1.13 + 0.5 * fi));
   }
   float v = 0.5 + 0.5 * sin(p.x + p.y + time * 0.2);
   // Franjas de contorno finas: el toque "lámpara de lava" psicodélico.
-  float bands2 = 0.5 + 0.5 * sin(v * 18.0 - time * 2.0 - bass * 8.0);
+  float bands2 = 0.5 + 0.5 * sin(v * 18.0 - time * 2.0 - bass * 4.0 - beat * 3.0);
   vec3 col = hsv(fract(v * 0.7 + time * 0.035 + bass * 0.25), 0.85, 0.15 + 0.85 * bands2 * smoothstep(0.05, 0.9, v));
   // Algo de rastro girando para que "fluya".
   float ang = 0.012 + level * 0.03;
   vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * 0.99;
   q.x /= asp;
   vec3 trail = texture(prev, q + 0.5).rgb;
-  o = vec4(clamp(mix(col, trail, 0.5 - level * 0.25) * (0.85 + level * 0.7), 0.0, 1.0), 1.0);
+  o = vec4(clamp(mix(col, trail, 0.5 - beat * 0.3) * (0.85 + level * 0.4 + beat * 0.6), 0.0, 1.0), 1.0);
 }`;
 
 const SPIRAL = `${COMMON}
@@ -147,18 +148,17 @@ void main() {
   vec2 c = uv - 0.5;
   float asp = res.x / res.y;
   c.x *= asp;
-  float bass = avg(0, 6);
   float mid = avg(6, 24);
   float r = length(c) + 1e-4;
   float a = atan(c.y, c.x);
   float lr = log(r);
   // Brazos en espiral logarítmica que avanzan con el ritmo.
-  float arms = sin(a * 5.0 + lr * 9.0 - time * 2.2 - bass * 5.0);
-  float glow = smoothstep(-0.1, 0.9, arms) * (0.25 + mid * 1.6) * smoothstep(0.0, 0.12, r);
+  float arms = sin(a * 5.0 + lr * 9.0 - time * 2.2 - bass * 2.0 - beat * 2.5);
+  float glow = smoothstep(-0.1, 0.9, arms) * (0.25 + mid * 1.2 + beat * 0.9) * smoothstep(0.0, 0.12, r);
   vec3 col = hsv(fract(lr * 0.35 + time * 0.06 + a / 6.2831853), 0.9, 1.0) * glow;
   // Rastro hacia dentro: sensación de túnel.
   float ang = -0.02 - level * 0.03;
-  vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * 1.025;
+  vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * (1.025 + beat * 0.04);
   q.x /= asp;
   vec3 trail = texture(prev, q + 0.5).rgb * 0.86;
   o = vec4(clamp(max(trail, col) + col * 0.3, 0.0, 1.0), 1.0);
@@ -245,6 +245,8 @@ class Feedback implements VizRenderer {
     gl.uniform1i(gl.getUniformLocation(this.draw_, "prev"), 0);
     gl.uniform1fv(gl.getUniformLocation(this.draw_, "bands"), f.bands);
     gl.uniform1f(gl.getUniformLocation(this.draw_, "level"), f.level);
+    gl.uniform1f(gl.getUniformLocation(this.draw_, "beat"), f.beat);
+    gl.uniform1f(gl.getUniformLocation(this.draw_, "bass"), f.bass);
     gl.uniform1f(gl.getUniformLocation(this.draw_, "time"), t);
     gl.uniform2f(gl.getUniformLocation(this.draw_, "res"), this.w, this.h);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

@@ -74,6 +74,7 @@ impl Decoding {
             &stream.url,
             stream.user_agent.as_deref(),
             stream.content_length,
+            stream.upgrade.clone(),
         )?;
         let probe = source.probe();
         let mss = MediaSourceStream::new(Box::new(source), Default::default());

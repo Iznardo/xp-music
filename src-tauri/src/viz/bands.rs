@@ -16,6 +16,13 @@ const FLOOR_DB: f32 = -70.0;
 const ATTACK: f32 = 0.6;
 const RELEASE: f32 = 0.15;
 const PEAK_FALL: f32 = 0.01;
+/// Graves que marcan el ritmo (bombo, bajo).
+const BEAT_LO_HZ: f32 = 40.0;
+const BEAT_HI_HZ: f32 = 160.0;
+/// Un golpe es un salto de energía de graves sobre su media reciente…
+const BEAT_JUMP: f32 = 1.45;
+/// …con un mínimo de fotogramas entre golpes (~0,23 s a 30 fps).
+const BEAT_GAP: u32 = 7;
 
 pub struct Analyzer {
     fft: Arc<dyn Fft<f32>>,
@@ -28,6 +35,14 @@ pub struct Analyzer {
     pub peaks: [f32; BANDS],
     pub wave: [f32; WAVE],
     pub level: f32,
+    /// Pulso de ritmo: 1 justo en un golpe y cae rápido (para que los visuales "latan").
+    pub beat: f32,
+    /// Energía de graves normalizada a lo que suena la canción (control automático de ganancia).
+    pub bass: f32,
+    bass_bins: (usize, usize),
+    bass_avg: f32,
+    bass_max: f32,
+    since_beat: u32,
 }
 
 impl Analyzer {
@@ -47,6 +62,12 @@ impl Analyzer {
             peaks: [0.0; BANDS],
             wave: [0.0; WAVE],
             level: 0.0,
+            beat: 0.0,
+            bass: 0.0,
+            bass_bins: bass_bins(sample_rate),
+            bass_avg: 0.0,
+            bass_max: 1e-6,
+            since_beat: BEAT_GAP,
         }
     }
 
@@ -86,6 +107,27 @@ impl Analyzer {
         }
         let rms = (sum_sq / FFT_SIZE as f32).sqrt();
         self.level += ((rms * 2.0).min(1.0) - self.level) * 0.3;
+        self.track_beat(norm);
+    }
+
+    fn track_beat(&mut self, norm: f32) {
+        let (lo, hi) = self.bass_bins;
+        let e: f32 = self.buf[lo..hi]
+            .iter()
+            .map(|c| (c.norm() * norm).powi(2))
+            .sum();
+        // Ganancia automática: referencia = máximo reciente que cae despacio.
+        self.bass_max = (self.bass_max * 0.996).max(e).max(1e-6);
+        self.bass = (e / self.bass_max).sqrt().clamp(0.0, 1.0);
+        let avg = self.bass_avg;
+        self.bass_avg = avg * 0.92 + e * 0.08;
+        self.since_beat = self.since_beat.saturating_add(1);
+        if self.since_beat >= BEAT_GAP && e > avg * BEAT_JUMP && e > self.bass_max * 0.2 {
+            self.beat = 1.0;
+            self.since_beat = 0;
+        } else {
+            self.beat *= 0.8;
+        }
     }
 
     /// Sin audio (pausa): todo cae suavemente a cero.
@@ -96,6 +138,8 @@ impl Analyzer {
         }
         self.wave = [0.0; WAVE];
         self.level *= 0.7;
+        self.beat *= 0.7;
+        self.bass *= 0.8;
     }
 
     pub fn is_silent(&self) -> bool {
@@ -118,6 +162,13 @@ fn band_ranges(sample_rate: u32) -> Vec<(usize, usize)> {
             (lo, hi)
         })
         .collect()
+}
+
+fn bass_bins(sample_rate: u32) -> (usize, usize) {
+    let bin_hz = sample_rate as f32 / FFT_SIZE as f32;
+    let lo = ((BEAT_LO_HZ / bin_hz).round() as usize).max(1);
+    let hi = ((BEAT_HI_HZ / bin_hz).round() as usize + 1).max(lo + 1);
+    (lo, hi)
 }
 
 /// Frecuencia central de una banda (para tests y etiquetas).
@@ -195,6 +246,22 @@ mod tests {
             &a.bands[24..]
         );
         assert!(a.level > 0.3);
+    }
+
+    #[test]
+    fn un_bombo_tras_silencio_es_un_golpe() {
+        let mut a = Analyzer::new(48_000);
+        let quiet = sine(80.0, 48_000.0, 0.02);
+        for _ in 0..30 {
+            a.analyze(&quiet);
+        }
+        assert!(a.beat < 0.1, "sin golpes en un tono constante: {}", a.beat);
+        a.analyze(&sine(80.0, 48_000.0, 0.9));
+        assert!(a.beat > 0.99, "golpe = {}", a.beat);
+        assert!(a.bass > 0.9);
+        // Justo después no hay otro golpe aunque siga fuerte (hueco mínimo).
+        a.analyze(&sine(80.0, 48_000.0, 0.95));
+        assert!(a.beat < 0.9);
     }
 
     #[test]

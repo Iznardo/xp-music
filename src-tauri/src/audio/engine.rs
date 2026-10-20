@@ -854,6 +854,7 @@ mod tests {
             &real.url,
             None,
             real.content_length,
+            None,
         )
         .unwrap();
         std::io::Read::read_to_end(&mut src, &mut bytes).unwrap();

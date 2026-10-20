@@ -32,6 +32,10 @@ pub struct VizFrame {
     pub wave: Vec<f32>,
     /// Nivel RMS suavizado 0..1.
     pub level: f32,
+    /// Pulso de ritmo 0..1 (1 en cada golpe de graves, cae en ~0,2 s).
+    pub beat: f32,
+    /// Graves normalizados a la canción 0..1.
+    pub bass: f32,
 }
 
 pub struct VizService {
@@ -131,6 +135,8 @@ fn run(active: Arc<AtomicBool>, player: Arc<PlayerService>, app: AppHandle) {
                 peaks: analyzer.peaks.to_vec(),
                 wave: analyzer.wave.to_vec(),
                 level: analyzer.level,
+                beat: analyzer.beat,
+                bass: analyzer.bass,
             };
             let _ = frame.emit(&app);
         }

@@ -208,6 +208,9 @@ pub fn run() {
                 Arc::new(reporter.clone()),
             );
             reporter.attach(&player);
+            player.set_fast_start(Arc::new(|id| {
+                audio::fast::resolve_head(id, audio::resolver::FormatPreference::Aac128)
+            }));
             app.manage(viz::VizService::new(handle.clone(), Arc::clone(&player)));
             app.manage(Arc::clone(&yt));
             app.manage(Arc::clone(&player));

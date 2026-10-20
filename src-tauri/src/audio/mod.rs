@@ -2,6 +2,7 @@
 
 pub mod decoder;
 pub mod engine;
+pub mod fast;
 pub mod output;
 pub mod resolver;
 pub mod sounds;

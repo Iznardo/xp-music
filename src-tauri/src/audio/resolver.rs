@@ -26,7 +26,7 @@ pub enum FormatPreference {
 }
 
 impl FormatPreference {
-    fn itag(self) -> u32 {
+    pub fn itag(self) -> u32 {
         match self {
             Self::Aac128 => 140,
         }
@@ -43,6 +43,45 @@ pub struct ResolvedStream {
     /// Segundos Unix (parámetro `expire` de la URL).
     pub expires_at: u64,
     pub user_agent: Option<String>,
+    /// Arranque rápido: esta URL solo sirve el principio y la completa llega
+    /// aquí más tarde (ver `fast.rs`). Nunca se guarda en caché.
+    #[serde(skip)]
+    pub upgrade: Option<Upgrade>,
+}
+
+/// Hueco donde llega la resolución completa de una pista que ya está sonando
+/// con la URL del arranque rápido.
+#[derive(Clone, Default)]
+pub struct Upgrade(Arc<(Mutex<Option<AppResult<ResolvedStream>>>, std::sync::Condvar)>);
+
+impl Upgrade {
+    pub fn fill(&self, r: AppResult<ResolvedStream>) {
+        *self.0.0.lock().unwrap() = Some(r);
+        self.0.1.notify_all();
+    }
+
+    /// Espera hasta `timeout`; `None` si aún no ha llegado.
+    pub fn wait(&self, timeout: Duration) -> Option<AppResult<ResolvedStream>> {
+        let guard = self.0.0.lock().unwrap();
+        let (guard, _) = self
+            .0
+            .1
+            .wait_timeout_while(guard, timeout, |r| r.is_none())
+            .unwrap();
+        guard.clone()
+    }
+}
+
+impl std::fmt::Debug for Upgrade {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Upgrade")
+    }
+}
+
+impl PartialEq for Upgrade {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
 }
 
 impl ResolvedStream {
@@ -59,6 +98,10 @@ pub trait StreamResolver: Send + Sync {
     fn resolve(&self, id: &TrackId, pref: FormatPreference) -> AppResult<ResolvedStream>;
     /// Olvida lo que se tenga en caché de `id` (URL caducada o rechazada).
     fn invalidate(&self, _id: &TrackId) {}
+    /// Resolución ya disponible sin esperar (caché válida).
+    fn cached(&self, _id: &TrackId, _pref: FormatPreference) -> Option<ResolvedStream> {
+        None
+    }
 }
 
 // ---------------------------------------------------------------- yt-dlp
@@ -217,6 +260,7 @@ fn parse_info(id: &TrackId, stdout: &[u8]) -> AppResult<ResolvedStream> {
         expires_at,
         user_agent: info.http_headers.get("User-Agent").cloned(),
         url: info.url,
+        upgrade: None,
     })
 }
 
@@ -451,6 +495,10 @@ impl<R: StreamResolver> StreamResolver for CachedResolver<R> {
         res
     }
 
+    fn cached(&self, id: &TrackId, pref: FormatPreference) -> Option<ResolvedStream> {
+        self.lookup(&(id.0.clone(), pref.itag()))
+    }
+
     fn invalidate(&self, id: &TrackId) {
         self.mem.lock().unwrap().retain(|k, _| k.0 != id.0);
         let _ = self
@@ -488,6 +536,7 @@ mod tests {
                 duration_ms: Some(1000),
                 expires_at: now + self.expires_in,
                 user_agent: None,
+                upgrade: None,
             })
         }
     }

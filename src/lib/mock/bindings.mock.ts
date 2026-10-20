@@ -64,7 +64,7 @@ export const events = {
   queueChanged: makeEvent<QueueSnapshot>("queue://changed"),
   settingsChanged: makeEvent<Settings>("settings://changed"),
   ytCacheUpdated: makeEvent<{ key: string }>("yt://cache-updated"),
-  vizFrame: makeEvent<{ bands: number[]; peaks: number[]; wave: number[]; level: number }>("viz://frame"),
+  vizFrame: makeEvent<{ bands: number[]; peaks: number[]; wave: number[]; level: number; beat: number; bass: number }>("viz://frame"),
   updateAvailable: makeEvent<{ version: string; notes: string | null; date: string | null }>("update://available"),
 };
 
@@ -209,7 +209,7 @@ function fakeViz() {
   });
   bands.forEach((b, i) => (peaks[i] = Math.max(b, peaks[i] - 0.01)));
   const wave = Array.from({ length: 256 }, (_, i) => 0.5 * beat * Math.sin(i * 0.15) + 0.2 * Math.sin(i * 0.9 + t * 20));
-  events.vizFrame.emit({ bands, peaks: [...peaks], wave, level: 0.3 + beat * 0.5 });
+  events.vizFrame.emit({ bands, peaks: [...peaks], wave, level: 0.3 + beat * 0.5, beat: beat > 0.9 ? 1 : beat * 0.8, bass: beat });
 }
 
 let auth: AuthStatus = { SignedIn: { name: "chema iznardo", handle: "@chemaiz4", photo: null } };

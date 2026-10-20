@@ -1,7 +1,7 @@
 //! `MediaSource` sobre HTTP con peticiones Range (FR-002-01/03, NFR-002-03).
 //!
-//! Un hilo descargador mantiene bloques de 1 MiB alrededor de la posición de
-//! lectura (8 por delante, 2 por detrás: ≤ 11 MiB). `read` bloquea hasta que
+//! Un hilo descargador mantiene bloques de 256 KiB alrededor de la posición de
+//! lectura (32 por delante, 8 por detrás: ≤ 10 MiB). `read` bloquea hasta que
 //! llega el bloque necesario; `seek` solo mueve la posición.
 
 use std::collections::BTreeMap;
@@ -14,10 +14,16 @@ use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_RANGE, RANGE, USER_AGENT};
 
-pub const CHUNK: u64 = 1 << 20;
-const AHEAD: u64 = 8;
-const KEEP_BEHIND: u64 = 2;
+use super::fast::HEAD_LIMIT;
+use super::resolver::Upgrade;
+
+/// 256 KiB: el primer bloque llega rápido y suena antes (008).
+pub const CHUNK: u64 = 1 << 18;
+const AHEAD: u64 = 32;
+const KEEP_BEHIND: u64 = 8;
 const RETRIES: u32 = 3;
+/// Lo más que se espera a la URL completa en un arranque rápido.
+const UPGRADE_TIMEOUT: Duration = Duration::from_secs(45);
 const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
 
 /// Fallos que el motor distingue: un 403 significa URL caducada (re-resolver).
@@ -87,11 +93,14 @@ impl SourceProbe {
 
 impl HttpRangeSource {
     /// Abre la fuente. Si no se conoce la longitud, la pide (bloqueante).
+    /// Con `upgrade`, `url` solo sirve el principio (arranque rápido) y el resto
+    /// se descarga con la URL completa cuando llegue.
     pub fn open(
         client: Client,
         url: &str,
         user_agent: Option<&str>,
         len: Option<u64>,
+        upgrade: Option<Upgrade>,
     ) -> Result<Self, SourceError> {
         let ua = user_agent.unwrap_or(DEFAULT_UA).to_owned();
         let len = match len {
@@ -111,7 +120,7 @@ impl HttpRangeSource {
         let url = url.to_owned();
         thread::Builder::new()
             .name("audio-download".into())
-            .spawn(move || download_loop(worker, client, url, ua, len))
+            .spawn(move || download_loop(worker, client, url, ua, len, upgrade))
             .map_err(|_| SourceError::Network)?;
         Ok(Self {
             shared,
@@ -145,7 +154,38 @@ fn probe_len(client: &Client, url: &str, ua: &str) -> Result<u64, SourceError> {
         .ok_or(SourceError::Network)
 }
 
-fn download_loop(sh: Arc<Shared>, client: Client, url: String, ua: String, len: u64) {
+/// Espera la URL completa sin dejar de atender al cierre de la fuente.
+fn wait_upgrade(sh: &Shared, up: &Upgrade, len: u64) -> Option<(String, String)> {
+    let deadline = std::time::Instant::now() + UPGRADE_TIMEOUT;
+    while std::time::Instant::now() < deadline {
+        if sh.state.lock().unwrap().closed {
+            return None;
+        }
+        match up.wait(Duration::from_millis(200)) {
+            // Otro tamaño = otro archivo: no se mezclan bytes de dos versiones.
+            Some(Ok(full)) if full.content_length.is_some_and(|l| l != len) => {
+                tracing::warn!("arranque rápido: la URL completa es de otro archivo");
+                return None;
+            }
+            Some(Ok(full)) => {
+                let ua = full.user_agent.unwrap_or_else(|| DEFAULT_UA.to_owned());
+                return Some((full.url, ua));
+            }
+            Some(Err(_)) => return None,
+            None => {}
+        }
+    }
+    None
+}
+
+fn download_loop(
+    sh: Arc<Shared>,
+    client: Client,
+    mut url: String,
+    mut ua: String,
+    len: u64,
+    mut upgrade: Option<Upgrade>,
+) {
     let n_chunks = len.div_ceil(CHUNK);
     loop {
         let target = {
@@ -171,6 +211,25 @@ fn download_loop(sh: Arc<Shared>, client: Client, url: String, ua: String, len: 
 
         let start = target * CHUNK;
         let end = (start + CHUNK).min(len) - 1;
+        // Arranque rápido: más allá del principio hace falta la URL completa.
+        if end >= HEAD_LIMIT
+            && let Some(up) = upgrade.take()
+        {
+            match wait_upgrade(&sh, &up, len) {
+                Some((full, full_ua)) => {
+                    tracing::debug!("arranque rápido: se pasa a la URL completa");
+                    url = full;
+                    ua = full_ua;
+                }
+                None => {
+                    // Sin URL completa: el motor lo trata como caducada y re-resuelve.
+                    let mut st = sh.state.lock().unwrap();
+                    st.error = Some(SourceError::Expired);
+                    sh.cv.notify_all();
+                    return;
+                }
+            }
+        }
         let result = fetch(&client, &url, &ua, start, end);
         let mut st = sh.state.lock().unwrap();
         match result {
@@ -351,7 +410,7 @@ mod tests {
     fn lee_en_orden_y_tras_seek() {
         let data = Arc::new(pattern(5 * CHUNK as usize + 12345));
         let url = test_server::serve(Arc::clone(&data), None);
-        let mut src = HttpRangeSource::open(client(), &url, None, None).unwrap();
+        let mut src = HttpRangeSource::open(client(), &url, None, None, None).unwrap();
         assert_eq!(src.len, data.len() as u64);
 
         let mut buf = vec![0u8; 3000];
@@ -373,7 +432,8 @@ mod tests {
     fn mide_lo_almacenado_por_delante() {
         let data = Arc::new(pattern(3 * CHUNK as usize));
         let url = test_server::serve(Arc::clone(&data), None);
-        let mut src = HttpRangeSource::open(client(), &url, None, Some(data.len() as u64)).unwrap();
+        let mut src =
+            HttpRangeSource::open(client(), &url, None, Some(data.len() as u64), None).unwrap();
         let probe = src.probe();
         let mut b = [0u8; 10];
         src.read_exact(&mut b).unwrap();
@@ -394,10 +454,61 @@ mod tests {
         let data = Arc::new(pattern(4 * CHUNK as usize));
         // Petición 0 = longitud, 1 = primer bloque; después 403.
         let url = test_server::serve(Arc::clone(&data), Some(2));
-        let mut src = HttpRangeSource::open(client(), &url, None, None).unwrap();
+        let mut src = HttpRangeSource::open(client(), &url, None, None, None).unwrap();
         let mut buf = vec![0u8; CHUNK as usize];
         src.read_exact(&mut buf).unwrap();
         src.seek(SeekFrom::Start(3 * CHUNK)).unwrap();
+        let err = src.read(&mut buf).unwrap_err();
+        assert_eq!(SourceError::from_io(&err), SourceError::Expired);
+    }
+
+    #[test]
+    fn arranque_rapido_pasa_a_la_url_completa() {
+        let data = Arc::new(pattern(3 * CHUNK as usize + 777));
+        // La URL "rápida" solo sirve el primer MiB (los bloques que caben en él).
+        let head = test_server::serve(Arc::clone(&data), Some((HEAD_LIMIT / CHUNK) as usize));
+        let full = test_server::serve(Arc::clone(&data), None);
+        let up = Upgrade::default();
+        let mut src = HttpRangeSource::open(
+            client(),
+            &head,
+            None,
+            Some(data.len() as u64),
+            Some(up.clone()),
+        )
+        .unwrap();
+        let filler = up.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(300));
+            filler.fill(Ok(crate::audio::resolver::ResolvedStream {
+                track_id: crate::domain::TrackId("t".into()),
+                url: full,
+                itag: 140,
+                content_length: None,
+                duration_ms: None,
+                expires_at: u64::MAX,
+                user_agent: None,
+                upgrade: None,
+            }));
+        });
+        let mut all = Vec::new();
+        src.read_to_end(&mut all).unwrap();
+        assert_eq!(all.len(), data.len());
+        assert!(all == *data, "contenido distinto tras el cambio de URL");
+    }
+
+    #[test]
+    fn sin_url_completa_se_reporta_como_caducado() {
+        let data = Arc::new(pattern(2 * HEAD_LIMIT as usize));
+        let head = test_server::serve(Arc::clone(&data), Some((HEAD_LIMIT / CHUNK) as usize));
+        let up = Upgrade::default();
+        up.fill(Err(crate::error::AppError::internal("yt-dlp falló")));
+        let mut src =
+            HttpRangeSource::open(client(), &head, None, Some(data.len() as u64), Some(up))
+                .unwrap();
+        // El principio se oye; más allá no hay URL con la que seguir.
+        let mut buf = vec![0u8; HEAD_LIMIT as usize];
+        src.read_exact(&mut buf).unwrap();
         let err = src.read(&mut buf).unwrap_err();
         assert_eq!(SourceError::from_io(&err), SourceError::Expired);
     }

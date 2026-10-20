@@ -22,7 +22,7 @@ use super::types::{
     QueueSource, RepeatMode,
 };
 use crate::audio::engine::{EngineCmd, EngineEvent, EngineHandle, EngineState};
-use crate::audio::resolver::{FormatPreference, StreamResolver};
+use crate::audio::resolver::{FormatPreference, ResolvedStream, StreamResolver, Upgrade};
 use crate::domain::{Track, TrackId};
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::settings::Settings;
@@ -94,7 +94,11 @@ pub struct PlayerService {
     /// Pistas que el usuario probablemente va a pedir (ratón encima, fila
     /// seleccionada). Carril aparte para no esperar a la precarga de la cola.
     hint_tx: Sender<Vec<TrackId>>,
+    /// Arranque rápido (008): URL del principio del audio en ~0,3 s.
+    fast_start: Mutex<Option<FastStart>>,
 }
+
+pub type FastStart = Arc<dyn Fn(&TrackId) -> AppResult<ResolvedStream> + Send + Sync>;
 
 impl PlayerService {
     pub fn start(
@@ -150,6 +154,7 @@ impl PlayerService {
             observers: Mutex::new(Vec::new()),
             prefetch_tx,
             hint_tx,
+            fast_start: Mutex::new(None),
         });
 
         spawn_prefetcher("player-prefetch", Arc::clone(&svc.resolver), prefetch_rx);
@@ -258,7 +263,7 @@ impl PlayerService {
 
         let svc = Arc::clone(self);
         thread::spawn(move || {
-            let result = svc.resolver.resolve(&track.id, FormatPreference::Aac128);
+            let result = svc.resolve_for_play(&track.id);
             {
                 let mut i = svc.lock();
                 if i.load_seq != seq {
@@ -277,6 +282,41 @@ impl PlayerService {
                 Err(e) => svc.fail(e),
             }
         });
+    }
+
+    pub fn set_fast_start(&self, f: FastStart) {
+        *self.fast_start.lock().unwrap() = Some(f);
+    }
+
+    /// Lo que se carga en el motor: de la caché, con arranque rápido (y la
+    /// resolución completa en paralelo) o, si no, esperando a yt-dlp.
+    fn resolve_for_play(self: &Arc<Self>, id: &TrackId) -> AppResult<ResolvedStream> {
+        let pref = FormatPreference::Aac128;
+        if let Some(s) = self.resolver.cached(id, pref) {
+            return Ok(s);
+        }
+        let Some(fast) = self.fast_start.lock().unwrap().clone() else {
+            return self.resolver.resolve(id, pref);
+        };
+        let upgrade = Upgrade::default();
+        {
+            let (resolver, id, up) = (Arc::clone(&self.resolver), id.clone(), upgrade.clone());
+            thread::spawn(move || up.fill(resolver.resolve(&id, pref)));
+        }
+        let t0 = std::time::Instant::now();
+        match fast(id) {
+            Ok(mut head) => {
+                tracing::info!(track = %id.0, ms = t0.elapsed().as_millis() as u64, "arranque rápido");
+                head.upgrade = Some(upgrade);
+                Ok(head)
+            }
+            // Sin arranque rápido: lo de siempre (la resolución ya va en marcha).
+            Err(_) => loop {
+                if let Some(r) = upgrade.wait(Duration::from_secs(1)) {
+                    break r;
+                }
+            },
+        }
     }
 
     /// Resuelve ya las pistas que el usuario está a punto de elegir.
