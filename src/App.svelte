@@ -20,6 +20,7 @@
   import { auth } from "./lib/stores/auth.svelte";
   import { library } from "./lib/stores/library.svelte";
   import { ui } from "./lib/stores/ui.svelte";
+  import { updates } from "./lib/stores/updates.svelte";
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
@@ -43,6 +44,7 @@
     void settings.init();
     void player.init();
     void library.init();
+    void updates.init();
     void auth.init().then(() => {
       if (!auth.signedIn) ui.loginOpen = true;
       else void library.refresh();

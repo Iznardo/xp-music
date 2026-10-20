@@ -74,6 +74,22 @@ export const commands = {
 	uiLog: (level: string, message: string) => __TAURI_INVOKE<void>("ui_log", { level, message }),
 	/**  Activa el analizador solo mientras la visualización está a la vista (FR-005-03). */
 	vizSetActive: (active: boolean) => __TAURI_INVOKE<void>("viz_set_active", { active }),
+	/**  Versiones de la app y de las herramientas (pestaña "Acerca de"). */
+	toolsVersions: () => __TAURI_INVOKE<ToolVersions>("tools_versions"),
+	/**  Busca ya una versión nueva de yt-dlp. Devuelve la instalada si ha cambiado. */
+	toolsUpdateNow: () => typedError<string | null, AppError>(__TAURI_INVOKE("tools_update_now")),
+	/**  Abre la carpeta de registros en el Explorador. */
+	toolsOpenLogsDir: () => typedError<null, AppError>(__TAURI_INVOKE("tools_open_logs_dir")),
+	updateStatus: () => __TAURI_INVOKE<UpdaterStatus>("update_status"),
+	/**  Guarda (o borra, con `None`) el token de GitHub en el Administrador de credenciales. */
+	updateSetToken: (token: string | null) => typedError<null, AppError>(__TAURI_INVOKE("update_set_token", { token })),
+	updateCheck: () => typedError<{
+	version: string,
+	notes: string | null,
+	date: string | null,
+} | null, AppError>(__TAURI_INVOKE("update_check")),
+	/**  Descarga e instala la versión pendiente y reinicia la app. */
+	updateInstall: () => typedError<null, AppError>(__TAURI_INVOKE("update_install")),
 };
 
 /** Events */
@@ -84,6 +100,7 @@ export const events = {
 	playerState: makeEvent<PlayerState>("player://state"),
 	queueChanged: makeEvent<QueueSnapshot>("queue://changed"),
 	settingsChanged: makeEvent<Settings>("settings://changed"),
+	updateAvailable: makeEvent<UpdateInfo>("update://available"),
 	vizFrame: makeEvent<VizFrame>("viz://frame"),
 	ytCacheUpdated: makeEvent<CacheUpdated>("yt://cache-updated"),
 };
@@ -309,6 +326,14 @@ export type Thumbnail = {
 	height: number,
 };
 
+export type ToolVersions = {
+	app: string,
+	ytDlp: string | null,
+	deno: string | null,
+	/**  La copia de yt-dlp en uso la ha actualizado la propia app. */
+	ytDlpUpdated: boolean,
+};
+
 export type Track = {
 	id: TrackId,
 	title: string,
@@ -334,6 +359,19 @@ export type UiSound =
 "Error" | 
 /**  Pregunta / advertencia. */
 "Exclamation";
+
+export type UpdateInfo = {
+	version: string,
+	notes: string | null,
+	date: string | null,
+};
+
+export type UpdaterStatus = {
+	/**  Esta compilación trae la clave pública del updater. */
+	enabled: boolean,
+	hasToken: boolean,
+	pending: UpdateInfo | null,
+};
 
 export type VizFrame = {
 	/**  64 valores 0..1, de graves a agudos. */

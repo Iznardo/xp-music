@@ -8,7 +8,9 @@ mod player;
 mod settings;
 mod state;
 mod storage;
+mod tools;
 mod ui_state;
+mod updater;
 mod viz;
 mod yt;
 
@@ -27,6 +29,7 @@ use crate::yt::service::YtService;
 use crate::yt::thumbs::ThumbCache;
 
 /// Ruta del archivo de bindings TS, relativa a `src-tauri/`.
+#[cfg(any(debug_assertions, test))]
 const BINDINGS_PATH: &str = "../src/lib/bindings.ts";
 
 /// Registro único de comandos, eventos y tipos compartidos con el frontend.
@@ -88,6 +91,13 @@ fn specta_builder() -> Builder<tauri::Wry> {
             ui_state::window_set_compact,
             ui_state::ui_log,
             ui_state::viz_set_active,
+            tools::tools_versions,
+            tools::tools_update_now,
+            tools::tools_open_logs_dir,
+            updater::update_status,
+            updater::update_set_token,
+            updater::update_check,
+            updater::update_install,
         ])
         .events(collect_events![
             settings::Settings,
@@ -98,10 +108,12 @@ fn specta_builder() -> Builder<tauri::Wry> {
             yt::service::AuthStatus,
             yt::service::CacheUpdated,
             viz::VizFrame,
+            updater::UpdateInfo,
         ])
         .typ::<error::AppError>()
 }
 
+#[cfg(any(debug_assertions, test))]
 fn export_bindings(builder: &Builder<tauri::Wry>) {
     builder
         .export(
@@ -162,6 +174,12 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // Sin clave pública (compilación de desarrollo) `update_check` lo rechaza antes de usarlo.
+        .plugin(
+            tauri_plugin_updater::Builder::new()
+                .pubkey(updater::PUBKEY.unwrap_or_default())
+                .build(),
+        )
         // Portadas: http://thumb.localhost/<url codificada>
         .register_asynchronous_uri_scheme_protocol("thumb", move |_ctx, request, responder| {
             let thumbs = Arc::clone(&thumbs);
@@ -172,6 +190,7 @@ pub fn run() {
         })
         .manage(ui_state::UiState::default())
         .manage(os::OsState::default())
+        .manage(updater::UpdaterState::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
@@ -189,6 +208,9 @@ pub fn run() {
             app.manage(viz::VizService::new(handle.clone(), Arc::clone(&player)));
             app.manage(Arc::clone(&yt));
             app.manage(Arc::clone(&player));
+
+            tools::spawn_daily_check();
+            updater::spawn_startup_check(handle.clone(), Arc::clone(&db));
 
             // --- Integración con Windows (006) ---
             if let Err(e) = os::tray::create(&handle, Arc::clone(&player), Arc::clone(&yt)) {

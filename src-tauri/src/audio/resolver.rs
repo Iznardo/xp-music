@@ -63,6 +63,7 @@ pub trait StreamResolver: Send + Sync {
 
 // ---------------------------------------------------------------- yt-dlp
 
+#[derive(Clone, Debug)]
 pub struct ToolPaths {
     pub yt_dlp: PathBuf,
     pub deno: PathBuf,
@@ -86,18 +87,26 @@ impl ToolPaths {
         #[cfg(debug_assertions)]
         candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools"));
 
-        candidates.into_iter().find_map(|dir| {
-            // Preferir la versión "onedir" (`yt-dlp/yt-dlp.exe`): no se descomprime en
-            // cada uso y arranca ~0,7 s antes que el ejecutable de un solo archivo.
-            let yt_dlp = [
-                dir.join("yt-dlp").join("yt-dlp.exe"),
-                dir.join("yt-dlp.exe"),
-            ]
-            .into_iter()
+        let deno = candidates
+            .iter()
+            .map(|d| d.join("deno.exe"))
             .find(|p| p.is_file())?;
-            let deno = dir.join("deno.exe");
-            deno.is_file().then_some(Self { yt_dlp, deno })
-        })
+        // La copia que actualiza la propia app (007) tiene prioridad; si no, la incluida.
+        // Se prefiere la versión "onedir" (`yt-dlp/yt-dlp.exe`): no se descomprime en cada
+        // uso y arranca ~0,7 s antes que el ejecutable de un solo archivo.
+        let yt_dlp = crate::tools::updated_yt_dlp()
+            .filter(|p| p.is_file())
+            .or_else(|| {
+                candidates.iter().find_map(|dir| {
+                    [
+                        dir.join("yt-dlp").join("yt-dlp.exe"),
+                        dir.join("yt-dlp.exe"),
+                    ]
+                    .into_iter()
+                    .find(|p| p.is_file())
+                })
+            })?;
+        Some(Self { yt_dlp, deno })
     }
 }
 
@@ -105,6 +114,7 @@ pub struct YtDlpResolver {
     tools: ToolPaths,
     /// Da las cookies de la sesión (formato Netscape), solo para el reintento (NFR-002-05).
     cookies: Option<CookieProvider>,
+    failures: std::sync::atomic::AtomicU32,
 }
 
 pub type CookieProvider = Box<dyn Fn() -> Option<String> + Send + Sync>;
@@ -121,7 +131,11 @@ struct YtDlpInfo {
 
 impl YtDlpResolver {
     pub fn new(tools: ToolPaths, cookies: Option<CookieProvider>) -> Self {
-        Self { tools, cookies }
+        Self {
+            tools,
+            cookies,
+            failures: Default::default(),
+        }
     }
 
     fn run(
@@ -130,7 +144,9 @@ impl YtDlpResolver {
         pref: FormatPreference,
         cookies: Option<&Path>,
     ) -> AppResult<ResolvedStream> {
-        let mut cmd = Command::new(&self.tools.yt_dlp);
+        // Se vuelven a buscar en cada uso: tras una actualización se usa la copia nueva.
+        let tools = ToolPaths::locate().unwrap_or_else(|| self.tools.clone());
+        let mut cmd = Command::new(&tools.yt_dlp);
         cmd.args([
             "-f",
             &pref.itag().to_string(),
@@ -139,7 +155,7 @@ impl YtDlpResolver {
             "--no-warnings",
         ])
         .arg("--js-runtimes")
-        .arg(format!("deno:{}", self.tools.deno.display()));
+        .arg(format!("deno:{}", tools.deno.display()));
         if let Some(c) = cookies {
             cmd.arg("--cookies").arg(c);
         }
@@ -252,8 +268,34 @@ fn run_with_timeout(mut cmd: Command, timeout: Duration) -> AppResult<std::proce
     })
 }
 
+/// Fallos seguidos a partir de los cuales se sospecha de un yt-dlp desfasado (FR-007-09).
+const FAILS_BEFORE_UPDATE: u32 = 2;
+
 impl StreamResolver for YtDlpResolver {
     fn resolve(&self, id: &TrackId, pref: FormatPreference) -> AppResult<ResolvedStream> {
+        use std::sync::atomic::Ordering;
+        let res = self.resolve_once(id, pref);
+        if res.is_ok() {
+            self.failures.store(0, Ordering::Relaxed);
+            return res;
+        }
+        if self.failures.fetch_add(1, Ordering::Relaxed) + 1 < FAILS_BEFORE_UPDATE {
+            return res;
+        }
+        // YouTube cambia a menudo y una versión nueva de yt-dlp suele arreglarlo.
+        match crate::tools::update_yt_dlp(true) {
+            Ok(Some(v)) => {
+                tracing::info!(version = %v, track = %id.0, "reintentando con yt-dlp actualizado");
+                self.failures.store(0, Ordering::Relaxed);
+                self.resolve_once(id, pref)
+            }
+            _ => res,
+        }
+    }
+}
+
+impl YtDlpResolver {
+    fn resolve_once(&self, id: &TrackId, pref: FormatPreference) -> AppResult<ResolvedStream> {
         match self.run(id, pref, None) {
             Ok(s) => Ok(s),
             Err(first) => {

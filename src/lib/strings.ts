@@ -1,6 +1,21 @@
 // Todos los textos de la interfaz (constitución: UI en español, en un único módulo).
 
 export const t = {
+  updates: {
+    title: "Actualización de XP Music",
+    question: (v: string, notes: string | null) =>
+      `Hay una versión nueva de XP Music (${v}).${notes ? `
+
+${notes}` : ""}
+
+¿Quiere instalarla ahora? La aplicación se reiniciará.`,
+    install: "Instalar ahora",
+    later: "Más tarde",
+    checking: "Buscando actualizaciones…",
+    upToDate: "XP Music está al día.",
+    available: (v: string) => `Versión ${v} disponible.`,
+    downloading: "Descargando actualización…",
+  },
   appName: "XP Music",
   window: {
     minimize: "Minimizar",
@@ -146,12 +161,32 @@ export const t = {
   },
   options: {
     title: "Opciones",
-    tabs: { player: "Reproductor", audio: "Audio", keys: "Teclado", account: "Cuenta", viz: "Visualización" },
+    tabs: { player: "Reproductor", audio: "Audio", keys: "Teclado", account: "Cuenta", viz: "Visualización", about: "Acerca de" },
     pauseOnLock: "Pausar al bloquear el equipo",
     hotkeys: "Atajos globales (funcionan aunque XP Music esté en segundo plano)",
     hotkeyNames: { playPause: "Reproducir/Pausa", next: "Siguiente", previous: "Anterior", show: "Mostrar XP Music" },
     hotkeyHint: "Haz clic en un campo y pulsa la combinación (por ejemplo Ctrl+Alt+P). Supr la quita.",
     mediaKeysNote: "Las teclas multimedia del teclado funcionan siempre, sin configurar nada.",
+    about: {
+      version: "Versión",
+      components: "Componentes",
+      ytDlpUpdated: "(actualizado automáticamente)",
+      unknown: "no encontrado",
+      checkUpdates: "Buscar actualización de yt-dlp",
+      checking: "Buscando…",
+      upToDate: "yt-dlp ya está al día.",
+      updated: (v: string) => `yt-dlp actualizado a ${v}.`,
+      openLogs: "Abrir carpeta de registros",
+      notice: "XP Music no está afiliado a Microsoft ni a Google. Windows y YouTube son marcas de sus respectivos propietarios.",
+      appUpdates: "Actualizaciones de XP Music",
+      tokenLabel: "Token de GitHub (solo lectura)",
+      tokenSaved: "Token guardado en el Administrador de credenciales.",
+      tokenMissing: "Sin token: no se buscan actualizaciones.",
+      save: "Guardar",
+      remove: "Quitar",
+      checkApp: "Buscar actualizaciones",
+      disabled: "Esta compilación no tiene activadas las actualizaciones automáticas.",
+    },
     theme: "Combinación de colores",
     themes: { Blue: "Azul (predeterminado)", Olive: "Verde oliva", Silver: "Plateado" },
     xpSounds: "Reproducir sonidos del sistema",

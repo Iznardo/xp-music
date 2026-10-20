@@ -65,6 +65,7 @@ export const events = {
   settingsChanged: makeEvent<Settings>("settings://changed"),
   ytCacheUpdated: makeEvent<{ key: string }>("yt://cache-updated"),
   vizFrame: makeEvent<{ bands: number[]; peaks: number[]; wave: number[]; level: number }>("viz://frame"),
+  updateAvailable: makeEvent<{ version: string; notes: string | null; date: string | null }>("update://available"),
 };
 
 // ------------------------------------------------------------------ datos
@@ -415,6 +416,13 @@ export const commands = {
     if (on) vizTimer = setInterval(fakeViz, 33);
     return v(undefined);
   },
+  toolsVersions: () => v({ app: "0.1.0", ytDlp: "2026.08.19", deno: "2.9.7", ytDlpUpdated: false }),
+  toolsUpdateNow: () => ok<string | null>(null),
+  toolsOpenLogsDir: () => ok(null),
+  updateStatus: () => v({ enabled: true, hasToken: false, pending: null }),
+  updateSetToken: (_t: string | null) => ok(null),
+  updateCheck: () => ok(null),
+  updateInstall: () => ok(null),
   uiLog: (level: string, message: string) => {
     console[level === "error" ? "error" : "log"](message);
     return v(undefined);

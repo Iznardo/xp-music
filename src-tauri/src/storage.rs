@@ -55,6 +55,26 @@ impl Db {
     pub fn conn(&self) -> MutexGuard<'_, Connection> {
         self.0.lock().unwrap_or_else(|p| p.into_inner())
     }
+
+    /// Valor suelto de la tabla `settings` (marcas de tiempo internas, etc.).
+    pub fn kv_get(&self, key: &str) -> AppResult<Option<String>> {
+        use rusqlite::OptionalExtension;
+        Ok(self
+            .conn()
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+                r.get(0)
+            })
+            .optional()?)
+    }
+
+    pub fn kv_set(&self, key: &str, value: &str) -> AppResult<()> {
+        self.conn().execute(
+            "INSERT INTO settings (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [key, value],
+        )?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

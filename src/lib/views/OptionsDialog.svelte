@@ -1,13 +1,14 @@
 <script lang="ts">
   // Opciones estilo hoja de propiedades de XP (FR-004-14).
-  import { commands, type AudioDevice, type Settings, type Theme, type VizPreset } from "../bindings";
+  import { commands, type AudioDevice, type Settings, type Theme, type ToolVersions, type VizPreset } from "../bindings";
   import { settings } from "../stores/settings.svelte";
   import { auth } from "../stores/auth.svelte";
   import { ui } from "../stores/ui.svelte";
+  import { updates } from "../stores/updates.svelte";
   import { t } from "../strings";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
 
-  type Tab = "player" | "audio" | "keys" | "account" | "viz";
+  type Tab = "player" | "audio" | "keys" | "account" | "viz" | "about";
   type HotkeyName = keyof Settings["hotkeys"];
   const hotkeyNames: HotkeyName[] = ["playPause", "next", "previous", "show"];
 
@@ -30,6 +31,25 @@
   let draft = $state<Settings | null>(settings.current ? { ...settings.current } : null);
   let devices = $state<AudioDevice[]>([]);
   void commands.playerListDevices().then((d) => (devices = d));
+
+  let versions = $state<ToolVersions | null>(null);
+  let updateMsg = $state("");
+  let checking = $state(false);
+  let tokenInput = $state("");
+  $effect(() => {
+    if (tab === "about" && !versions) void commands.toolsVersions().then((v) => (versions = v));
+  });
+  async function checkUpdates() {
+    checking = true;
+    updateMsg = t.options.about.checking;
+    const r = await commands.toolsUpdateNow();
+    checking = false;
+    if (r.status === "error") updateMsg = r.error.message;
+    else {
+      updateMsg = r.data ? t.options.about.updated(r.data) : t.options.about.upToDate;
+      if (r.data) versions = await commands.toolsVersions();
+    }
+  }
 
   const themes: Theme[] = ["Blue", "Olive", "Silver"];
   const vizs: VizPreset[] = ["Bars", "Waves", "Ambience", "Battery", "Cover"];
@@ -123,6 +143,38 @@
             <label><input type="radio" name="viz" checked={draft.visualization === v} onchange={() => draft && (draft.visualization = v)} /> {t.options.vizNames[v]}</label>
           {/each}
         </fieldset>
+      {:else if tab === "about"}
+        <div class="about">
+          <p class="brand"><b>XP Music</b> — {t.options.about.version} {versions?.app ?? "…"}</p>
+          <fieldset>
+            <legend>{t.options.about.components}</legend>
+            <p>yt-dlp: {versions ? (versions.ytDlp ?? t.options.about.unknown) : "…"} {versions?.ytDlpUpdated ? t.options.about.ytDlpUpdated : ""}</p>
+            <p>Deno: {versions ? (versions.deno ?? t.options.about.unknown) : "…"}</p>
+            <div class="row">
+              <button class="xp-btn" disabled={checking} onclick={checkUpdates}>{t.options.about.checkUpdates}</button>
+              <button class="xp-btn" onclick={() => commands.toolsOpenLogsDir()}>{t.options.about.openLogs}</button>
+            </div>
+            {#if updateMsg}<p class="hint">{updateMsg}</p>{/if}
+          </fieldset>
+          <fieldset>
+            <legend>{t.options.about.appUpdates}</legend>
+            {#if updates.status && !updates.status.enabled}
+              <p class="hint">{t.options.about.disabled}</p>
+            {:else}
+              <label class="hk">
+                <span>{t.options.about.tokenLabel}</span>
+                <input class="xp-input" type="password" autocomplete="off" bind:value={tokenInput} placeholder={updates.status?.hasToken ? "••••••••" : "github_pat_…"} />
+              </label>
+              <div class="row">
+                <button class="xp-btn" disabled={!tokenInput.trim()} onclick={() => updates.setToken(tokenInput).then(() => (tokenInput = ""))}>{t.options.about.save}</button>
+                <button class="xp-btn" disabled={!updates.status?.hasToken} onclick={() => updates.setToken(null)}>{t.options.about.remove}</button>
+                <button class="xp-btn" disabled={updates.busy || !updates.status?.hasToken} onclick={() => updates.check()}>{t.options.about.checkApp}</button>
+              </div>
+              <p class="hint">{updates.message || (updates.status?.hasToken ? t.options.about.tokenSaved : t.options.about.tokenMissing)}</p>
+            {/if}
+          </fieldset>
+          <p class="hint">{t.options.about.notice}</p>
+        </div>
       {/if}
     </div>
     <div class="buttons">
@@ -184,7 +236,15 @@
     margin: 6px 0 0;
     color: #555;
   }
+  .about p {
+    margin: 2px 0;
+  }
+  .brand {
+    font-size: 1.15em;
+  }
   .row {
+    flex-wrap: wrap;
+    margin-top: 4px;
     display: flex;
     gap: 6px;
   }

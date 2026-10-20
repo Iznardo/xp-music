@@ -1,0 +1,12 @@
+﻿{
+    "ytDlp":  {
+                  "version":  "2026.08.19",
+                  "asset":  "yt-dlp_win.zip",
+                  "sha256":  "30b4c14aafab6082becff7881e41b76df46dc43ea7633479410a91e29da492bf"
+              },
+    "deno":  {
+                 "version":  "v2.9.7",
+                 "asset":  "deno-x86_64-pc-windows-msvc.zip",
+                 "sha256":  "a0c3101b4158d1dfb7d6a78a7bf0f3de80c96bb423c152beec8beb22786f2238"
+             }
+}
