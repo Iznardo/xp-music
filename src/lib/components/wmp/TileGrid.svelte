@@ -21,7 +21,9 @@
     {@const src = thumbSrc(itemThumbs(item), 120)}
     <button class="tile" class:round={!!item.Artist} onmouseenter={() => item.Track && hintTrack(item.Track.id)} ondblclick={() => openItem(item)} onkeydown={(e) => e.key === "Enter" && openItem(item)} oncontextmenu={(e) => menu(item, e)} title={itemTitle(item)}>
       <span class="art">
-        {#if src}<img {src} alt="" loading="lazy" />{/if}
+        <span class="ph">♫</span>
+        <!-- Algunas listas automáticas no traen portada válida: se queda el icono. -->
+        {#if src}<img {src} alt="" loading="lazy" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = "hidden")} />{/if}
         {#if item.Track}<span class="badge">♪</span>{/if}
       </span>
       <span class="title">{itemTitle(item)}</span>
@@ -77,7 +79,17 @@
     border-radius: 50%;
     overflow: hidden;
   }
+  .ph {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 40px;
+    color: rgb(255 255 255 / 0.85);
+    text-shadow: 0 1px 3px rgb(0 0 40 / 0.4);
+  }
   .art img {
+    position: relative;
     width: 100%;
     height: 100%;
     object-fit: cover;

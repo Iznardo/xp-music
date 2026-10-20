@@ -42,6 +42,27 @@
   let winW = $state(0);
   let winH = $state(0);
   const outline = $derived(winW && winH && !maximized ? shellPath(winW, winH) : null);
+  let edgeEl = $state<SVGPathElement>();
+
+  // La misma silueta como región de la ventana (Windows): fuera de ella no se pinta
+  // nada ni se reciben clics. Se muestrea el trazado en píxeles físicos.
+  $effect(() => {
+    const path = edgeEl;
+    const shaped = !ui.compact && outline !== null && path !== undefined;
+    const id = setTimeout(() => {
+      if (!shaped || !path) return void commands.windowSetShape(null);
+      const dpr = devicePixelRatio || 1;
+      const len = path.getTotalLength();
+      const n = Math.min(600, Math.max(120, Math.round(len / 6)));
+      const pts: [number, number][] = [];
+      for (let i = 0; i < n; i++) {
+        const p = path.getPointAtLength((i / n) * len);
+        pts.push([Math.round(p.x * dpr), Math.round(p.y * dpr)]);
+      }
+      void commands.windowSetShape(pts);
+    }, 60);
+    return () => clearTimeout(id);
+  });
 
   onMount(() => {
     void router.restore();
@@ -86,7 +107,7 @@
 >
   {#if outline}
     <svg class="outline" width={winW} height={winH} aria-hidden="true">
-      <path d={outline} class="edge" />
+      <path d={outline} class="edge" bind:this={edgeEl} />
       <path d={outline} class="hi" />
     </svg>
   {/if}

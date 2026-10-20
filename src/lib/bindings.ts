@@ -77,6 +77,12 @@ export const commands = {
 	windowIsCompact: () => __TAURI_INVOKE<boolean>("window_is_compact"),
 	/**  Cambia entre modo completo y compacto (FR-004-13). */
 	windowSetCompact: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("window_set_compact", { enabled })),
+	/**
+	 *  Da a la ventana la forma del skin (`SetWindowRgn`): fuera del contorno no se
+	 *  pinta nada ni se reciben clics. `points` en píxeles físicos relativos al área
+	 *  de cliente; `None` vuelve a la ventana rectangular (maximizada, modo compacto).
+	 */
+	windowSetShape: (points: ([number, number])[] | null) => typedError<null, AppError>(__TAURI_INVOKE("window_set_shape", { points })),
 	/**  Errores y avisos del frontend al log de la app (la WebView no tiene consola visible). */
 	uiLog: (level: string, message: string) => __TAURI_INVOKE<void>("ui_log", { level, message }),
 	/**  Activa el analizador solo mientras la visualización está a la vista (FR-005-03). */

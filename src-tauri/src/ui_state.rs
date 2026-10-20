@@ -124,3 +124,65 @@ pub fn ui_log(level: String, message: String) {
 pub fn viz_set_active(viz: State<'_, crate::viz::VizService>, active: bool) {
     viz.set_active(active);
 }
+
+/// Da a la ventana la forma del skin (`SetWindowRgn`): fuera del contorno no se
+/// pinta nada ni se reciben clics. `points` en píxeles físicos relativos al área
+/// de cliente; `None` vuelve a la ventana rectangular (maximizada, modo compacto).
+#[tauri::command]
+#[specta::specta]
+pub fn window_set_shape(window: WebviewWindow, points: Option<Vec<(i32, i32)>>) -> AppResult<()> {
+    #[cfg(windows)]
+    {
+        let hwnd = window
+            .hwnd()
+            .map_err(|e| AppError::internal(e.to_string()))?
+            .0 as isize;
+        let _ = window.run_on_main_thread(move || unsafe { set_region(hwnd, points) });
+    }
+    #[cfg(not(windows))]
+    let _ = (window, points);
+    Ok(())
+}
+
+#[cfg(windows)]
+unsafe fn set_region(hwnd: isize, points: Option<Vec<(i32, i32)>>) {
+    use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
+    use windows_sys::Win32::Graphics::Gdi::{
+        ClientToScreen, CreatePolygonRgn, SetWindowRgn, WINDING,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
+
+    let hwnd = hwnd as HWND;
+    let Some(points) = points.filter(|p| p.len() >= 3) else {
+        unsafe { SetWindowRgn(hwnd, std::ptr::null_mut(), 1) };
+        return;
+    };
+    // La región va en coordenadas de ventana; sin decoración, Windows aún deja un
+    // marco invisible para redimensionar, así que se suma el desfase del cliente.
+    let mut win = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
+    let mut origin = POINT { x: 0, y: 0 };
+    unsafe {
+        GetWindowRect(hwnd, &mut win);
+        ClientToScreen(hwnd, &mut origin);
+    }
+    let (dx, dy) = (origin.x - win.left, origin.y - win.top);
+    let pts: Vec<POINT> = points
+        .into_iter()
+        .map(|(x, y)| POINT {
+            x: x + dx,
+            y: y + dy,
+        })
+        .collect();
+    unsafe {
+        let rgn = CreatePolygonRgn(pts.as_ptr(), pts.len() as i32, WINDING);
+        // Con éxito, Windows pasa a ser dueño de la región (no hay que borrarla).
+        if !rgn.is_null() {
+            SetWindowRgn(hwnd, rgn, 1);
+        }
+    }
+}
