@@ -390,6 +390,10 @@ export const commands = {
   uiSetLastRoute: (_r: string) => v(undefined),
   windowIsCompact: () => v(false),
   windowSetCompact: (_e: boolean) => ok(null),
+  uiLog: (level: string, message: string) => {
+    console[level === "error" ? "error" : "log"](message);
+    return v(undefined);
+  },
 };
 
 void seq;

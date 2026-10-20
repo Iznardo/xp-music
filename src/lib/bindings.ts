@@ -70,6 +70,8 @@ export const commands = {
 	windowIsCompact: () => __TAURI_INVOKE<boolean>("window_is_compact"),
 	/**  Cambia entre modo completo y compacto (FR-004-13). */
 	windowSetCompact: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("window_set_compact", { enabled })),
+	/**  Errores y avisos del frontend al log de la app (la WebView no tiene consola visible). */
+	uiLog: (level: string, message: string) => __TAURI_INVOKE<void>("ui_log", { level, message }),
 };
 
 /** Events */

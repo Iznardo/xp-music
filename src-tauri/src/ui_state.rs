@@ -105,3 +105,15 @@ pub fn window_set_compact(
     *compact = enabled;
     Ok(())
 }
+
+/// Errores y avisos del frontend al log de la app (la WebView no tiene consola visible).
+#[tauri::command]
+#[specta::specta]
+pub fn ui_log(level: String, message: String) {
+    let message = crate::logging::redact(&message);
+    match level.as_str() {
+        "error" => tracing::error!(target: "ui", "{message}"),
+        "warn" => tracing::warn!(target: "ui", "{message}"),
+        _ => tracing::info!(target: "ui", "{message}"),
+    }
+}

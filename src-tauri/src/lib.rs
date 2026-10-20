@@ -84,6 +84,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             ui_state::ui_set_last_route,
             ui_state::window_is_compact,
             ui_state::window_set_compact,
+            ui_state::ui_log,
         ])
         .events(collect_events![
             settings::Settings,
@@ -163,6 +164,7 @@ pub fn run() {
         .manage(AppState {
             db: Arc::clone(&db),
         })
+        .manage(ui_state::UiState::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
