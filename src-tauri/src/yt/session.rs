@@ -34,6 +34,9 @@ pub struct Session {
     #[serde(default)]
     pub account_photo: Option<String>,
     pub imported_at: u64,
+    /// Sesión iniciada en la ventana propia de la app (se renueva con ella).
+    #[serde(default)]
+    pub app_login: bool,
 }
 
 impl std::fmt::Debug for Session {
@@ -495,6 +498,7 @@ mod tests {
             account_handle: None,
             account_photo: None,
             imported_at: 1,
+            app_login: false,
         };
         store.save(&s).unwrap();
         let raw = std::fs::read(dir.join("session.bin")).unwrap();

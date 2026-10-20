@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import TitleBar from "./lib/components/xp/TitleBar.svelte";
-  import MenuBar from "./lib/components/xp/MenuBar.svelte";
   import ContextMenu from "./lib/components/xp/ContextMenu.svelte";
   import Dialogs from "./lib/components/xp/Dialogs.svelte";
   import DialogFrame from "./lib/components/xp/DialogFrame.svelte";
-  import TaskBar from "./lib/components/wmp/TaskBar.svelte";
+  import SideTasks from "./lib/components/wmp/SideTasks.svelte";
   import TransportBar from "./lib/components/wmp/TransportBar.svelte";
   import LibraryView from "./lib/views/LibraryView.svelte";
   import HomeView from "./lib/views/HomeView.svelte";
@@ -24,6 +23,7 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
+  import { SHAPE, shellPath } from "./lib/shape";
   import { t } from "./lib/strings";
   import type { SearchFilter } from "./lib/bindings";
 
@@ -37,6 +37,11 @@
   $effect(() => {
     document.documentElement.dataset.theme = (settings.current?.theme ?? "Blue").toLowerCase();
   });
+
+  // Silueta de la ventana: se recalcula con el tamaño (sin forma al maximizar).
+  let winW = $state(0);
+  let winH = $state(0);
+  const outline = $derived(winW && winH && !maximized ? shellPath(winW, winH) : null);
 
   onMount(() => {
     void router.restore();
@@ -68,12 +73,28 @@
 {#if ui.compact}
   <CompactPlayer />
 {:else}
-<div class="window" class:maximized class:inactive={!active}>
+<div
+  class="window"
+  class:maximized
+  class:inactive={!active}
+  bind:clientWidth={winW}
+  bind:clientHeight={winH}
+  style:clip-path={outline ? `path("${outline}")` : undefined}
+  style:--shape-top="{maximized ? 0 : SHAPE.top}px"
+  style:--shape-left="{maximized ? 0 : SHAPE.left}px"
+  style:--shape-bottom="{maximized ? 0 : SHAPE.bottom}px"
+>
+  {#if outline}
+    <svg class="outline" width={winW} height={winH} aria-hidden="true">
+      <path d={outline} class="edge" />
+      <path d={outline} class="hi" />
+    </svg>
+  {/if}
   <TitleBar {title} {maximized} {active} />
-  <MenuBar />
-  <TaskBar />
 
-  <main class="main">
+  <div class="body">
+  <SideTasks />
+  <main class="main" class:dark={router.route.name === "now"}>
     {#if router.route.name === "now"}
       <NowPlayingView />
     {:else if router.route.name === "home"}
@@ -86,6 +107,7 @@
       <LibraryView />
     {/if}
   </main>
+  </div>
 
   <TransportBar />
 </div>
@@ -109,28 +131,54 @@
 {/if}
 
 <style>
+  /* Marco asimétrico del skin WMP 9: la ventana es transparente y la forma la dan
+     los radios (grande arriba a la izquierda, siguiendo el pod de ▶ abajo). */
+  /* Silueta asimétrica (ver lib/shape.ts): el fondo del skin rellena la forma y los
+     márgenes dejan sitio a la oreja, al borde abombado y al disco del ▶. */
   .window {
+    position: relative;
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--surface);
-    border: 3px solid var(--frame);
-    border-top: none;
-    border-radius: 8px 8px 0 0;
-    overflow: hidden;
+    padding-top: var(--shape-top);
+    background: linear-gradient(to right, var(--skin-mid), var(--skin-low) 30%);
   }
   .window.inactive {
-    border-color: var(--frame-inactive);
+    filter: saturate(0.85);
   }
-  .window.maximized {
-    border-width: 0;
-    border-radius: 0;
+  .outline {
+    position: absolute;
+    inset: 0;
+    z-index: 950;
+    pointer-events: none;
+    fill: none;
+  }
+  .outline .edge {
+    stroke: var(--skin-edge);
+    stroke-width: 4;
+  }
+  .outline .hi {
+    stroke: var(--skin-hi);
+    stroke-width: 1;
+    transform: translate(1px, 1px);
+    opacity: 0.6;
+  }
+  .body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    margin-left: var(--shape-left);
   }
   .main {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-width: 0;
     min-height: 0;
+    background: var(--surface);
+  }
+  .main.dark {
+    background: var(--np-bg);
   }
   .about {
     display: flex;

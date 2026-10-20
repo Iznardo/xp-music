@@ -30,11 +30,17 @@ pub enum AudioQuality {
 
 #[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum VizPreset {
-    #[default]
     Bars,
     Waves,
     Ambience,
     Battery,
+    /// Rayos que brotan del centro con rastro (estilo "Ambiente: Agua" de WMP 9).
+    #[default]
+    Water,
+    /// Plasma psicodélico con remolinos.
+    Alchemy,
+    /// Túnel en espiral hipnótico.
+    Spiral,
     Cover,
 }
 
@@ -84,7 +90,7 @@ impl Default for Settings {
             start_minimized: false,
             launch_at_login: false,
             report_history: true,
-            visualization: Some(VizPreset::Bars),
+            visualization: Some(VizPreset::Water),
             xp_sounds: true,
             notifications: true,
             pause_on_lock: false,

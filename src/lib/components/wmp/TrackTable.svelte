@@ -1,7 +1,7 @@
 <script lang="ts">
   // Lista de canciones (columnas WMP) con reproducción, menú contextual y "cargar más".
   import type { QueueSource, Track } from "../../bindings";
-  import { artistNames, fmtTime, playTracks, trackMenu } from "../../actions";
+  import { artistNames, fmtTime, hintTrack, playTracks, trackMenu } from "../../actions";
   import { player } from "../../stores/player.svelte";
   import { ui } from "../../stores/ui.svelte";
   import { t } from "../../strings";
@@ -54,6 +54,7 @@
     {current}
     rowKey={(r, i) => `${r.id}:${i}`}
     onactivate={playFrom}
+    onhint={(i) => hintTrack(tracks[i]?.id)}
     onmenu={(idx, e) => {
       const sel = idx.map((i) => tracks[i]!);
       ui.openMenu(e, trackMenu(sel, { onPlay: () => (sel.length === 1 ? playFrom(idx[0]!) : playTracks(sel, 0, source)) }));

@@ -154,6 +154,14 @@ pub fn queue_set(
     player.queue_set(tracks, start_index, source)
 }
 
+/// La UI avisa de las pistas que probablemente se van a pedir (ratón encima,
+/// selección) para resolverlas antes del doble clic.
+#[tauri::command]
+#[specta::specta]
+pub fn player_hint(player: Player<'_>, ids: Vec<TrackId>) {
+    player.hint(ids);
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn queue_play_index(player: Player<'_>, index: u32) -> AppResult<()> {
@@ -198,6 +206,13 @@ type YtState<'a> = State<'a, Arc<YtService>>;
 #[specta::specta]
 pub fn auth_status(yt: YtState<'_>) -> AuthStatus {
     yt.status()
+}
+
+/// Abre la ventana de inicio de sesión de Google y devuelve las cuentas de esa sesión.
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_sign_in(yt: YtState<'_>) -> AppResult<Vec<SessionAccount>> {
+    yt.sign_in_app().await
 }
 
 /// Perfiles de navegadores basados en Firefox (Zen, Firefox, LibreWolf…).

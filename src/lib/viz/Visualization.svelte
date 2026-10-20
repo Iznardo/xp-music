@@ -5,7 +5,7 @@
   import { commands, events, type VizPreset } from "../bindings";
   import { EMPTY_FRAME, toData, type VizData, type VizRenderer } from "./types";
   import { Bars, Waves } from "./canvas2d";
-  import { Ambience, Battery } from "./webgl";
+  import { Alchemy, Ambience, Battery, Spiral, Water } from "./webgl";
 
   let { preset }: { preset: VizPreset } = $props();
   let canvas: HTMLCanvasElement;
@@ -14,6 +14,9 @@
     try {
       if (preset === "Ambience") return new Ambience(c);
       if (preset === "Battery") return new Battery(c);
+      if (preset === "Water") return new Water(c);
+      if (preset === "Alchemy") return new Alchemy(c);
+      if (preset === "Spiral") return new Spiral(c);
     } catch (e) {
       void commands.uiLog("warn", `visualización WebGL no disponible: ${String(e)}`);
       return new Bars(c);

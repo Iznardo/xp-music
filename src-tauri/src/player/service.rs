@@ -91,6 +91,9 @@ pub struct PlayerService {
     /// (bandeja, controles multimedia de Windows, notificaciones).
     observers: Mutex<Vec<StateObserver>>,
     prefetch_tx: Sender<Vec<TrackId>>,
+    /// Pistas que el usuario probablemente va a pedir (ratón encima, fila
+    /// seleccionada). Carril aparte para no esperar a la precarga de la cola.
+    hint_tx: Sender<Vec<TrackId>>,
 }
 
 impl PlayerService {
@@ -112,6 +115,7 @@ impl PlayerService {
 
         let (ev_tx, ev_rx) = unbounded();
         let (prefetch_tx, prefetch_rx) = unbounded();
+        let (hint_tx, hint_rx) = unbounded();
         let engine = EngineHandle::spawn(ev_tx);
         engine.send(EngineCmd::SetVolume {
             volume: settings.volume,
@@ -145,9 +149,11 @@ impl PlayerService {
             dirty: AtomicBool::new(false),
             observers: Mutex::new(Vec::new()),
             prefetch_tx,
+            hint_tx,
         });
 
-        spawn_prefetcher(Arc::clone(&svc.resolver), prefetch_rx);
+        spawn_prefetcher("player-prefetch", Arc::clone(&svc.resolver), prefetch_rx);
+        spawn_prefetcher("player-hint", Arc::clone(&svc.resolver), hint_rx);
         let pump = Arc::clone(&svc);
         thread::Builder::new()
             .name("player-events".into())
@@ -271,6 +277,13 @@ impl PlayerService {
                 Err(e) => svc.fail(e),
             }
         });
+    }
+
+    /// Resuelve ya las pistas que el usuario está a punto de elegir.
+    pub fn hint(&self, ids: Vec<TrackId>) {
+        if !ids.is_empty() {
+            let _ = self.hint_tx.send(ids);
+        }
     }
 
     /// Pide resolver en segundo plano las próximas pistas para que ⏭ y las
@@ -807,9 +820,9 @@ impl PlayerService {
 
 /// Hilo que resuelve (y deja en caché) las pistas que le llegan, de una en
 /// una. Si llega una lista nueva, abandona la anterior.
-fn spawn_prefetcher(resolver: Arc<dyn StreamResolver>, rx: Receiver<Vec<TrackId>>) {
+fn spawn_prefetcher(name: &str, resolver: Arc<dyn StreamResolver>, rx: Receiver<Vec<TrackId>>) {
     thread::Builder::new()
-        .name("player-prefetch".into())
+        .name(name.into())
         .spawn(move || {
             while let Ok(mut ids) = rx.recv() {
                 'list: loop {

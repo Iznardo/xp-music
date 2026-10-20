@@ -142,7 +142,7 @@ let settings: Settings = {
   startMinimized: false,
   launchAtLogin: false,
   reportHistory: true,
-  visualization: "Bars",
+  visualization: "Water",
   xpSounds: true,
   notifications: true,
   pauseOnLock: false,
@@ -328,6 +328,7 @@ export const commands = {
     return v(undefined);
   },
   authStatus: () => v(auth),
+  authSignIn: () => ok([{ source: "App", index: 0, name: "Usuario de prueba", handle: "@prueba", photo: null }]),
   authDetectBrowsers: () => v<BrowserProfile[]>([{ browser: "Zen", name: "Default (release)", path: "C:\\zen" }]),
   authScanBrowser: (_p: string) =>
     ok<SessionAccount[]>([
@@ -409,6 +410,7 @@ export const commands = {
   uiPlaySound: (_s: string) => v(undefined),
   uiGetLastRoute: () => v<string | null>(null),
   uiSetLastRoute: (_r: string) => v(undefined),
+  playerHint: (_ids: string[]) => v(undefined),
   windowIsCompact: () => v(false),
   windowSetCompact: (_e: boolean) => ok(null),
   vizSetActive: (on: boolean) => {

@@ -1,7 +1,7 @@
 <script lang="ts">
   // Iconos grandes estilo explorador de XP (FR-004-07): portada + título + subtítulo.
   import type { MediaItem } from "../../bindings";
-  import { itemSubtitle, itemThumbs, itemTitle, openItem, playTracks, trackMenu } from "../../actions";
+  import { hintTrack, itemSubtitle, itemThumbs, itemTitle, openItem, playTracks, trackMenu } from "../../actions";
   import { ui, type MenuItem } from "../../stores/ui.svelte";
   import { thumbSrc } from "../../thumb";
   import { t } from "../../strings";
@@ -19,7 +19,7 @@
 <div class="grid" class:row>
   {#each items as item, i (i)}
     {@const src = thumbSrc(itemThumbs(item), 120)}
-    <button class="tile" class:round={!!item.Artist} ondblclick={() => openItem(item)} onkeydown={(e) => e.key === "Enter" && openItem(item)} oncontextmenu={(e) => menu(item, e)} title={itemTitle(item)}>
+    <button class="tile" class:round={!!item.Artist} onmouseenter={() => item.Track && hintTrack(item.Track.id)} ondblclick={() => openItem(item)} onkeydown={(e) => e.key === "Enter" && openItem(item)} oncontextmenu={(e) => menu(item, e)} title={itemTitle(item)}>
       <span class="art">
         {#if src}<img {src} alt="" loading="lazy" />{/if}
         {#if item.Track}<span class="badge">♪</span>{/if}

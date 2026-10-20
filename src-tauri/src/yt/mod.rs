@@ -1,6 +1,7 @@
 //! Integración con YouTube Music (specs/003).
 
 pub mod innertube;
+pub mod login;
 pub mod parse;
 pub mod playback;
 pub mod service;

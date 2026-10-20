@@ -21,11 +21,23 @@ export async function playTracks(tracks: Track[], index = 0, source: QueueSource
 }
 
 /// Una sola canción suelta: suena ella y después su radio (como YouTube Music).
+/// Empieza a sonar ya; la radio se pide a la vez y se añade detrás al llegar.
 export async function playWithRadio(track: Track) {
-  ui.status = t.status.loadingRadio;
+  await playTracks([track], 0, { Radio: track.id });
   const radio = (await check(commands.ytRadio(track.id))) ?? [];
-  ui.status = "";
-  await playTracks([track, ...radio.filter((r) => r.id !== track.id)], 0, { Radio: track.id });
+  // Si mientras tanto se eligió otra cosa, no se toca la cola nueva.
+  const q = await commands.queueGet();
+  if (q.tracks.length !== 1 || q.tracks[0]?.id !== track.id) return;
+  const rest = radio.filter((r) => r.id !== track.id);
+  if (rest.length) await commands.queueAdd(rest, "End");
+}
+
+let lastHint: string | null = null;
+/// Avisa al reproductor de que esta canción probablemente se va a pedir.
+export function hintTrack(id: string | undefined) {
+  if (!id || id === lastHint) return;
+  lastHint = id;
+  void commands.playerHint([id]);
 }
 
 export async function playNext(tracks: Track[]) {

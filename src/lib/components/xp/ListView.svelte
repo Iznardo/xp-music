@@ -9,10 +9,12 @@
     current = null,
     rowKey,
     onactivate,
+    onhint,
     onmenu,
     ondelete,
     onmove,
     empty = "",
+    dark = false,
   }: {
     rows: T[];
     columns: Column<T>[];
@@ -20,14 +22,19 @@
     current?: number | null;
     rowKey: (row: T, index: number) => string;
     onactivate?: (index: number) => void;
+    /// Fila que el usuario probablemente va a activar (ratón encima un momento, clic).
+    onhint?: (index: number) => void;
     onmenu?: (indices: number[], e: MouseEvent | { x: number; y: number }) => void;
     ondelete?: (indices: number[]) => void;
     /// Si se da, se pueden arrastrar filas (solo sin ordenar).
     onmove?: (from: number, to: number) => void;
     empty?: string;
+    /// Estilo de la lista de reproducción de WMP 9: fondo negro y texto claro.
+    dark?: boolean;
   } = $props();
 
   const ROW = 18;
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined;
   let scroller = $state<HTMLDivElement>();
   let scrollTop = $state(0);
   let height = $state(300);
@@ -202,7 +209,7 @@
   }
 </script>
 
-<div class="listview" role="grid" aria-rowcount={rows.length} tabindex="0" onkeydown={key}>
+<div class="listview" class:dark role="grid" aria-rowcount={rows.length} tabindex="0" onkeydown={key}>
   <div class="header" style:grid-template-columns={template}>
     {#each columns as c}
       <button class="col" style:text-align={c.align ?? "left"} onclick={() => sortBy(c.key)}>
@@ -238,7 +245,15 @@
           tabindex="-1"
           aria-selected={selected.has(i)}
           draggable={canDrag}
-          onclick={(e) => click(pos, e)}
+          onclick={(e) => {
+            click(pos, e);
+            onhint?.(i);
+          }}
+          onmouseenter={() => {
+            clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(() => onhint?.(i), 250);
+          }}
+          onmouseleave={() => clearTimeout(hoverTimer)}
           ondblclick={() => onactivate?.(i)}
           oncontextmenu={(e) => {
             e.preventDefault();
@@ -346,6 +361,44 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .dark {
+    background: #000;
+    border-color: #000;
+    color: var(--dark-list-text);
+  }
+  .dark .header {
+    height: 18px;
+    background: linear-gradient(to bottom, #2a2f3a, #111);
+    border-bottom-color: #333;
+  }
+  .dark .col {
+    color: #9aa6bf;
+    border-right-color: #2a2a2a;
+  }
+  .dark .col:hover {
+    background: #1c2230;
+    box-shadow: inset 0 -2px var(--dark-list-current);
+  }
+  .dark .row:nth-child(even) {
+    background: #070707;
+  }
+  .dark .row.current {
+    color: var(--dark-list-current);
+  }
+  .dark .row:hover {
+    background: #121a2c;
+  }
+  .dark .row.sel,
+  .dark:focus-within .row.sel {
+    background: var(--dark-list-sel);
+    color: #fff;
+  }
+  .dark:focus-within .row.focus {
+    outline-color: #8aa0d0;
+  }
+  .dark .body {
+    scrollbar-color: #3a4a6e #000;
   }
   .empty {
     position: absolute;

@@ -153,6 +153,9 @@ impl YtDlpResolver {
             "-j",
             "--no-playlist",
             "--no-warnings",
+            // Solo hace falta el formato progresivo: sin manifiestos HLS/DASH (~0,3 s menos).
+            "--extractor-args",
+            "youtube:skip=hls,dash,translated_subs",
         ])
         .arg("--js-runtimes")
         .arg(format!("deno:{}", tools.deno.display()));
@@ -336,6 +339,15 @@ pub struct CachedResolver<R> {
     inner: R,
     db: Arc<Db>,
     mem: Mutex<HashMap<(String, u32), ResolvedStream>>,
+    /// Resoluciones en marcha: quien pida la misma pista espera a esa en vez de
+    /// lanzar otro yt-dlp (p. ej. doble clic mientras se resolvía al pasar el ratón).
+    inflight: Mutex<HashMap<(String, u32), Arc<Flight>>>,
+}
+
+#[derive(Default)]
+struct Flight {
+    result: Mutex<Option<AppResult<ResolvedStream>>>,
+    done: std::sync::Condvar,
 }
 
 impl<R: StreamResolver> CachedResolver<R> {
@@ -344,6 +356,7 @@ impl<R: StreamResolver> CachedResolver<R> {
             inner,
             db,
             mem: Mutex::new(HashMap::new()),
+            inflight: Mutex::new(HashMap::new()),
         }
     }
 
@@ -407,9 +420,35 @@ impl<R: StreamResolver> StreamResolver for CachedResolver<R> {
             tracing::debug!(track = %id.0, "resolución desde caché");
             return Ok(s);
         }
-        let s = self.inner.resolve(id, pref)?;
-        self.store(key, &s);
-        Ok(s)
+        let (flight, leader) = {
+            let mut map = self.inflight.lock().unwrap();
+            match map.get(&key) {
+                Some(f) => (Arc::clone(f), false),
+                None => {
+                    let f = Arc::new(Flight::default());
+                    map.insert(key.clone(), Arc::clone(&f));
+                    (f, true)
+                }
+            }
+        };
+        if !leader {
+            tracing::debug!(track = %id.0, "esperando a la resolución en marcha");
+            let mut r = flight.result.lock().unwrap();
+            while r.is_none() {
+                r = flight.done.wait(r).unwrap();
+            }
+            return r.clone().expect("resultado");
+        }
+        let t0 = std::time::Instant::now();
+        let res = self.inner.resolve(id, pref);
+        tracing::info!(track = %id.0, ms = t0.elapsed().as_millis() as u64, ok = res.is_ok(), "yt-dlp");
+        if let Ok(s) = &res {
+            self.store(key.clone(), s);
+        }
+        *flight.result.lock().unwrap() = Some(res.clone());
+        flight.done.notify_all();
+        self.inflight.lock().unwrap().remove(&key);
+        res
     }
 
     fn invalidate(&self, id: &TrackId) {
@@ -435,6 +474,8 @@ mod tests {
     impl StreamResolver for Fake {
         fn resolve(&self, id: &TrackId, _: FormatPreference) -> AppResult<ResolvedStream> {
             self.calls.fetch_add(1, Ordering::SeqCst);
+            // Como yt-dlp: tarda un poco.
+            std::thread::sleep(std::time::Duration::from_millis(50));
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -449,6 +490,24 @@ mod tests {
                 user_agent: None,
             })
         }
+    }
+
+    #[test]
+    fn peticiones_simultaneas_comparten_una_resolucion() {
+        let (r, _db) = cached(3600);
+        let r = Arc::new(r);
+        let hilos: Vec<_> = (0..4)
+            .map(|_| {
+                let r = Arc::clone(&r);
+                std::thread::spawn(move || {
+                    r.resolve(&TrackId("abc".into()), FormatPreference::Aac128)
+                })
+            })
+            .collect();
+        for h in hilos {
+            assert!(h.join().unwrap().is_ok());
+        }
+        assert_eq!(r.inner.calls.load(Ordering::SeqCst), 1);
     }
 
     fn cached(expires_in: u64) -> (CachedResolver<Fake>, Arc<Db>) {

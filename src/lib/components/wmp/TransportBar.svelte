@@ -1,10 +1,10 @@
 <script lang="ts">
-  // Barra de transporte inferior al estilo de WMP 10 (FR-004-11/12).
+  // Transporte inferior del skin WMP 9 (FR-004-11/12): pantalla LCD verde, botón de
+  // reproducir grande en un "pod" que sobresale y el resto de controles en una pista.
   import { commands, type RepeatMode } from "../../bindings";
   import { player } from "../../stores/player.svelte";
   import { ui } from "../../stores/ui.svelte";
   import { router } from "../../router.svelte";
-  import { thumbSrc } from "../../thumb";
   import { artistNames, fmtTime } from "../../actions";
   import { t } from "../../strings";
   import Slider from "../xp/Slider.svelte";
@@ -37,6 +37,13 @@
     }
   });
 
+  // Pantalla LCD: avisos y estados; mientras suena, el álbum (o el artista).
+  const lcdText = $derived.by(() => {
+    if (ui.status || !st?.track || st.status !== "Playing") return statusText;
+    const album = st.track.album?.name;
+    return album ? `${t.transport.album}: ${album}` : artistNames(st.track);
+  });
+
   // Los avisos de la barra de estado desaparecen solos.
   $effect(() => {
     if (!ui.status) return;
@@ -66,47 +73,15 @@
 </script>
 
 <footer class="transport">
-  <div
-    class="seek"
-    bind:this={seekEl}
-    title={t.transport.seek}
-    role="slider"
-    aria-label={t.transport.seek}
-    aria-valuemin={0}
-    aria-valuemax={duration}
-    aria-valuenow={shown}
-    tabindex="-1"
-    onpointerdown={seekDown}
-    onpointermove={seekMove}
-    onpointerup={seekUp}
-  >
-    <div class="buffered" style:width="{bufferedPct}%"></div>
-    <div class="played" style:width="{playedPct}%"></div>
-    {#if duration}<div class="thumb" style:left="{playedPct}%"></div>{/if}
-  </div>
+  <button class="lcd" onclick={() => router.go({ name: "now" })} title={t.tabs.now.replace("\n", " ")}>
+    <span class="lcd-text">{lcdText}</span>
+    <span class="lcd-time">{fmtTime(shown) || "00:00"}{duration ? ` / ${fmtTime(duration)}` : ""}</span>
+  </button>
 
-  <div class="controls">
-    <button class="np" onclick={() => router.go({ name: "now" })} title={t.tabs.now.replace("\n", " ")}>
-      {#if thumbSrc(st?.track?.thumbnails, 60)}
-        <img src={thumbSrc(st?.track?.thumbnails, 60)} alt="" />
-      {:else}
-        <span class="noart"></span>
-      {/if}
-      <span class="np-text">
-        <span class="np-title">{st?.track?.title ?? t.views.nothingPlaying}</span>
-        <span class="np-artist">{st?.track ? artistNames(st.track) : statusText}</span>
-      </span>
-    </button>
-
-    <div class="buttons">
-      <button class="round small" title={t.transport.stop} aria-label={t.transport.stop} onclick={() => commands.playerStop()}>
-        <svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1" /></svg>
-      </button>
-      <button class="round small" title={t.transport.previous} aria-label={t.transport.previous} onclick={() => commands.playerPrevious()}>
-        <svg viewBox="0 0 16 16"><rect x="3" y="4" width="2" height="8" /><path d="M13 4v8L6 8z" /></svg>
-      </button>
+  <div class="deck">
+    <div class="pod">
       <button
-        class="round big"
+        class="play"
         class:on={playing}
         title={playing ? t.transport.pause : t.transport.play}
         aria-label={playing ? t.transport.pause : t.transport.play}
@@ -118,82 +93,202 @@
           <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" /></svg>
         {/if}
       </button>
-      <button class="round small" title={t.transport.next} aria-label={t.transport.next} onclick={() => commands.playerNext()}>
-        <svg viewBox="0 0 16 16"><path d="M3 4v8l7-4z" /><rect x="11" y="4" width="2" height="8" /></svg>
-      </button>
+    </div>
 
-      <button
-        class="flat"
-        title={st?.muted ? t.transport.unmute : t.transport.mute}
-        aria-label={st?.muted ? t.transport.unmute : t.transport.mute}
-        onclick={() => commands.playerSetMuted(!st?.muted)}
+    <div class="rail">
+      <div
+        class="seek"
+        bind:this={seekEl}
+        title={t.transport.seek}
+        role="slider"
+        aria-label={t.transport.seek}
+        aria-valuemin={0}
+        aria-valuemax={duration}
+        aria-valuenow={shown}
+        tabindex="-1"
+        onpointerdown={seekDown}
+        onpointermove={seekMove}
+        onpointerup={seekUp}
       >
-        <svg viewBox="0 0 16 16">
-          <path d="M2 6h3l4-3v10l-4-3H2z" />
-          {#if st?.muted}
-            <path d="M11 6l4 4M15 6l-4 4" stroke="currentColor" stroke-width="1.5" fill="none" />
-          {:else}
-            <path d="M11 5.5c1.2 1.4 1.2 3.6 0 5M12.8 4c2 2.3 2 5.7 0 8" stroke="currentColor" stroke-width="1.2" fill="none" />
-          {/if}
-        </svg>
-      </button>
-      <div class="volume">
-        <Slider
-          value={Math.round((st?.volume ?? 0.8) * 100)}
-          min={0}
-          max={100}
-          label={t.transport.volume}
-          dark
-          onchange={(v) => commands.playerSetVolume(v / 100)}
-        />
+        <div class="buffered" style:width="{bufferedPct}%"></div>
+        <div class="played" style:width="{playedPct}%"></div>
+        {#if duration}<div class="thumb" style:left="{playedPct}%"></div>{/if}
+      </div>
+
+      <div class="row">
+        <button class="round" title={t.transport.stop} aria-label={t.transport.stop} onclick={() => commands.playerStop()}>
+          <svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1" /></svg>
+        </button>
+        <div class="pill">
+          <button title={t.transport.previous} aria-label={t.transport.previous} onclick={() => commands.playerPrevious()}>
+            <svg viewBox="0 0 16 16"><rect x="2" y="4" width="2" height="8" /><path d="M9 4v8L4 8zM14 4v8L9 8z" /></svg>
+          </button>
+          <button title={t.transport.next} aria-label={t.transport.next} onclick={() => commands.playerNext()}>
+            <svg viewBox="0 0 16 16"><path d="M2 4v8l5-4zM7 4v8l5-4z" /><rect x="12" y="4" width="2" height="8" /></svg>
+          </button>
+        </div>
+
+        <button
+          class="round"
+          title={st?.muted ? t.transport.unmute : t.transport.mute}
+          aria-label={st?.muted ? t.transport.unmute : t.transport.mute}
+          onclick={() => commands.playerSetMuted(!st?.muted)}
+        >
+          <svg viewBox="0 0 16 16">
+            <path d="M2 6h3l4-3v10l-4-3H2z" />
+            {#if st?.muted}
+              <path d="M11 6l4 4M15 6l-4 4" stroke="currentColor" stroke-width="1.5" fill="none" />
+            {:else}
+              <path d="M11 5.5c1.2 1.4 1.2 3.6 0 5M12.8 4c2 2.3 2 5.7 0 8" stroke="currentColor" stroke-width="1.2" fill="none" />
+            {/if}
+          </svg>
+        </button>
+        <div class="volume">
+          <Slider
+            value={Math.round((st?.volume ?? 0.8) * 100)}
+            min={0}
+            max={100}
+            label={t.transport.volume}
+            dark
+            onchange={(v) => commands.playerSetVolume(v / 100)}
+          />
+        </div>
+
+        <span class="spacer"></span>
+        <button
+          class="flat"
+          class:on={st?.shuffle}
+          title={st?.shuffle ? t.transport.shuffleOff : t.transport.shuffleOn}
+          aria-pressed={st?.shuffle ?? false}
+          onclick={() => commands.playerSetShuffle(!st?.shuffle)}
+        >
+          <svg viewBox="0 0 16 16"><path d="M1 4h3l7 8h3M1 12h3l2-2.3M9 6.3 11 4h3M12 2l2 2-2 2M12 10l2 2-2 2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
+        </button>
+        <button
+          class="flat"
+          class:on={st?.repeat !== "Off"}
+          title={t.transport.repeat[st?.repeat ?? "Off"]}
+          aria-label={t.transport.repeat[st?.repeat ?? "Off"]}
+          onclick={() => commands.playerSetRepeat(nextRepeat[st?.repeat ?? "Off"])}
+        >
+          <svg viewBox="0 0 16 16"><path d="M3 7V5h9M10 3l2 2-2 2M13 9v2H4M6 13l-2-2 2-2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
+          {#if st?.repeat === "One"}<span class="one">1</span>{/if}
+        </button>
+        <button class="flat" title={t.transport.compact} aria-label={t.transport.compact} onclick={() => ui.setCompact(true)}>
+          <svg viewBox="0 0 16 16"><rect x="1.5" y="4.5" width="13" height="7" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3" /><circle cx="5" cy="8" r="1.8" /></svg>
+        </button>
       </div>
     </div>
-
-    <div class="right">
-      <span class="time">{fmtTime(shown) || "0:00"}{duration ? ` / ${fmtTime(duration)}` : ""}</span>
-      <button
-        class="flat toggle"
-        class:on={st?.shuffle}
-        title={st?.shuffle ? t.transport.shuffleOff : t.transport.shuffleOn}
-        aria-pressed={st?.shuffle ?? false}
-        onclick={() => commands.playerSetShuffle(!st?.shuffle)}
-      >
-        <svg viewBox="0 0 16 16"><path d="M1 4h3l7 8h3M1 12h3l2-2.3M9 6.3 11 4h3M12 2l2 2-2 2M12 10l2 2-2 2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
-      </button>
-      <button
-        class="flat toggle"
-        class:on={st?.repeat !== "Off"}
-        title={t.transport.repeat[st?.repeat ?? "Off"]}
-        aria-label={t.transport.repeat[st?.repeat ?? "Off"]}
-        onclick={() => commands.playerSetRepeat(nextRepeat[st?.repeat ?? "Off"])}
-      >
-        <svg viewBox="0 0 16 16"><path d="M3 7V5h9M10 3l2 2-2 2M13 9v2H4M6 13l-2-2 2-2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
-        {#if st?.repeat === "One"}<span class="one">1</span>{/if}
-      </button>
-      <button class="flat" title={t.transport.compact} aria-label={t.transport.compact} onclick={() => ui.setCompact(true)}>
-        <svg viewBox="0 0 16 16"><rect x="1.5" y="4.5" width="13" height="7" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3" /><circle cx="5" cy="8" r="1.8" /></svg>
-      </button>
-    </div>
   </div>
-  <div class="statusline">{statusText}</div>
 </footer>
 
 <style>
   .transport {
     flex: none;
-    background: linear-gradient(to bottom, var(--wmp-top) 0%, var(--wmp-mid) 45%, var(--wmp-deep) 100%);
-    border-top: 1px solid var(--wmp-line);
-    color: var(--wmp-text);
-    padding: 0 10px 2px;
+    position: relative;
+    margin-bottom: var(--shape-bottom, 0px);
+    color: #fff;
     user-select: none;
+  }
+  /* Pantalla LCD sobre el transporte. */
+  .lcd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 18px;
+    padding: 0 34px 0 106px;
+    border: 0;
+    border-top: 1px solid var(--skin-edge);
+    border-bottom: 1px solid #1a1a1a;
+    background: var(--lcd-bg);
+    color: var(--lcd-text);
+    font: bold 11px var(--font-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .lcd-text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lcd-time {
+    font-variant-numeric: tabular-nums;
+  }
+  .deck {
+    display: flex;
+    align-items: stretch;
+    height: 50px;
+    background: linear-gradient(to bottom, var(--skin-hi) 0%, var(--skin-top) 10%, var(--skin-mid) 50%, var(--skin-low) 100%);
+  }
+  /* Disco del ▶: coincide con el círculo de la silueta (lib/shape.ts: centro a 50 px
+     del borde izquierdo y 48 px del inferior, radio 48) y sobresale por arriba. */
+  .pod {
+    flex: none;
+    width: 100px;
+  }
+  .pod::before {
+    content: "";
+    position: absolute;
+    z-index: 940;
+    left: 4px;
+    bottom: calc(-1 * var(--shape-bottom, 0px) + 2px);
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 30%, var(--skin-hi), var(--skin-mid) 45%, var(--skin-low) 75%, var(--skin-deep));
+    box-shadow: inset 0 2px 3px rgb(255 255 255 / 0.5), inset 0 -3px 6px rgb(0 0 0 / 0.35);
+  }
+  .play {
+    position: absolute;
+    z-index: 941;
+    left: 19px;
+    bottom: calc(-1 * var(--shape-bottom, 0px) + 17px);
+    width: 62px;
+    height: 62px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid #06183f;
+    color: #fff;
+    background: radial-gradient(circle at 50% 28%, #d8efff 0%, #5cb0ff 28%, #1765dc 62%, #0a2f86 100%);
+    box-shadow: inset 0 -4px 6px rgb(0 0 40 / 0.5), 0 0 8px rgb(80 160 255 / 0.55), 0 2px 4px #000;
+    cursor: pointer;
+  }
+  .play.on {
+    background: radial-gradient(circle at 50% 28%, #e4fff0 0%, #6fe08f 28%, #1f9a45 62%, #0b4d20 100%);
+    box-shadow: inset 0 -4px 6px rgb(0 40 0 / 0.5), 0 0 8px rgb(90 230 120 / 0.55), 0 2px 4px #000;
+  }
+  .play svg {
+    width: 26px;
+    height: 26px;
+    fill: currentColor;
+    filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.5));
+  }
+  .play:hover {
+    filter: brightness(1.12);
+  }
+  .play:active {
+    filter: brightness(0.88);
+  }
+  .rail {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 64px 0 4px;
   }
   .seek {
     position: relative;
-    height: 7px;
-    margin: 6px 0 4px;
-    border-radius: 4px;
-    background: #000;
-    box-shadow: inset 0 1px 2px #000, 0 1px var(--wmp-top);
+    height: 6px;
+    border-radius: 3px;
+    background: var(--skin-deep);
+    box-shadow: inset 0 1px 2px #000, 0 1px rgb(255 255 255 / 0.3);
     cursor: pointer;
     touch-action: none;
   }
@@ -201,129 +296,92 @@
   .played {
     position: absolute;
     inset: 0 auto 0 0;
-    border-radius: 4px;
+    border-radius: 3px;
   }
   .buffered {
-    background: var(--wmp-mid);
+    background: rgb(255 255 255 / 0.18);
   }
   .played {
-    background: linear-gradient(to bottom, #9cf09c, #2fb62f 55%, #178417);
+    background: linear-gradient(to bottom, #b6ffb6, #36c436 55%, #178417);
   }
   .thumb {
     position: absolute;
     top: -4px;
-    width: 9px;
-    height: 15px;
-    margin-left: -4px;
-    border-radius: 3px;
-    background: linear-gradient(to right, #f4f7ff, #a7b6d6);
-    border: 1px solid #2b3c63;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #fff, #c9d6f2 50%, #6c85bd);
+    border: 1px solid var(--skin-edge);
     box-shadow: 0 1px 2px #000;
   }
-  .controls {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
-    height: 48px;
-  }
-  .np {
+  .row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-width: 0;
-    background: none;
-    border: 0;
-    padding: 0;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
+    gap: 5px;
   }
-  .np img,
-  .noart {
-    width: 40px;
-    height: 40px;
-    flex: none;
-    border: 1px solid var(--wmp-line);
-    background: var(--wmp-deep);
-    object-fit: cover;
-  }
-  .np-text {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  .np-title,
-  .np-artist {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .np-title {
-    font-weight: bold;
-    color: #fff;
-  }
-  .np-artist {
-    color: var(--wmp-dim);
-  }
-  .buttons {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .round {
+  .round,
+  .pill button {
     display: grid;
     place-items: center;
     padding: 0;
-    border-radius: 50%;
-    border: 1px solid #0a1224;
-    color: #20345e;
-    background: radial-gradient(circle at 50% 30%, #ffffff 0%, #d9e3f6 35%, #8ea5d3 70%, #5d78b2 100%);
-    box-shadow: inset 0 -2px 3px rgb(0 0 30 / 0.35), 0 1px 2px #000;
+    color: var(--skin-deep);
+    background: radial-gradient(circle at 50% 30%, #ffffff 0%, #dfe8fa 35%, #9fb4dd 75%, #6f88bf 100%);
+    border: 1px solid var(--skin-edge);
+    box-shadow: inset 0 -2px 3px rgb(0 0 30 / 0.3), 0 1px 1px rgb(0 0 0 / 0.5);
     cursor: pointer;
   }
-  .round svg {
+  .round {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+  }
+  .pill {
+    display: flex;
+  }
+  .pill button {
+    width: 28px;
+    height: 20px;
+  }
+  .pill button:first-child {
+    border-radius: 10px 0 0 10px;
+  }
+  .pill button:last-child {
+    border-radius: 0 10px 10px 0;
+    border-left: 0;
+  }
+  .round svg,
+  .pill svg {
+    width: 12px;
+    height: 12px;
     fill: currentColor;
   }
-  .round.small {
-    width: 26px;
-    height: 26px;
+  .round:hover,
+  .pill button:hover {
+    filter: brightness(1.1);
   }
-  .round.small svg {
-    width: 13px;
-    height: 13px;
+  .round:active,
+  .pill button:active {
+    filter: brightness(0.85);
   }
-  .round.big {
-    width: 44px;
-    height: 44px;
-    margin: 0 4px;
-    color: #fff;
-    background: radial-gradient(circle at 50% 28%, #c7e6ff 0%, #4ea6ff 30%, #1460d8 65%, #0a2f86 100%);
-    border-color: #06183f;
-    box-shadow: inset 0 -3px 5px rgb(0 0 40 / 0.45), 0 0 6px rgb(80 160 255 / 0.5), 0 1px 3px #000;
+  .volume {
+    width: 84px;
   }
-  .round.big svg {
-    width: 20px;
-    height: 20px;
-    filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.5));
-  }
-  .round:hover {
-    filter: brightness(1.12);
-  }
-  .round:active {
-    filter: brightness(0.88);
+  .spacer {
+    flex: 1;
   }
   .flat {
     display: grid;
     place-items: center;
     position: relative;
     width: 24px;
-    height: 22px;
+    height: 20px;
     padding: 0;
     background: none;
     border: 1px solid transparent;
     border-radius: 3px;
-    color: var(--wmp-dim);
+    color: #fff;
+    opacity: 0.8;
     cursor: pointer;
   }
   .flat svg {
@@ -332,12 +390,13 @@
     fill: currentColor;
   }
   .flat:hover {
-    border-color: var(--wmp-line);
-    background: rgb(255 255 255 / 0.06);
-    color: #fff;
+    opacity: 1;
+    border-color: rgb(255 255 255 / 0.4);
+    background: rgb(255 255 255 / 0.1);
   }
   .flat.on {
-    color: #7dff7d;
+    opacity: 1;
+    color: #8dff8d;
   }
   .one {
     position: absolute;
@@ -345,28 +404,5 @@
     bottom: 0;
     font-size: 8px;
     font-weight: bold;
-  }
-  .volume {
-    width: 80px;
-    margin-left: 2px;
-  }
-  .right {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 4px;
-  }
-  .time {
-    margin-right: 6px;
-    font-variant-numeric: tabular-nums;
-    color: var(--wmp-text);
-  }
-  .statusline {
-    height: 14px;
-    font-size: 10px;
-    color: var(--wmp-dim);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 </style>

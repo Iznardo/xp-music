@@ -60,6 +60,8 @@ pub enum AccountSource {
     },
     /// Cookie pegada a mano (queda en memoria hasta elegir cuenta).
     Pasted,
+    /// Ventana de inicio de sesión de la propia app.
+    App,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
@@ -91,6 +93,8 @@ pub struct YtService {
     client: tokio::sync::Mutex<Option<Arc<Yt>>>,
     limiter: Semaphore,
     pasted: Mutex<Option<String>>,
+    /// Cookies de la ventana de inicio de sesión, hasta elegir cuenta.
+    app_login: Mutex<Option<super::login::Cookies>>,
 }
 
 impl YtService {
@@ -106,10 +110,12 @@ impl YtService {
             client: tokio::sync::Mutex::new(None),
             limiter: Semaphore::new(MAX_CONCURRENT),
             pasted: Mutex::new(None),
+            app_login: Mutex::new(None),
         });
         // Sesiones viejas importadas del navegador: se renuevan en segundo plano.
         let stale = svc.session.read().unwrap().as_ref().is_some_and(|s| {
-            s.source.is_some() && now_secs().saturating_sub(s.imported_at) > SESSION_REFRESH_AFTER
+            (s.source.is_some() || s.app_login)
+                && now_secs().saturating_sub(s.imported_at) > SESSION_REFRESH_AFTER
         });
         if stale {
             let s = Arc::clone(&svc);
@@ -242,18 +248,27 @@ impl YtService {
                 "No hay sesión iniciada.",
             ));
         };
-        let Some(source) = s.source.clone() else {
-            self.mark_expired();
-            return Err(AppError::new(
-                ErrorCode::AuthExpired,
-                "La sesión caducó. Vuelve a pegar la cookie.",
-            ));
-        };
-        let (header, netscape) =
+        let (header, netscape) = if s.app_login {
+            let app = self
+                .app
+                .as_ref()
+                .ok_or_else(|| AppError::internal("sin AppHandle"))?;
+            super::login::refresh(app)
+                .await
+                .inspect_err(|_| self.mark_expired())?
+        } else {
+            let Some(source) = s.source.clone() else {
+                self.mark_expired();
+                return Err(AppError::new(
+                    ErrorCode::AuthExpired,
+                    "La sesión caducó. Vuelve a iniciar sesión.",
+                ));
+            };
             tokio::task::spawn_blocking(move || session::read_cookies(&source))
                 .await
                 .map_err(|e| AppError::internal(e.to_string()))?
-                .inspect_err(|_| self.mark_expired())?;
+                .inspect_err(|_| self.mark_expired())?
+        };
         // La cuenta puede haber cambiado de índice si se añadieron otras en el navegador.
         let accounts = Self::accounts_in(&header).await?;
         let found = accounts
@@ -274,11 +289,12 @@ impl YtService {
         s.account_handle = handle;
         s.account_photo = photo;
         s.imported_at = now_secs();
+        let s_app_login = s.app_login;
         self.store.save(&s)?;
         *self.session.write().unwrap() = Some(s);
         *self.expired.write().unwrap() = false;
         *self.client.lock().await = None;
-        tracing::info!("sesión de YouTube Music renovada desde el navegador");
+        tracing::info!(app_login = s_app_login, "sesión de YouTube Music renovada");
         self.emit_status();
         Ok(())
     }
@@ -379,6 +395,27 @@ impl YtService {
         Ok(out)
     }
 
+    /// Abre la ventana de inicio de sesión de Google y devuelve las cuentas de esa sesión.
+    pub async fn sign_in_app(&self) -> AppResult<Vec<SessionAccount>> {
+        let app = self
+            .app
+            .as_ref()
+            .ok_or_else(|| AppError::internal("sin AppHandle"))?;
+        let cookies = super::login::sign_in(app).await?;
+        let accounts = Self::accounts_in(&cookies.0).await?;
+        *self.app_login.lock().unwrap() = Some(cookies);
+        Ok(accounts
+            .into_iter()
+            .map(|(index, name, handle, photo)| SessionAccount {
+                source: AccountSource::App,
+                index,
+                name,
+                handle,
+                photo,
+            })
+            .collect())
+    }
+
     /// Cuentas en una cookie pegada a mano.
     pub async fn scan_pasted(&self, raw: String) -> AppResult<Vec<SessionAccount>> {
         let cookie = session::clean_pasted_cookie(&raw)?;
@@ -418,7 +455,14 @@ impl YtService {
                 let n = session::netscape_from_header(&cookie);
                 (cookie, n, None)
             }
+            AccountSource::App => {
+                let (h, n) = self.app_login.lock().unwrap().take().ok_or_else(|| {
+                    AppError::new(ErrorCode::InvalidInput, "Vuelve a iniciar sesión.")
+                })?;
+                (h, n, None)
+            }
         };
+        let app_login = account.source == AccountSource::App;
         let s = Session {
             cookie_header,
             netscape,
@@ -428,6 +472,7 @@ impl YtService {
             account_handle: account.handle,
             account_photo: account.photo,
             imported_at: now_secs(),
+            app_login,
         };
         self.store.save(&s)?;
         *self.session.write().unwrap() = Some(s);
@@ -443,6 +488,16 @@ impl YtService {
     }
 
     pub async fn logout(&self) {
+        let was_app = self
+            .session
+            .read()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|s| s.app_login);
+        if was_app {
+            // Cerrar sesión de verdad: fuera también el perfil de la ventana de Google.
+            let _ = tokio::task::spawn_blocking(super::login::forget).await;
+        }
         self.store.clear();
         *self.session.write().unwrap() = None;
         *self.expired.write().unwrap() = false;

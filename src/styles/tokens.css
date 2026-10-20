@@ -108,3 +108,45 @@
   --font-ui: Tahoma, "Segoe UI", sans-serif;
   --font-title: "Trebuchet MS", Tahoma, sans-serif;
 }
+
+/* Skin WMP 9 (marco asimétrico). Por tema; el resto de colores sale de --wmp-*. */
+:root,
+:root[data-theme="blue"] {
+  --skin-hi: #9cc0ff;
+  --skin-top: #4f86e8;
+  --skin-mid: #2a5bc9;
+  --skin-low: #163a94;
+  --skin-deep: #0c2367;
+  --skin-edge: #06143f;
+  --side-top: #6d9cf0;
+  --side-bottom: #2d5cc4;
+}
+:root[data-theme="olive"] {
+  --skin-hi: #d8e6b4;
+  --skin-top: #a3b874;
+  --skin-mid: #7d934c;
+  --skin-low: #5a6e30;
+  --skin-deep: #3d4c1f;
+  --skin-edge: #1f2810;
+  --side-top: #b6c98a;
+  --side-bottom: #75893f;
+}
+:root[data-theme="silver"] {
+  --skin-hi: #ffffff;
+  --skin-top: #d7d8e2;
+  --skin-mid: #aeb0c0;
+  --skin-low: #8a8c9f;
+  --skin-deep: #5d5f70;
+  --skin-edge: #33343f;
+  --side-top: #e6e7ee;
+  --side-bottom: #9fa1b3;
+}
+:root {
+  --lcd-bg: #000;
+  --lcd-text: #4ce34c;
+  --lcd-dim: #2a8f2a;
+  --np-bg: #000;
+  --dark-list-text: #cfdcff;
+  --dark-list-sel: #23407f;
+  --dark-list-current: #5cff5c;
+}

@@ -10,6 +10,21 @@ export type MenuItem =
 
 export type MessageKind = "info" | "error" | "warning" | "question";
 
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeFlag(key: string, on: boolean) {
+  try {
+    localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    /* sin almacenamiento: no se recuerda */
+  }
+}
+
 class UiStore {
   message = $state<{ title: string; text: string; kind: MessageKind; buttons: string[]; resolve: (b: string) => void } | null>(null);
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -21,6 +36,13 @@ class UiStore {
   status = $state("");
   /// Modo compacto (skin pequeño, siempre encima).
   compact = $state(false);
+  /// Panel de tareas lateral oculto (se recuerda en este equipo).
+  sideCollapsed = $state(readFlag("xpm.sideCollapsed"));
+
+  toggleSide() {
+    this.sideCollapsed = !this.sideCollapsed;
+    writeFlag("xpm.sideCollapsed", this.sideCollapsed);
+  }
 
   sound(s: UiSound) {
     void commands.uiPlaySound(s);

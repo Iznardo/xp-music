@@ -29,6 +29,11 @@ export const commands = {
 	queueGet: () => __TAURI_INVOKE<QueueSnapshot>("queue_get"),
 	/**  Sustituye la cola y empieza a sonar `start_index` (índice en `tracks`). */
 	queueSet: (tracks: Track[], startIndex: number, source: QueueSource) => typedError<null, AppError>(__TAURI_INVOKE("queue_set", { tracks, startIndex, source })),
+	/**
+	 *  La UI avisa de las pistas que probablemente se van a pedir (ratón encima,
+	 *  selección) para resolverlas antes del doble clic.
+	 */
+	playerHint: (ids: TrackId[]) => __TAURI_INVOKE<void>("player_hint", { ids }),
 	queuePlayIndex: (index: number) => typedError<null, AppError>(__TAURI_INVOKE("queue_play_index", { index })),
 	queueAdd: (tracks: Track[], position: InsertPosition) => __TAURI_INVOKE<void>("queue_add", { tracks, position }),
 	queueRemove: (index: number) => __TAURI_INVOKE<void>("queue_remove", { index }),
@@ -36,6 +41,8 @@ export const commands = {
 	queueClear: () => __TAURI_INVOKE<void>("queue_clear"),
 	queueSetAutoplay: (enabled: boolean) => __TAURI_INVOKE<void>("queue_set_autoplay", { enabled }),
 	authStatus: () => __TAURI_INVOKE<AuthStatus>("auth_status"),
+	/**  Abre la ventana de inicio de sesión de Google y devuelve las cuentas de esa sesión. */
+	authSignIn: () => typedError<SessionAccount[], AppError>(__TAURI_INVOKE("auth_sign_in")),
 	/**  Perfiles de navegadores basados en Firefox (Zen, Firefox, LibreWolf…). */
 	authDetectBrowsers: () => __TAURI_INVOKE<BrowserProfile[]>("auth_detect_browsers"),
 	/**  Cuentas de YouTube con sesión en ese perfil (todas sus sesiones/contenedores). */
@@ -121,7 +128,9 @@ export type AccountSource =
 	containerName: string,
 } } | 
 /**  Cookie pegada a mano (queda en memoria hasta elegir cuenta). */
-"Pasted";
+"Pasted" | 
+/**  Ventana de inicio de sesión de la propia app. */
+"App";
 
 export type AlbumDetail = {
 	summary: AlbumSummary,
@@ -383,7 +392,13 @@ export type VizFrame = {
 	level: number | null,
 };
 
-export type VizPreset = "Bars" | "Waves" | "Ambience" | "Battery" | "Cover";
+export type VizPreset = "Bars" | "Waves" | "Ambience" | "Battery" | 
+/**  Rayos que brotan del centro con rastro (estilo "Ambiente: Agua" de WMP 9). */
+"Water" | 
+/**  Plasma psicodélico con remolinos. */
+"Alchemy" | 
+/**  Túnel en espiral hipnótico. */
+"Spiral" | "Cover";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

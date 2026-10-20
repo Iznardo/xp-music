@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Conectar con YouTube Music importando la sesión del navegador (FR-004-17, FR-003-01).
+  // Conectar con YouTube Music: ventana de Google propia (principal) o importar
+  // la sesión de un navegador Firefox/Zen / pegar la cookie (FR-004-17, FR-003-01).
   import { commands, type BrowserProfile, type SessionAccount } from "../bindings";
   import { auth } from "../stores/auth.svelte";
   import { library } from "../stores/library.svelte";
@@ -27,12 +28,26 @@
     return r.data;
   }
 
+  let waiting = $state(false);
+
+  /// Con una sola cuenta no hay nada que elegir.
+  async function offer(found: SessionAccount[] | null) {
+    accounts = found ?? [];
+    if (accounts.length === 1) await choose(accounts[0]!);
+  }
+  async function signIn() {
+    waiting = true;
+    const found = await run(commands.authSignIn());
+    waiting = false;
+    await offer(found);
+  }
   async function scan(path: string) {
-    accounts = (await run(commands.authScanBrowser(path))) ?? [];
+    await offer(await run(commands.authScanBrowser(path)));
   }
   async function scanPasted() {
-    accounts = (await run(commands.authScanCookie(pasted))) ?? [];
+    const found = await run(commands.authScanCookie(pasted));
     pasted = "";
+    await offer(found);
   }
   async function choose(a: SessionAccount) {
     if (await run(commands.authSelectAccount(a))) {
@@ -40,7 +55,8 @@
       void library.refresh();
     }
   }
-  const where = (a: SessionAccount) => (typeof a.source === "object" && a.source.Browser ? a.source.Browser.containerName : t.login.pasted);
+  const where = (a: SessionAccount) =>
+    typeof a.source === "object" && a.source.Browser ? a.source.Browser.containerName : a.source === "App" ? t.login.google : t.login.pasted;
 </script>
 
 <DialogFrame title={t.login.title} onclose={() => (ui.loginOpen = false)} width={460}>
@@ -48,19 +64,13 @@
     {#if auth.accountName && !auth.signedIn}<p class="warn">{t.login.expired(auth.accountName)}</p>{/if}
     <p>{t.login.intro}</p>
 
-    <fieldset>
-      <legend>{t.login.browsers}</legend>
-      {#each browsers as b}
-        <div class="row">
-          <span class="grow"><b>{b.browser}</b> — {b.name}</span>
-          <button class="xp-btn" disabled={busy} onclick={() => scan(b.path)}>{t.login.scan}</button>
-        </div>
-      {:else}
-        <p>{t.login.noBrowsers}</p>
-      {/each}
-    </fieldset>
+    <button class="xp-btn big" disabled={busy} onclick={signIn}>
+      <span class="g">G</span>
+      {t.login.signIn}
+    </button>
+    {#if waiting}<p class="help">{t.login.waiting}</p>{/if}
 
-    {#if accounts.length}
+    {#if accounts.length > 1}
       <fieldset>
         <legend>{t.login.accounts}</legend>
         {#each accounts as a}
@@ -73,12 +83,26 @@
     {/if}
 
     <details>
-      <summary>{t.login.pasteTitle}</summary>
-      <p class="help">{t.login.pasteHelp}</p>
-      <div class="row">
-        <input class="xp-input grow" type="password" bind:value={pasted} placeholder="SAPISID=…; SID=…" />
-        <button class="xp-btn" disabled={busy || !pasted} onclick={scanPasted}>{t.login.paste}</button>
-      </div>
+      <summary>{t.login.other}</summary>
+      <fieldset>
+        <legend>{t.login.browsers}</legend>
+        {#each browsers as b}
+          <div class="row">
+            <span class="grow"><b>{b.browser}</b> — {b.name}</span>
+            <button class="xp-btn" disabled={busy} onclick={() => scan(b.path)}>{t.login.scan}</button>
+          </div>
+        {:else}
+          <p>{t.login.noBrowsers}</p>
+        {/each}
+      </fieldset>
+      <fieldset>
+        <legend>{t.login.pasteTitle}</legend>
+        <p class="help">{t.login.pasteHelp}</p>
+        <div class="row">
+          <input class="xp-input grow" type="password" bind:value={pasted} placeholder="SAPISID=…; SID=…" />
+          <button class="xp-btn" disabled={busy || !pasted} onclick={scanPasted}>{t.login.paste}</button>
+        </div>
+      </fieldset>
     </details>
 
     {#if busy}<p>{t.views.loading}</p>{/if}
@@ -97,6 +121,29 @@
   .login p {
     margin: 0;
     line-height: 1.4;
+  }
+  .big {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 12px;
+    font-weight: bold;
+  }
+  .g {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    color: #4285f4;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    box-shadow: 0 0 0 1px #c5c5c5;
+  }
+  details fieldset {
+    margin-top: 6px;
   }
   .row {
     display: flex;

@@ -1,9 +1,12 @@
 <script lang="ts">
-  // Reproducción actual: portada / visualización + lista actual a la derecha (FR-004-08/10).
+  // Reproducción actual al estilo WMP 9 (FR-004-08/10): artista y título arriba,
+  // visualización o portada en negro, barra de visualización con ◀ ▶ y la lista
+  // actual a la derecha, también en negro.
   import { commands, type Track, type VizPreset } from "../bindings";
   import { settings } from "../stores/settings.svelte";
   import { appWindow } from "../platform";
   import Visualization from "../viz/Visualization.svelte";
+  import { VIZ_ORDER } from "../viz/presets";
   import { artistNames, fmtTime, trackMenu } from "../actions";
   import { player } from "../stores/player.svelte";
   import { ui } from "../stores/ui.svelte";
@@ -18,32 +21,21 @@
   const cover = $derived(thumbSrc(st?.track?.thumbnails, 544));
   const small = $derived(thumbSrc(st?.track?.thumbnails, 120));
 
-  // Visualización (005): `null` o "Cover" = solo portada.
-  const order: VizPreset[] = ["Bars", "Waves", "Ambience", "Battery", "Cover"];
+  // Visualización (005): "Cover" = solo portada.
   const preset = $derived<VizPreset>(settings.current?.visualization ?? "Cover");
   const showViz = $derived(preset !== "Cover" && !!st?.track);
 
-  // Información superpuesta unos segundos al cambiar de canción o de preset (FR-005-06).
-  let infoVisible = $state(true);
-  let label = $state<string | null>(null);
-  let infoTimer: ReturnType<typeof setTimeout> | undefined;
-  $effect(() => {
-    void st?.track?.id;
-    infoVisible = true;
-    clearTimeout(infoTimer);
-    infoTimer = setTimeout(() => (infoVisible = false), 6000);
-  });
+  function step(dir: 1 | -1) {
+    const i = VIZ_ORDER.indexOf(preset);
+    const next = VIZ_ORDER[(i + dir + VIZ_ORDER.length) % VIZ_ORDER.length]!;
+    void settings.update({ visualization: next });
+  }
 
   let clickTimer: ReturnType<typeof setTimeout> | undefined;
   function stageClick() {
     // Un clic cambia de visualización; el doble clic (pantalla completa) lo cancela.
     clearTimeout(clickTimer);
-    clickTimer = setTimeout(() => {
-      const next = order[(order.indexOf(preset) + 1) % order.length]!;
-      void settings.update({ visualization: next });
-      label = t.options.vizNames[next];
-      setTimeout(() => (label = null), 1500);
-    }, 250);
+    clickTimer = setTimeout(() => step(1), 250);
   }
 
   let fullscreen = $state(false);
@@ -53,62 +45,80 @@
     void appWindow()?.setFullscreen(fullscreen);
   }
 
+  const totalMs = $derived((q?.tracks ?? []).reduce((a, x) => a + (x.durationMs ?? 0), 0));
+
   const columns: Column<Track>[] = [
     { key: "title", label: t.columns.title, width: "3fr", text: (r) => r.title },
     { key: "artist", label: t.columns.artist, width: "2fr", text: (r) => artistNames(r) },
-    { key: "dur", label: t.columns.duration, width: "50px", align: "right", text: (r) => fmtTime(r.durationMs), sort: (r) => r.durationMs ?? 0 },
+    { key: "dur", label: t.columns.duration, width: "44px", align: "right", text: (r) => fmtTime(r.durationMs), sort: (r) => r.durationMs ?? 0 },
   ];
+
+  function goArtist() {
+    const a = st?.track?.artists.find((x) => x.id);
+    if (a?.id) router.go({ name: "artist", id: a.id });
+  }
+  function goAlbum() {
+    const id = st?.track?.album?.id;
+    if (id) router.go({ name: "album", id });
+  }
 </script>
 
 <div class="now">
-  <!-- El escenario se maneja con el ratón como en WMP; el teclado tiene Ctrl+… y el menú Ver. -->
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div
-    class="stage"
-    class:fullscreen
-    class:viz={showViz}
-    onclick={stageClick}
-    ondblclick={toggleFullscreen}
-    onpointermove={() => {
-      if (showViz) {
-        infoVisible = true;
-        clearTimeout(infoTimer);
-        infoTimer = setTimeout(() => (infoVisible = false), 2500);
-      }
-    }}
-    onkeydown={(e) => e.key === "Escape" && fullscreen && toggleFullscreen()}
-  >
-    {#if showViz}
-      {#key preset}<Visualization {preset} />{/key}
-      <div class="overlay" class:hidden={!infoVisible}>
-        {#if small}<img src={small} alt="" />{/if}
-        <div>
-          <span class="o-title">{st?.track?.title}</span>
-          <span class="o-artist">{st?.track ? artistNames(st.track) : ""}</span>
-        </div>
-      </div>
-      {#if label}<div class="preset-label">{label}</div>{/if}
-    {:else}
-    <div class="glow" style:background-image={cover ? `url("${cover}")` : undefined}></div>
-    {#if label}<div class="preset-label">{label}</div>{/if}
-    {#if st?.track}
-      <div class="art">{#if cover}<img src={cover} alt="" />{/if}</div>
-      <div class="meta">
+  <section class="center">
+    <header class="head">
+      {#if st?.track}
+        <button class="artist" onclick={goArtist}>{artistNames(st.track)}</button>
         <span class="title">{st.track.title}</span>
-        <button class="link" onclick={() => { const a = st?.track?.artists.find((x) => x.id); if (a?.id) router.go({ name: "artist", id: a.id }); }}>{artistNames(st.track)}</button>
-        {#if st.track.album}
-          <button class="link album" onclick={() => { const id = st?.track?.album?.id; if (id) router.go({ name: "album", id }); }}>{st.track.album.name}</button>
-        {/if}
+      {:else}
+        <span class="title idle">{t.views.nothingPlaying}</span>
+      {/if}
+    </header>
+
+    <!-- El escenario se maneja con el ratón como en WMP; el teclado tiene Ctrl+… y el menú Ver. -->
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div
+      class="stage"
+      class:fullscreen
+      class:viz={showViz}
+      onclick={stageClick}
+      ondblclick={toggleFullscreen}
+      onkeydown={(e) => e.key === "Escape" && fullscreen && toggleFullscreen()}
+    >
+      {#if showViz}
+        {#key preset}<Visualization {preset} />{/key}
+      {:else if st?.track}
+        <div class="glow" style:background-image={cover ? `url("${cover}")` : undefined}></div>
+        <div class="art">{#if cover}<img src={cover} alt="" />{/if}</div>
+      {/if}
+    </div>
+
+    <div class="vizbar">
+      <div class="steps">
+        <button title={t.viz.previous} aria-label={t.viz.previous} onclick={() => step(-1)}>
+          <svg viewBox="0 0 10 10"><path d="M7 1.5 2.5 5 7 8.5z" /></svg>
+        </button>
+        <button title={t.viz.next} aria-label={t.viz.next} onclick={() => step(1)}>
+          <svg viewBox="0 0 10 10"><path d="M3 1.5 7.5 5 3 8.5z" /></svg>
+        </button>
       </div>
-    {:else}
-      <p class="idle">{t.views.nothingPlaying}</p>
-    {/if}
-    {/if}
-  </div>
+      <span class="preset">{t.options.vizNames[preset]}</span>
+      <span class="grow"></span>
+      {#if st?.track}
+        <button class="album" onclick={goAlbum} disabled={!st.track.album?.id}>
+          {#if small}<img src={small} alt="" />{/if}
+          <span>{st.track.album?.name ?? artistNames(st.track)}</span>
+        </button>
+      {/if}
+    </div>
+  </section>
 
   <aside class="queue">
-    <header>{t.views.queue}</header>
+    <header>
+      <span class="q-title">{t.views.queue}</span>
+      <span class="q-count">{q?.tracks.length ?? 0}</span>
+    </header>
     <ListView
+      dark
       rows={q?.tracks ?? []}
       {columns}
       current={q?.currentIndex ?? null}
@@ -123,8 +133,12 @@
       empty={t.views.queueEmpty}
     />
     <footer>
-      <label><input type="checkbox" checked={q?.autoplay ?? true} onchange={(e) => commands.queueSetAutoplay(e.currentTarget.checked)} /> {t.views.autoplay}</label>
-      <button class="xp-btn" disabled={!q?.tracks.length} onclick={() => commands.queueClear()}>{t.views.clearQueue}</button>
+      <label title={t.views.autoplay}>
+        <input type="checkbox" checked={q?.autoplay ?? true} onchange={(e) => commands.queueSetAutoplay(e.currentTarget.checked)} />
+        {t.views.autoplayShort}
+      </label>
+      <button class="clear" disabled={!q?.tracks.length} onclick={() => commands.queueClear()}>{t.views.clearQueue}</button>
+      <span class="total">{t.views.totalTime}: {fmtTime(totalMs) || "0:00"}</span>
     </footer>
   </aside>
 </div>
@@ -134,73 +148,60 @@
     flex: 1;
     display: flex;
     min-height: 0;
-    background: #000;
+    background: var(--np-bg);
+    color: #fff;
   }
-  .stage {
-    position: relative;
+  .center {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    overflow: hidden;
-    background: radial-gradient(ellipse at 50% 40%, #1d3263 0%, #070d1d 70%);
-    color: #fff;
+    border-right: 2px solid var(--skin-low);
   }
-  /* Fondo: la portada desenfocada (hasta que llegue la visualización de 005). */
-  .glow {
-    position: absolute;
-    inset: -40px;
-    background-size: cover;
-    background-position: center;
-    filter: blur(40px) saturate(1.3) brightness(0.45);
-    opacity: 0.8;
-  }
-  .art {
-    position: relative;
-    width: min(46vh, 60%);
-    aspect-ratio: 1;
-    border: 1px solid #5a74ad;
-    background: #0c1630;
-    box-shadow: 0 6px 24px rgb(0 0 0 / 0.7), 0 0 0 4px rgb(255 255 255 / 0.05);
-  }
-  .art img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .meta {
-    position: relative;
+  .head {
+    flex: none;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    text-align: center;
-    max-width: 90%;
-    text-shadow: 0 1px 3px #000;
+    padding: 6px 10px 6px;
+    min-width: 0;
   }
-  .title {
-    font: bold 18px var(--font-title);
-  }
-  .link {
+  .artist {
+    align-self: flex-start;
+    max-width: 100%;
+    padding: 0;
     border: 0;
     background: none;
-    color: #b8cdf7;
-    font: 13px var(--font-ui);
+    color: #c8c8c8;
+    font: 12px var(--font-ui);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     cursor: pointer;
   }
-  .link:hover {
-    text-decoration: underline;
+  .artist:hover {
     color: #fff;
+    text-decoration: underline;
   }
-  .album {
-    font-size: 11px;
-    color: #8ea6d6;
+  .title {
+    font: bold 17px var(--font-title);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .idle {
+  .title.idle {
+    color: #8a8a8a;
+    font-weight: normal;
+  }
+  .stage {
     position: relative;
-    color: #8ea3cf;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    margin: 0 6px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid #1d1d1d;
   }
   .stage.viz {
     cursor: pointer;
@@ -209,80 +210,154 @@
     position: fixed;
     inset: 0;
     z-index: 700;
+    margin: 0;
+    border: 0;
   }
-  .overlay {
+  .glow {
     position: absolute;
-    left: 14px;
-    bottom: 14px;
+    inset: -40px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(40px) saturate(1.4) brightness(0.45);
+  }
+  .art {
+    position: relative;
+    height: min(78%, 420px);
+    aspect-ratio: 1;
+    border: 1px solid #333;
+    background: #0a0a0a;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.8);
+  }
+  .art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .vizbar {
+    flex: none;
     display: flex;
     align-items: center;
-    gap: 10px;
-    max-width: 70%;
-    padding: 8px 12px 8px 8px;
-    border-radius: 6px;
-    background: rgb(0 0 0 / 0.55);
-    border: 1px solid rgb(255 255 255 / 0.15);
-    transition: opacity 0.6s;
-    pointer-events: none;
+    gap: 6px;
+    height: 30px;
+    padding: 0 8px;
   }
-  .overlay.hidden {
-    opacity: 0;
-  }
-  .overlay img {
-    width: 54px;
-    height: 54px;
-    border: 1px solid #5a74ad;
-  }
-  .overlay div {
+  .steps {
     display: flex;
-    flex-direction: column;
-    min-width: 0;
+    gap: 3px;
   }
-  .o-title {
-    font: bold 15px var(--font-title);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .steps button {
+    width: 17px;
+    height: 17px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid #000;
+    background: radial-gradient(circle at 50% 30%, #f0f0f0, #9a9a9a 70%, #555);
+    color: #111;
+    cursor: pointer;
   }
-  .o-artist {
-    color: #b8cdf7;
+  .steps button:hover {
+    filter: brightness(1.15);
   }
-  .preset-label {
-    position: absolute;
-    top: 12px;
-    left: 14px;
-    padding: 3px 8px;
-    border-radius: 3px;
-    background: rgb(0 0 0 / 0.6);
-    color: #fff;
+  .steps svg {
+    width: 9px;
+    height: 9px;
+    fill: currentColor;
+  }
+  .preset {
     font-weight: bold;
-    pointer-events: none;
+    color: #e6e6e6;
+    white-space: nowrap;
+  }
+  .grow {
+    flex: 1;
+  }
+  .album {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 55%;
+    height: 24px;
+    padding: 0 8px 0 0;
+    border: 1px solid #2a2a2a;
+    background: linear-gradient(to right, #1a1a1a, #000);
+    color: #f0c040;
+    font: bold 11px var(--font-ui);
+    cursor: pointer;
+  }
+  .album:disabled {
+    cursor: default;
+  }
+  .album img {
+    height: 22px;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+  .album span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .queue {
     flex: none;
-    width: 300px;
+    width: 270px;
     display: flex;
     flex-direction: column;
-    background: #eef2fa;
-    border-left: 1px solid #071022;
+    background: #000;
   }
   .queue header {
-    padding: 5px 8px;
-    background: linear-gradient(to bottom, var(--wmp-top), var(--wmp-mid));
-    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    margin: 4px 6px;
+    padding: 0 8px;
+    border: 1px solid var(--skin-edge);
+    border-radius: 3px;
+    background: linear-gradient(to bottom, #fff, #e3e8f3 60%, #c3cde2);
+    color: #000;
+  }
+  .q-title {
+    flex: 1;
     font-weight: bold;
+  }
+  .q-count {
+    color: #555;
   }
   .queue footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 6px;
-    padding: 4px 6px;
-    border-top: 1px solid #a6b9de;
+    height: 24px;
+    padding: 0 6px;
+    color: #c8c8c8;
+    border-top: 1px solid #1d1d1d;
   }
   .queue footer label {
     display: flex;
     align-items: center;
     gap: 3px;
+  }
+  .clear {
+    padding: 0 6px;
+    height: 17px;
+    border: 1px solid #444;
+    border-radius: 3px;
+    background: #151515;
+    color: #ddd;
+    font: inherit;
+    cursor: pointer;
+  }
+  .clear:hover:not(:disabled) {
+    background: #252a36;
+  }
+  .clear:disabled {
+    opacity: 0.5;
+  }
+  .total {
+    margin-left: auto;
+    white-space: nowrap;
   }
 </style>

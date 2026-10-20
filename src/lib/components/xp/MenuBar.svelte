@@ -3,6 +3,8 @@
   import { ui } from "../../stores/ui.svelte";
   import { menuBar } from "../../menus";
 
+  /// `dark`: integrada en la franja superior del skin (texto blanco, sin fondo).
+  let { dark = false }: { dark?: boolean } = $props();
   const menus = $derived(menuBar());
   let openIndex = $state<number | null>(null);
 
@@ -18,7 +20,7 @@
   });
 </script>
 
-<nav class="menubar">
+<nav class="menubar" class:dark>
   {#each menus as m, i}
     <button
       class="item"
@@ -54,5 +56,21 @@
   .item.open {
     background: var(--selection);
     color: #fff;
+  }
+  .menubar.dark {
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .dark .item {
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #fff;
+    text-shadow: 0 1px 1px rgb(0 0 0 / 0.5);
+  }
+  .dark .item:hover,
+  .dark .item.open {
+    background: rgb(255 255 255 / 0.22);
   }
 </style>

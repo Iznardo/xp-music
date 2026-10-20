@@ -7,6 +7,7 @@
   import { updates } from "../stores/updates.svelte";
   import { t } from "../strings";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
+  import { VIZ_ORDER } from "../viz/presets";
 
   type Tab = "player" | "audio" | "keys" | "account" | "viz" | "about";
   type HotkeyName = keyof Settings["hotkeys"];
@@ -52,7 +53,7 @@
   }
 
   const themes: Theme[] = ["Blue", "Olive", "Silver"];
-  const vizs: VizPreset[] = ["Bars", "Waves", "Ambience", "Battery", "Cover"];
+  const vizs: VizPreset[] = VIZ_ORDER;
 
   async function apply() {
     if (!draft) return;
