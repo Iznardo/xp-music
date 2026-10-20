@@ -451,6 +451,16 @@ impl PlayerService {
         self.emit_state();
     }
 
+    /// Activa o desactiva la copia de PCM para el analizador (005).
+    pub fn set_tap(&self, on: bool) {
+        self.engine.send(EngineCmd::SetTap(on));
+    }
+
+    /// Derivación de PCM nueva (si la salida se abrió o cambió desde la última vez).
+    pub fn take_tap(&self) -> Option<crate::audio::output::PcmTap> {
+        self.engine.take_tap()
+    }
+
     /// Sonido de la interfaz (004), mezclado sobre la salida.
     pub fn play_sound(&self, s: crate::audio::sounds::UiSound) {
         self.engine.send(EngineCmd::PlaySound(s));

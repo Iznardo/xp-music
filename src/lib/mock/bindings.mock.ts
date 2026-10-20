@@ -64,6 +64,7 @@ export const events = {
   queueChanged: makeEvent<QueueSnapshot>("queue://changed"),
   settingsChanged: makeEvent<Settings>("settings://changed"),
   ytCacheUpdated: makeEvent<{ key: string }>("yt://cache-updated"),
+  vizFrame: makeEvent<{ bands: number[]; peaks: number[]; wave: number[]; level: number }>("viz://frame"),
 };
 
 // ------------------------------------------------------------------ datos
@@ -190,6 +191,23 @@ setInterval(() => {
   }
   events.playerPosition.emit({ positionMs: state.positionMs, bufferedMs: 30_000 });
 }, 250);
+
+// Fotogramas de visualización inventados: bombo a 120 BPM, voces en medios y charles.
+let vizTimer: ReturnType<typeof setInterval> | undefined;
+const peaks = new Array(64).fill(0);
+function fakeViz() {
+  const t = performance.now() / 1000;
+  const beat = Math.exp(-((t * 2) % 1) * 6);
+  const bands = Array.from({ length: 64 }, (_, i) => {
+    const low = i < 10 ? beat * (1 - i / 14) : 0;
+    const mid = 0.45 * Math.exp(-(((i - 26) / 9) ** 2)) * (0.7 + 0.3 * Math.sin(t * 3 + i));
+    const hat = i > 44 ? 0.35 * Math.exp(-((t * 4) % 1) * 9) : 0;
+    return Math.min(1, low + mid + hat + 0.05 * Math.random());
+  });
+  bands.forEach((b, i) => (peaks[i] = Math.max(b, peaks[i] - 0.01)));
+  const wave = Array.from({ length: 256 }, (_, i) => 0.5 * beat * Math.sin(i * 0.15) + 0.2 * Math.sin(i * 0.9 + t * 20));
+  events.vizFrame.emit({ bands, peaks: [...peaks], wave, level: 0.3 + beat * 0.5 });
+}
 
 let auth: AuthStatus = { SignedIn: { name: "chema iznardo", handle: "@chemaiz4", photo: null } };
 
@@ -390,6 +408,11 @@ export const commands = {
   uiSetLastRoute: (_r: string) => v(undefined),
   windowIsCompact: () => v(false),
   windowSetCompact: (_e: boolean) => ok(null),
+  vizSetActive: (on: boolean) => {
+    clearInterval(vizTimer);
+    if (on) vizTimer = setInterval(fakeViz, 33);
+    return v(undefined);
+  },
   uiLog: (level: string, message: string) => {
     console[level === "error" ? "error" : "log"](message);
     return v(undefined);

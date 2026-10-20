@@ -42,6 +42,7 @@ ytmapi-rs = { version = "0.3.3", default-features = false, features = ["rustls",
 tokio = { version = "1.54.0", features = ["sync", "time", "macros", "rt"] }
 windows-sys = { version = "0.61.2", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
 rand = "0.9"
+rustfft = "6.4.1"
 
 [profile.release]
 codegen-units = 1

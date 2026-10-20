@@ -8,6 +8,7 @@ mod settings;
 mod state;
 mod storage;
 mod ui_state;
+mod viz;
 mod yt;
 
 use std::sync::Arc;
@@ -85,6 +86,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             ui_state::window_is_compact,
             ui_state::window_set_compact,
             ui_state::ui_log,
+            ui_state::viz_set_active,
         ])
         .events(collect_events![
             settings::Settings,
@@ -94,6 +96,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             player::types::PlayerError,
             yt::service::AuthStatus,
             yt::service::CacheUpdated,
+            viz::VizFrame,
         ])
         .typ::<error::AppError>()
 }
@@ -178,6 +181,10 @@ pub fn run() {
                 Arc::new(reporter.clone()),
             );
             reporter.attach(&player);
+            app.manage(viz::VizService::new(
+                app.handle().clone(),
+                Arc::clone(&player),
+            ));
             app.manage(yt);
             app.manage(player);
             Ok(())

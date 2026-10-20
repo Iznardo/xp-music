@@ -117,3 +117,10 @@ pub fn ui_log(level: String, message: String) {
         _ => tracing::info!(target: "ui", "{message}"),
     }
 }
+
+/// Activa el analizador solo mientras la visualización está a la vista (FR-005-03).
+#[tauri::command]
+#[specta::specta]
+pub fn viz_set_active(viz: State<'_, crate::viz::VizService>, active: bool) {
+    viz.set_active(active);
+}

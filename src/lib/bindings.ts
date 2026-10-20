@@ -72,6 +72,8 @@ export const commands = {
 	windowSetCompact: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("window_set_compact", { enabled })),
 	/**  Errores y avisos del frontend al log de la app (la WebView no tiene consola visible). */
 	uiLog: (level: string, message: string) => __TAURI_INVOKE<void>("ui_log", { level, message }),
+	/**  Activa el analizador solo mientras la visualización está a la vista (FR-005-03). */
+	vizSetActive: (active: boolean) => __TAURI_INVOKE<void>("viz_set_active", { active }),
 };
 
 /** Events */
@@ -82,6 +84,7 @@ export const events = {
 	playerState: makeEvent<PlayerState>("player://state"),
 	queueChanged: makeEvent<QueueSnapshot>("queue://changed"),
 	settingsChanged: makeEvent<Settings>("settings://changed"),
+	vizFrame: makeEvent<VizFrame>("viz://frame"),
 	ytCacheUpdated: makeEvent<CacheUpdated>("yt://cache-updated"),
 };
 
@@ -320,6 +323,16 @@ export type UiSound =
 "Error" | 
 /**  Pregunta / advertencia. */
 "Exclamation";
+
+export type VizFrame = {
+	/**  64 valores 0..1, de graves a agudos. */
+	bands: (number | null)[],
+	peaks: (number | null)[],
+	/**  256 muestras -1..1. */
+	wave: (number | null)[],
+	/**  Nivel RMS suavizado 0..1. */
+	level: number | null,
+};
 
 export type VizPreset = "Bars" | "Waves" | "Ambience" | "Battery" | "Cover";
 

@@ -19,7 +19,7 @@ use super::decoder::{DecodeFailure, Decoding, http_client};
 use super::output::{Output, PcmTap, perceptual_amplitude};
 use super::resolver::ResolvedStream;
 use crate::domain::TrackId;
-use crate::error::{AppError, ErrorCode};
+use crate::error::AppError;
 
 const POSITION_INTERVAL: Duration = Duration::from_millis(250);
 /// Muestras mínimas libres en el ring para decodificar otro paquete.
@@ -46,7 +46,7 @@ pub enum EngineCmd {
 
     SetGainDb(f32),
     SetDevice(Option<String>),
-    #[allow(dead_code)] // Analizador de visualizaciones (005).
+
     SetTap(bool),
     PlaySound(super::sounds::UiSound),
     Shutdown,
@@ -151,7 +151,6 @@ impl EngineHandle {
     }
 
     /// Toma la derivación de PCM (005). Cambia si cambia el dispositivo.
-    #[allow(dead_code)] // La usa el analizador de 005.
     pub fn take_tap(&self) -> Option<PcmTap> {
         self.tap.lock().unwrap().take()
     }
@@ -724,12 +723,6 @@ impl Engine {
             }
         }
     }
-}
-
-/// Error genérico del motor para el usuario.
-#[allow(dead_code)]
-pub fn engine_error(msg: &str) -> AppError {
-    AppError::new(ErrorCode::AudioDevice, msg)
 }
 
 #[cfg(test)]

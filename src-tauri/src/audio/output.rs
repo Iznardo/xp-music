@@ -68,7 +68,6 @@ pub fn perceptual_amplitude(volume: f32, muted: bool, gain_db: f32) -> f32 {
 }
 
 /// Derivación de PCM para el analizador (005).
-#[allow(dead_code)] // La consume el analizador de 005.
 pub struct PcmTap {
     pub consumer: HeapCons<f32>,
     pub sample_rate: u32,
