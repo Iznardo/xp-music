@@ -207,15 +207,15 @@
     display: grid;
     place-items: center;
     border-radius: 50%;
-    border: 1px solid #36508f;
-    color: #24386f;
-    background: radial-gradient(circle at 50% 28%, #ffffff 0%, #e6edfb 35%, #a9bce6 72%, #6f88c4 100%);
+    border: 1px solid var(--btn-border);
+    color: var(--btn-ink);
+    background: radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
     box-shadow: inset 0 -4px 6px rgb(20 40 110 / 0.35), 0 0 0 3px rgb(255 255 255 / 0.5), 0 2px 4px rgb(0 0 40 / 0.45);
     cursor: pointer;
   }
   .play.on {
     color: #fff;
-    background: radial-gradient(circle at 50% 28%, #dff0ff 0%, #6aaef6 30%, #2361d0 65%, #0d3384 100%);
+    background: radial-gradient(circle at 50% 28%, var(--accent-1) 0%, var(--accent-2) 35%, var(--accent-3) 100%);
   }
   .play svg {
     width: 26px;
@@ -237,9 +237,9 @@
     display: grid;
     place-items: center;
     padding: 0;
-    color: #24386f;
-    background: radial-gradient(circle at 50% 30%, #ffffff 0%, #e2e9f8 40%, #a6b8e2 80%, #7c94cb 100%);
-    border: 1px solid #4a64a6;
+    color: var(--btn-ink);
+    background: radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
+    border: 1px solid var(--btn-border);
     box-shadow: inset 0 -2px 3px rgb(20 40 110 / 0.25), 0 1px 1px rgb(0 0 40 / 0.35);
     cursor: pointer;
   }
@@ -310,8 +310,8 @@
     height: 16px;
     margin-left: -6px;
     border-radius: 4px;
-    background: linear-gradient(to right, #fff, #c5d2ee);
-    border: 1px solid #4a64a6;
+    background: linear-gradient(to right, var(--btn-1), var(--btn-3));
+    border: 1px solid var(--btn-border);
     box-shadow: 0 1px 2px rgb(0 0 40 / 0.5);
   }
   .row {
@@ -358,7 +358,7 @@
     gap: 10px;
     height: 22px;
     padding: 0 8px;
-    border: 1px solid #4a64a6;
+    border: 1px solid var(--btn-border);
     border-radius: 4px;
     background: var(--lcd-bg);
     box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.8), 0 1px rgb(255 255 255 / 0.6);
@@ -396,7 +396,7 @@
     fill: currentColor;
   }
   .flat:hover {
-    border-color: #7f93c6;
+    border-color: var(--btn-soft-border);
     background: rgb(255 255 255 / 0.35);
   }
   .flat.on {

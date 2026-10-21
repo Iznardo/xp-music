@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Barra lateral de WMP 9 (FR-004-02): siete tareas apiladas, búsqueda y emblema.
+  // Barra lateral de WMP 9 (FR-004-02): la cuenta arriba y siete tareas apiladas con búsqueda.
   // La pieza (forma y fondo) la dibuja App; aquí solo va el contenido.
   import { router } from "../../router.svelte";
   import { auth } from "../../stores/auth.svelte";
@@ -47,18 +47,8 @@
 </script>
 
 <nav class="side">
-  {#each tasks as task, i}
-    <button class="task" class:active={task.active} onclick={task.go}>
-      {#each task.label.split("\n") as line}<span>{line}</span>{/each}
-    </button>
-    {#if i === 5 && searching}
-      <form class="search" onsubmit={search}>
-        <input bind:this={searchEl} placeholder={t.views.searchPlaceholder} bind:value={query} aria-label={t.views.searchPlaceholder} />
-      </form>
-    {/if}
-  {/each}
-
-  <div class="foot">
+  <!-- La cuenta, arriba del todo. -->
+  <div class="user">
     {#if auth.accountName}
       <button
         class="account"
@@ -71,18 +61,18 @@
     {:else}
       <button class="account expired" onclick={() => (ui.loginOpen = true)}><span class="dot"></span>{t.options.connect}</button>
     {/if}
-    <svg class="emblem" viewBox="0 0 32 32" aria-hidden="true">
-      <defs>
-        <radialGradient id="side-emblem" cx="40%" cy="30%" r="75%">
-          <stop offset="0" stop-color="#d8ecff" />
-          <stop offset="0.55" stop-color="#3d8be6" />
-          <stop offset="1" stop-color="#0d3c9e" />
-        </radialGradient>
-      </defs>
-      <circle cx="16" cy="16" r="13" fill="url(#side-emblem)" stroke="#fff" stroke-width="1.5" />
-      <path d="M12.5 9.5v13l10-6.5z" fill="#ffa62a" stroke="#7a3300" stroke-width="0.8" />
-    </svg>
   </div>
+  {#each tasks as task, i}
+    <button class="task" class:active={task.active} onclick={task.go}>
+      {#each task.label.split("\n") as line}<span>{line}</span>{/each}
+    </button>
+    {#if i === 5 && searching}
+      <form class="search" onsubmit={search}>
+        <input bind:this={searchEl} placeholder={t.views.searchPlaceholder} bind:value={query} aria-label={t.views.searchPlaceholder} />
+      </form>
+    {/if}
+  {/each}
+
 </nav>
 
 <style>
@@ -138,13 +128,9 @@
     font: inherit;
     outline: none;
   }
-  .foot {
-    margin-top: auto;
+  .user {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 0 0 6px;
+    padding: 0 0 6px 2px;
   }
   .account {
     display: flex;
@@ -173,10 +159,5 @@
   }
   .account.expired .dot {
     background: radial-gradient(circle at 35% 35%, #ffd0c0, #d0401a);
-  }
-  .emblem {
-    width: 34px;
-    height: 34px;
-    filter: drop-shadow(0 1px 2px rgb(0 0 40 / 0.5));
   }
 </style>

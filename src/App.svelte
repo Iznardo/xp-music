@@ -33,6 +33,9 @@
 
   // Como WMP: "Título - XP Music" mientras suena algo.
   const title = $derived(player.state?.track ? `${player.state.track.title} - ${t.appName}` : t.appName);
+  $effect(() => {
+    document.title = title;
+  });
 
   // El tema se aplica en <html> para que lo vean todas las variables CSS.
   $effect(() => {
@@ -146,7 +149,7 @@
     {/if}
     <div class="piece body" style={place(L.body)} data-tauri-drag-region></div>
     <div class="piece tab" style={place(L.tab)}><PlaylistTab {maximized} /></div>
-    <div class="topbar" style={place(L.topBar)}><TitleBar {title} /></div>
+    <div class="topbar" style={place(L.topBar)}><TitleBar /></div>
     <button
       class="handle"
       style="left:{Math.max(0, L.content.x - 9)}px;top:{L.content.y + L.content.h / 2 - 22}px"

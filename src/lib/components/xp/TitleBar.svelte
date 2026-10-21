@@ -6,8 +6,6 @@
   import { menuBar } from "../../menus";
   import { t } from "../../strings";
 
-  let { title }: { title: string } = $props();
-
   function openMenu(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const items: MenuItem[] = menuBar().map((m) => ({ kind: "sub", label: m.label, items: m.items() }));
@@ -19,7 +17,8 @@
   <button class="menu" title={t.top.menu} aria-label={t.top.menu} onclick={openMenu}>
     <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" /><circle cx="8" cy="8" r="1.4" /></svg>
   </button>
-  <span class="title" data-tauri-drag-region>{title}</span>
+  <!-- Como en WMP 9, sin título: la franja solo sirve para arrastrar la ventana. -->
+  <span class="grow" data-tauri-drag-region></span>
   <div class="rounds">
     <button title={ui.sideCollapsed ? t.side.show : t.side.hide} aria-label={ui.sideCollapsed ? t.side.show : t.side.hide} onclick={() => ui.toggleSide()}>
       <svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.4" /><rect x="3" y="3.5" width="3.5" height="9" /></svg>
@@ -49,7 +48,7 @@
     border-radius: 50%;
     border: 1px solid var(--skin-edge);
     color: var(--skin-deep);
-    background: radial-gradient(circle at 50% 30%, #fff 0%, #dfe7f8 40%, #9fb3df 80%, #7b93c9 100%);
+    background: radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
     box-shadow: inset 0 -2px 3px rgb(0 0 40 / 0.25), 0 1px 1px rgb(0 0 40 / 0.35);
     cursor: pointer;
   }
@@ -57,22 +56,16 @@
     width: 21px;
     height: 21px;
     color: #fff;
-    background: radial-gradient(circle at 50% 30%, #bfe0ff 0%, #4a8fe8 45%, #1747b0 100%);
+    background: radial-gradient(circle at 50% 30%, var(--accent-1) 0%, var(--accent-2) 45%, var(--accent-3) 100%);
   }
   .menu svg {
     width: 12px;
     height: 12px;
     fill: currentColor;
   }
-  .title {
+  .grow {
     flex: 1;
-    min-width: 0;
-    color: var(--skin-deep);
-    font: bold 11px var(--font-ui);
-    text-shadow: 0 1px rgb(255 255 255 / 0.7);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    align-self: stretch;
   }
   .rounds {
     display: flex;

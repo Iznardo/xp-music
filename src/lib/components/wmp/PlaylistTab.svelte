@@ -48,8 +48,8 @@
 <div class="tab" data-tauri-drag-region>
   <button class="combo" onclick={open} title={label} aria-haspopup="menu">
     <svg class="doc" viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#5a6f9e" />
-      <path d="M5 6h6M5 8.5h6M5 11h4" stroke="#5a6f9e" />
+      <path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="var(--btn-border)" />
+      <path d="M5 6h6M5 8.5h6M5 11h4" stroke="var(--btn-border)" />
     </svg>
     <span class="label">{label}</span>
     <span class="count">{count}</span>
@@ -84,7 +84,7 @@
     gap: 5px;
     height: 23px;
     padding: 0 0 0 4px;
-    border: 1px solid #7f8fb8;
+    border: 1px solid var(--btn-soft-border);
     border-radius: 2px;
     background: #fff;
     color: #000;
@@ -114,13 +114,13 @@
     place-items: center;
     width: 19px;
     height: 100%;
-    border-left: 1px solid #b7c3df;
-    background: linear-gradient(to bottom, #f7f9ff, #c9d5ef);
+    border-left: 1px solid var(--btn-soft-border);
+    background: linear-gradient(to bottom, var(--btn-1), var(--btn-3));
   }
   .arrow svg {
     width: 8px;
     height: 5px;
-    fill: #2b3f75;
+    fill: var(--btn-ink);
   }
   .win {
     display: flex;

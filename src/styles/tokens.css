@@ -130,6 +130,18 @@
   --side-text-shadow: 0 1px 1px rgb(0 0 40 / 0.55);
   --side-line: rgb(255 255 255 / 0.75);
   --side-line-shadow: rgb(0 0 60 / 0.35);
+  /* Botones redondos, píldora, desplegable y deslizadores. */
+  --btn-1: #ffffff;
+  --btn-2: #e2e9f8;
+  --btn-3: #a6b8e2;
+  --btn-4: #7c94cb;
+  --btn-ink: #24386f;
+  --btn-border: #4a64a6;
+  --btn-soft-border: #7f8fb8;
+  --accent-1: #dff0ff;
+  --accent-2: #4a8fe8;
+  --accent-3: #1747b0;
+  --slider-fill: #4c8fe8;
 }
 :root[data-theme="olive"] {
   --skin-hi: #d8e6b4;
@@ -148,6 +160,17 @@
   --side-text-shadow: 0 1px 1px rgb(30 40 0 / 0.6);
   --side-line: rgb(255 255 255 / 0.7);
   --side-line-shadow: rgb(40 50 10 / 0.35);
+  --btn-1: #ffffff;
+  --btn-2: #eef2e2;
+  --btn-3: #c7d3a8;
+  --btn-4: #9fb27a;
+  --btn-ink: #3d4c1f;
+  --btn-border: #6d7f3f;
+  --btn-soft-border: #9fb07a;
+  --accent-1: #eef7d6;
+  --accent-2: #9cb862;
+  --accent-3: #5d7a2c;
+  --slider-fill: #8aa652;
 }
 :root[data-theme="silver"] {
   --skin-hi: #ffffff;
@@ -167,6 +190,17 @@
   --side-text-shadow: 0 1px 0 rgb(255 255 255 / 0.8);
   --side-line: rgb(60 62 80 / 0.35);
   --side-line-shadow: rgb(255 255 255 / 0.7);
+  --btn-1: #ffffff;
+  --btn-2: #ececf1;
+  --btn-3: #c6c8d3;
+  --btn-4: #9c9eae;
+  --btn-ink: #33343f;
+  --btn-border: #6f7182;
+  --btn-soft-border: #9a9caa;
+  --accent-1: #ffffff;
+  --accent-2: #a9abba;
+  --accent-3: #5d5f70;
+  --slider-fill: #8c8ea0;
 }
 :root {
   --lcd-bg: #000;

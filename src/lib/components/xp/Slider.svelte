@@ -84,7 +84,7 @@
   }
   .fill {
     height: 100%;
-    background: #4c8fe8;
+    background: var(--slider-fill);
   }
   .dark .fill {
     background: linear-gradient(to bottom, #9fc7ff, #3d7ee0);
@@ -95,9 +95,9 @@
     width: 10px;
     height: 14px;
     margin-left: -5px;
-    border: 1px solid #2c4e8f;
+    border: 1px solid var(--btn-border);
     border-radius: 2px 2px 5px 5px;
-    background: linear-gradient(to right, #ffffff, #d9e6fb 50%, #a7bfe8);
+    background: linear-gradient(to right, var(--btn-1), var(--btn-2) 50%, var(--btn-3));
     box-shadow: 0 1px 1px rgb(0 0 0 / 0.4);
   }
   .slider:focus-visible .knob {
