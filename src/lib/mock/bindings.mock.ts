@@ -413,7 +413,7 @@ export const commands = {
   playerHint: (_ids: string[]) => v(undefined),
   windowIsCompact: () => v(false),
   windowSetCompact: (_e: boolean) => ok(null),
-  windowSetShape: (_p: [number, number][] | null) => ok(null),
+  windowSetShape: (_p: [number, number][][] | null) => ok(null),
   vizSetActive: (on: boolean) => {
     clearInterval(vizTimer);
     if (on) vizTimer = setInterval(fakeViz, 33);

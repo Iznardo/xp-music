@@ -1,6 +1,7 @@
 <script lang="ts">
-  // Transporte inferior del skin WMP 9 (FR-004-11/12): pantalla LCD verde, botón de
-  // reproducir grande en un "pod" que sobresale y el resto de controles en una pista.
+  // Controles del skin WMP 9 (FR-004-11/12): una píldora plateada que sobresale
+  // abajo a la izquierda con ▶ grande, ■, tiempo, ⏮⏭, silencio y volumen; y la
+  // barra inferior del cuerpo con la pantalla de estado, aleatorio y repetir.
   import { commands, type RepeatMode } from "../../bindings";
   import { player } from "../../stores/player.svelte";
   import { ui } from "../../stores/ui.svelte";
@@ -8,6 +9,9 @@
   import { artistNames, fmtTime } from "../../actions";
   import { t } from "../../strings";
   import Slider from "../xp/Slider.svelte";
+  import { place, radii, type Piece, type Rect } from "../../skin";
+
+  let { pod, bar }: { pod: Piece; bar: Rect } = $props();
 
   const st = $derived(player.state);
   const playing = $derived(st?.status === "Playing" || st?.status === "Buffering" || st?.status === "Loading");
@@ -72,30 +76,27 @@
   }
 </script>
 
-<footer class="transport">
-  <button class="lcd" onclick={() => router.go({ name: "now" })} title={t.tabs.now.replace("\n", " ")}>
-    <span class="lcd-text">{lcdText}</span>
-    <span class="lcd-time">{fmtTime(shown) || "00:00"}{duration ? ` / ${fmtTime(duration)}` : ""}</span>
+<div class="pod" style="{place(pod)};border-radius:{radii(pod)}">
+  <button
+    class="play"
+    class:on={playing}
+    title={playing ? t.transport.pause : t.transport.play}
+    aria-label={playing ? t.transport.pause : t.transport.play}
+    onclick={() => commands.playerToggle()}
+  >
+    {#if playing}
+      <svg viewBox="0 0 16 16"><rect x="4" y="3" width="3" height="10" rx=".5" /><rect x="9" y="3" width="3" height="10" rx=".5" /></svg>
+    {:else}
+      <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" /></svg>
+    {/if}
+  </button>
+  <button class="round stop" title={t.transport.stop} aria-label={t.transport.stop} onclick={() => commands.playerStop()}>
+    <svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1" /></svg>
   </button>
 
-  <div class="deck">
-    <div class="pod">
-      <button
-        class="play"
-        class:on={playing}
-        title={playing ? t.transport.pause : t.transport.play}
-        aria-label={playing ? t.transport.pause : t.transport.play}
-        onclick={() => commands.playerToggle()}
-      >
-        {#if playing}
-          <svg viewBox="0 0 16 16"><rect x="4" y="3" width="3" height="10" rx=".5" /><rect x="9" y="3" width="3" height="10" rx=".5" /></svg>
-        {:else}
-          <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" /></svg>
-        {/if}
-      </button>
-    </div>
-
-    <div class="rail">
+  <div class="right">
+    <div class="seekrow">
+      <svg class="tick" viewBox="0 0 10 8" aria-hidden="true"><path d="M5 0v8L0 4zM10 0v8L5 4z" /></svg>
       <div
         class="seek"
         bind:this={seekEl}
@@ -114,94 +115,244 @@
         <div class="played" style:width="{playedPct}%"></div>
         {#if duration}<div class="thumb" style:left="{playedPct}%"></div>{/if}
       </div>
-
-      <div class="row">
-        <button class="round" title={t.transport.stop} aria-label={t.transport.stop} onclick={() => commands.playerStop()}>
-          <svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1" /></svg>
+      <svg class="tick" viewBox="0 0 10 8" aria-hidden="true"><path d="M0 0v8l5-4zM5 0v8l5-4z" /></svg>
+    </div>
+    <div class="row">
+      <div class="pill">
+        <button title={t.transport.previous} aria-label={t.transport.previous} onclick={() => commands.playerPrevious()}>
+          <svg viewBox="0 0 16 16"><rect x="3" y="4" width="2" height="8" /><path d="M13 4v8L6 8z" /></svg>
         </button>
-        <div class="pill">
-          <button title={t.transport.previous} aria-label={t.transport.previous} onclick={() => commands.playerPrevious()}>
-            <svg viewBox="0 0 16 16"><rect x="2" y="4" width="2" height="8" /><path d="M9 4v8L4 8zM14 4v8L9 8z" /></svg>
-          </button>
-          <button title={t.transport.next} aria-label={t.transport.next} onclick={() => commands.playerNext()}>
-            <svg viewBox="0 0 16 16"><path d="M2 4v8l5-4zM7 4v8l5-4z" /><rect x="12" y="4" width="2" height="8" /></svg>
-          </button>
-        </div>
-
-        <button
-          class="round"
-          title={st?.muted ? t.transport.unmute : t.transport.mute}
-          aria-label={st?.muted ? t.transport.unmute : t.transport.mute}
-          onclick={() => commands.playerSetMuted(!st?.muted)}
-        >
-          <svg viewBox="0 0 16 16">
-            <path d="M2 6h3l4-3v10l-4-3H2z" />
-            {#if st?.muted}
-              <path d="M11 6l4 4M15 6l-4 4" stroke="currentColor" stroke-width="1.5" fill="none" />
-            {:else}
-              <path d="M11 5.5c1.2 1.4 1.2 3.6 0 5M12.8 4c2 2.3 2 5.7 0 8" stroke="currentColor" stroke-width="1.2" fill="none" />
-            {/if}
-          </svg>
+        <button title={t.transport.next} aria-label={t.transport.next} onclick={() => commands.playerNext()}>
+          <svg viewBox="0 0 16 16"><path d="M3 4v8l7-4z" /><rect x="11" y="4" width="2" height="8" /></svg>
         </button>
-        <div class="volume">
-          <Slider
-            value={Math.round((st?.volume ?? 0.8) * 100)}
-            min={0}
-            max={100}
-            label={t.transport.volume}
-            dark
-            onchange={(v) => commands.playerSetVolume(v / 100)}
-          />
-        </div>
-
-        <span class="spacer"></span>
-        <button
-          class="flat"
-          class:on={st?.shuffle}
-          title={st?.shuffle ? t.transport.shuffleOff : t.transport.shuffleOn}
-          aria-pressed={st?.shuffle ?? false}
-          onclick={() => commands.playerSetShuffle(!st?.shuffle)}
-        >
-          <svg viewBox="0 0 16 16"><path d="M1 4h3l7 8h3M1 12h3l2-2.3M9 6.3 11 4h3M12 2l2 2-2 2M12 10l2 2-2 2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
-        </button>
-        <button
-          class="flat"
-          class:on={st?.repeat !== "Off"}
-          title={t.transport.repeat[st?.repeat ?? "Off"]}
-          aria-label={t.transport.repeat[st?.repeat ?? "Off"]}
-          onclick={() => commands.playerSetRepeat(nextRepeat[st?.repeat ?? "Off"])}
-        >
-          <svg viewBox="0 0 16 16"><path d="M3 7V5h9M10 3l2 2-2 2M13 9v2H4M6 13l-2-2 2-2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
-          {#if st?.repeat === "One"}<span class="one">1</span>{/if}
-        </button>
-        <button class="flat" title={t.transport.compact} aria-label={t.transport.compact} onclick={() => ui.setCompact(true)}>
-          <svg viewBox="0 0 16 16"><rect x="1.5" y="4.5" width="13" height="7" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3" /><circle cx="5" cy="8" r="1.8" /></svg>
-        </button>
+      </div>
+      <button
+        class="round mute"
+        title={st?.muted ? t.transport.unmute : t.transport.mute}
+        aria-label={st?.muted ? t.transport.unmute : t.transport.mute}
+        onclick={() => commands.playerSetMuted(!st?.muted)}
+      >
+        <svg viewBox="0 0 16 16">
+          <path d="M2 6h3l4-3v10l-4-3H2z" />
+          {#if st?.muted}
+            <path d="M11 6l4 4M15 6l-4 4" stroke="currentColor" stroke-width="1.5" fill="none" />
+          {:else}
+            <path d="M11 5.5c1.2 1.4 1.2 3.6 0 5M12.8 4c2 2.3 2 5.7 0 8" stroke="currentColor" stroke-width="1.2" fill="none" />
+          {/if}
+        </svg>
+      </button>
+      <div class="volume">
+        <Slider
+          value={Math.round((st?.volume ?? 0.8) * 100)}
+          min={0}
+          max={100}
+          label={t.transport.volume}
+          onchange={(v) => commands.playerSetVolume(v / 100)}
+        />
       </div>
     </div>
   </div>
-</footer>
+</div>
+
+<div class="bar" style={place(bar)}>
+  <button class="lcd" onclick={() => router.go({ name: "now" })} title={t.tabs.now.replace("\n", " ")}>
+    <span class="lcd-text">{lcdText}</span>
+    <span class="lcd-time">{fmtTime(shown) || "00:00"}{duration ? ` / ${fmtTime(duration)}` : ""}</span>
+  </button>
+  <button
+    class="flat"
+    class:on={st?.shuffle}
+    title={st?.shuffle ? t.transport.shuffleOff : t.transport.shuffleOn}
+    aria-pressed={st?.shuffle ?? false}
+    onclick={() => commands.playerSetShuffle(!st?.shuffle)}
+  >
+    <svg viewBox="0 0 16 16"><path d="M1 4h3l7 8h3M1 12h3l2-2.3M9 6.3 11 4h3M12 2l2 2-2 2M12 10l2 2-2 2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
+  </button>
+  <button
+    class="flat"
+    class:on={st?.repeat !== "Off"}
+    title={t.transport.repeat[st?.repeat ?? "Off"]}
+    aria-label={t.transport.repeat[st?.repeat ?? "Off"]}
+    onclick={() => commands.playerSetRepeat(nextRepeat[st?.repeat ?? "Off"])}
+  >
+    <svg viewBox="0 0 16 16"><path d="M3 7V5h9M10 3l2 2-2 2M13 9v2H4M6 13l-2-2 2-2" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
+    {#if st?.repeat === "One"}<span class="one">1</span>{/if}
+  </button>
+</div>
 
 <style>
-  .transport {
-    flex: none;
-    position: relative;
-    margin-bottom: var(--shape-bottom, 0px);
-    color: #fff;
+  /* Píldora plateada que sobresale por debajo del cuerpo. */
+  .pod {
+    position: absolute;
+    z-index: 30;
+    background: linear-gradient(to bottom, #f4f7ff 0%, #d3dcf2 35%, #aebde4 70%, #8ea2d3 100%);
+    border: 1px solid var(--skin-edge);
+    box-shadow: inset 0 2px 1px rgb(255 255 255 / 0.9), inset 0 -3px 6px rgb(30 50 120 / 0.25), 0 2px 4px rgb(0 0 40 / 0.35);
     user-select: none;
   }
-  /* Pantalla LCD sobre el transporte. */
+  .play {
+    position: absolute;
+    left: 15px;
+    top: 14px;
+    width: 58px;
+    height: 58px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid #36508f;
+    color: #24386f;
+    background: radial-gradient(circle at 50% 28%, #ffffff 0%, #e6edfb 35%, #a9bce6 72%, #6f88c4 100%);
+    box-shadow: inset 0 -4px 6px rgb(20 40 110 / 0.35), 0 0 0 3px rgb(255 255 255 / 0.5), 0 2px 4px rgb(0 0 40 / 0.45);
+    cursor: pointer;
+  }
+  .play.on {
+    color: #fff;
+    background: radial-gradient(circle at 50% 28%, #dff0ff 0%, #6aaef6 30%, #2361d0 65%, #0d3384 100%);
+  }
+  .play svg {
+    width: 26px;
+    height: 26px;
+    fill: currentColor;
+  }
+  .play:hover,
+  .round:hover,
+  .pill button:hover {
+    filter: brightness(1.08);
+  }
+  .play:active,
+  .round:active,
+  .pill button:active {
+    filter: brightness(0.85);
+  }
+  .round,
+  .pill button {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    color: #24386f;
+    background: radial-gradient(circle at 50% 30%, #ffffff 0%, #e2e9f8 40%, #a6b8e2 80%, #7c94cb 100%);
+    border: 1px solid #4a64a6;
+    box-shadow: inset 0 -2px 3px rgb(20 40 110 / 0.25), 0 1px 1px rgb(0 0 40 / 0.35);
+    cursor: pointer;
+  }
+  .round {
+    border-radius: 50%;
+  }
+  .stop {
+    position: absolute;
+    left: 80px;
+    top: 28px;
+    width: 30px;
+    height: 30px;
+  }
+  .round svg,
+  .pill svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+  }
+  .right {
+    position: absolute;
+    left: 120px;
+    right: 26px;
+    top: 18px;
+    bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .seekrow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tick {
+    width: 10px;
+    height: 8px;
+    fill: #6d82b8;
+  }
+  .seek {
+    position: relative;
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #6f84b9;
+    box-shadow: inset 0 1px 2px rgb(0 0 40 / 0.6), 0 1px rgb(255 255 255 / 0.8);
+    cursor: pointer;
+    touch-action: none;
+  }
+  .buffered,
+  .played {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 3px;
+  }
+  .buffered {
+    background: rgb(255 255 255 / 0.3);
+  }
+  .played {
+    background: linear-gradient(to bottom, #c4ffc4, #3fca3f 55%, #1a8a1a);
+  }
+  .thumb {
+    position: absolute;
+    top: -5px;
+    width: 12px;
+    height: 16px;
+    margin-left: -6px;
+    border-radius: 4px;
+    background: linear-gradient(to right, #fff, #c5d2ee);
+    border: 1px solid #4a64a6;
+    box-shadow: 0 1px 2px rgb(0 0 40 / 0.5);
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pill {
+    display: flex;
+  }
+  .pill button {
+    width: 30px;
+    height: 20px;
+  }
+  .pill button:first-child {
+    border-radius: 10px 0 0 10px;
+  }
+  .pill button:last-child {
+    border-radius: 0 10px 10px 0;
+    border-left: 0;
+  }
+  .mute {
+    width: 22px;
+    height: 22px;
+  }
+  .volume {
+    flex: 1;
+    min-width: 50px;
+  }
+  /* Barra inferior del cuerpo, a la derecha de la píldora. */
+  .bar {
+    position: absolute;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 26px 0 10px;
+  }
   .lcd {
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 10px;
-    width: 100%;
-    height: 18px;
-    padding: 0 34px 0 106px;
-    border: 0;
-    border-top: 1px solid var(--skin-edge);
-    border-bottom: 1px solid #1a1a1a;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid #4a64a6;
+    border-radius: 4px;
     background: var(--lcd-bg);
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.8), 0 1px rgb(255 255 255 / 0.6);
     color: var(--lcd-text);
     font: bold 11px var(--font-ui);
     text-align: left;
@@ -217,171 +368,17 @@
   .lcd-time {
     font-variant-numeric: tabular-nums;
   }
-  .deck {
-    display: flex;
-    align-items: stretch;
-    height: 50px;
-    background: linear-gradient(to bottom, var(--skin-hi) 0%, var(--skin-top) 10%, var(--skin-mid) 50%, var(--skin-low) 100%);
-  }
-  /* Disco del ▶: coincide con el círculo de la silueta (lib/shape.ts: centro a 50 px
-     del borde izquierdo y 48 px del inferior, radio 48) y sobresale por arriba. */
-  .pod {
-    flex: none;
-    width: 100px;
-  }
-  .pod::before {
-    content: "";
-    position: absolute;
-    z-index: 940;
-    left: 4px;
-    bottom: calc(-1 * var(--shape-bottom, 0px) + 2px);
-    width: 92px;
-    height: 92px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 50% 30%, var(--skin-hi), var(--skin-mid) 45%, var(--skin-low) 75%, var(--skin-deep));
-    box-shadow: inset 0 2px 3px rgb(255 255 255 / 0.5), inset 0 -3px 6px rgb(0 0 0 / 0.35);
-  }
-  .play {
-    position: absolute;
-    z-index: 941;
-    left: 19px;
-    bottom: calc(-1 * var(--shape-bottom, 0px) + 17px);
-    width: 62px;
-    height: 62px;
-    padding: 0;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    border: 1px solid #06183f;
-    color: #fff;
-    background: radial-gradient(circle at 50% 28%, #d8efff 0%, #5cb0ff 28%, #1765dc 62%, #0a2f86 100%);
-    box-shadow: inset 0 -4px 6px rgb(0 0 40 / 0.5), 0 0 8px rgb(80 160 255 / 0.55), 0 2px 4px #000;
-    cursor: pointer;
-  }
-  .play.on {
-    background: radial-gradient(circle at 50% 28%, #e4fff0 0%, #6fe08f 28%, #1f9a45 62%, #0b4d20 100%);
-    box-shadow: inset 0 -4px 6px rgb(0 40 0 / 0.5), 0 0 8px rgb(90 230 120 / 0.55), 0 2px 4px #000;
-  }
-  .play svg {
-    width: 26px;
-    height: 26px;
-    fill: currentColor;
-    filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.5));
-  }
-  .play:hover {
-    filter: brightness(1.12);
-  }
-  .play:active {
-    filter: brightness(0.88);
-  }
-  .rail {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 6px;
-    padding: 0 64px 0 4px;
-  }
-  .seek {
-    position: relative;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--skin-deep);
-    box-shadow: inset 0 1px 2px #000, 0 1px rgb(255 255 255 / 0.3);
-    cursor: pointer;
-    touch-action: none;
-  }
-  .buffered,
-  .played {
-    position: absolute;
-    inset: 0 auto 0 0;
-    border-radius: 3px;
-  }
-  .buffered {
-    background: rgb(255 255 255 / 0.18);
-  }
-  .played {
-    background: linear-gradient(to bottom, #b6ffb6, #36c436 55%, #178417);
-  }
-  .thumb {
-    position: absolute;
-    top: -4px;
-    width: 14px;
-    height: 14px;
-    margin-left: -7px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 40% 35%, #fff, #c9d6f2 50%, #6c85bd);
-    border: 1px solid var(--skin-edge);
-    box-shadow: 0 1px 2px #000;
-  }
-  .row {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .round,
-  .pill button {
-    display: grid;
-    place-items: center;
-    padding: 0;
-    color: var(--skin-deep);
-    background: radial-gradient(circle at 50% 30%, #ffffff 0%, #dfe8fa 35%, #9fb4dd 75%, #6f88bf 100%);
-    border: 1px solid var(--skin-edge);
-    box-shadow: inset 0 -2px 3px rgb(0 0 30 / 0.3), 0 1px 1px rgb(0 0 0 / 0.5);
-    cursor: pointer;
-  }
-  .round {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-  }
-  .pill {
-    display: flex;
-  }
-  .pill button {
-    width: 28px;
-    height: 20px;
-  }
-  .pill button:first-child {
-    border-radius: 10px 0 0 10px;
-  }
-  .pill button:last-child {
-    border-radius: 0 10px 10px 0;
-    border-left: 0;
-  }
-  .round svg,
-  .pill svg {
-    width: 12px;
-    height: 12px;
-    fill: currentColor;
-  }
-  .round:hover,
-  .pill button:hover {
-    filter: brightness(1.1);
-  }
-  .round:active,
-  .pill button:active {
-    filter: brightness(0.85);
-  }
-  .volume {
-    width: 84px;
-  }
-  .spacer {
-    flex: 1;
-  }
   .flat {
     display: grid;
     place-items: center;
     position: relative;
     width: 24px;
-    height: 20px;
+    height: 22px;
     padding: 0;
     background: none;
     border: 1px solid transparent;
     border-radius: 3px;
-    color: #fff;
-    opacity: 0.8;
+    color: var(--skin-deep);
     cursor: pointer;
   }
   .flat svg {
@@ -390,13 +387,11 @@
     fill: currentColor;
   }
   .flat:hover {
-    opacity: 1;
-    border-color: rgb(255 255 255 / 0.4);
-    background: rgb(255 255 255 / 0.1);
+    border-color: #7f93c6;
+    background: rgb(255 255 255 / 0.35);
   }
   .flat.on {
-    opacity: 1;
-    color: #8dff8d;
+    color: #148a14;
   }
   .one {
     position: absolute;

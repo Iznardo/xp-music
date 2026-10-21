@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Panel de tareas vertical de WMP 9 (FR-004-02): secciones, búsqueda, cuenta y
-  // una pestaña para ocultarlo.
+  // Barra lateral de WMP 9 (FR-004-02): siete tareas apiladas, búsqueda y emblema.
+  // La pieza (forma y fondo) la dibuja App; aquí solo va el contenido.
   import { router } from "../../router.svelte";
   import { auth } from "../../stores/auth.svelte";
   import { ui } from "../../stores/ui.svelte";
@@ -8,12 +8,29 @@
 
   let query = $state("");
   let searchEl = $state<HTMLInputElement>();
-  const tasks = [
-    { id: "now", label: t.tabs.now, go: () => router.go({ name: "now" }) },
-    { id: "home", label: t.tabs.home, go: () => router.go({ name: "home" }) },
-    { id: "library", label: t.tabs.library, go: () => router.go({ name: "library", section: "playlists" }) },
-    { id: "search", label: t.tabs.search, go: () => searchEl?.focus() },
-  ] as const;
+  let searching = $state(false);
+
+  const isLib = (s: string) => router.route.name === "library" && router.route.section === s;
+  const tasks = $derived([
+    { label: t.side.now, active: router.tab === "now", go: () => router.go({ name: "now" }) },
+    { label: t.side.guide, active: router.tab === "home", go: () => router.go({ name: "home" }) },
+    {
+      label: t.side.library,
+      active: router.tab === "library" && !isLib("liked") && !isLib("history"),
+      go: () => router.go({ name: "library", section: "playlists" }),
+    },
+    { label: t.side.liked, active: isLib("liked"), go: () => router.go({ name: "library", section: "liked" }) },
+    { label: t.side.history, active: isLib("history"), go: () => router.go({ name: "library", section: "history" }) },
+    {
+      label: t.side.search,
+      active: router.tab === "search" || searching,
+      go: () => {
+        searching = true;
+        queueMicrotask(() => searchEl?.focus());
+      },
+    },
+    { label: t.side.options, active: ui.optionsOpen, go: () => (ui.optionsOpen = true) },
+  ]);
 
   function search(e: SubmitEvent) {
     e.preventDefault();
@@ -22,102 +39,99 @@
 
   // Al llegar a una búsqueda por otra vía (menú, atajos), refleja el texto.
   $effect(() => {
-    if (router.route.name === "search") query = router.route.query;
+    if (router.route.name === "search") {
+      query = router.route.query;
+      searching = true;
+    }
   });
 </script>
 
-<nav class="side" class:collapsed={ui.sideCollapsed}>
-  {#if !ui.sideCollapsed}
-    <div class="tasks">
-      {#each tasks as task}
-        <button class="task" class:active={router.tab === task.id} onclick={task.go}>
-          {#each task.label.split("\n") as line}<span>{line}</span>{/each}
-        </button>
-      {/each}
+<nav class="side">
+  {#each tasks as task, i}
+    <button class="task" class:active={task.active} onclick={task.go}>
+      {#each task.label.split("\n") as line}<span>{line}</span>{/each}
+    </button>
+    {#if i === 5 && searching}
       <form class="search" onsubmit={search}>
         <input bind:this={searchEl} placeholder={t.views.searchPlaceholder} bind:value={query} aria-label={t.views.searchPlaceholder} />
       </form>
-    </div>
+    {/if}
+  {/each}
 
-    <div class="foot">
-      {#if auth.accountName}
-        <button
-          class="account"
-          class:expired={!auth.signedIn}
-          title={auth.signedIn ? "YouTube Music" : t.login.expired(auth.accountName)}
-          onclick={() => (ui.loginOpen = !auth.signedIn)}
-        >
-          <span class="dot"></span><span class="name">{auth.accountName}</span>
-        </button>
-      {:else}
-        <button class="account expired" onclick={() => (ui.loginOpen = true)}><span class="dot"></span>{t.options.connect}</button>
-      {/if}
-    </div>
-  {/if}
-
-  <button
-    class="handle"
-    title={ui.sideCollapsed ? t.side.show : t.side.hide}
-    aria-label={ui.sideCollapsed ? t.side.show : t.side.hide}
-    onclick={() => ui.toggleSide()}
-  >
-    <svg viewBox="0 0 6 10"><path d={ui.sideCollapsed ? "M1 1l4 4-4 4" : "M5 1L1 5l4 4"} fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
-  </button>
+  <div class="foot">
+    {#if auth.accountName}
+      <button
+        class="account"
+        class:expired={!auth.signedIn}
+        title={auth.signedIn ? "YouTube Music" : t.login.expired(auth.accountName)}
+        onclick={() => (ui.loginOpen = !auth.signedIn)}
+      >
+        <span class="dot"></span><span class="name">{auth.accountName}</span>
+      </button>
+    {:else}
+      <button class="account expired" onclick={() => (ui.loginOpen = true)}><span class="dot"></span>{t.options.connect}</button>
+    {/if}
+    <svg class="emblem" viewBox="0 0 32 32" aria-hidden="true">
+      <defs>
+        <radialGradient id="side-emblem" cx="40%" cy="30%" r="75%">
+          <stop offset="0" stop-color="#d8ecff" />
+          <stop offset="0.55" stop-color="#3d8be6" />
+          <stop offset="1" stop-color="#0d3c9e" />
+        </radialGradient>
+      </defs>
+      <circle cx="16" cy="16" r="13" fill="url(#side-emblem)" stroke="#fff" stroke-width="1.5" />
+      <path d="M12.5 9.5v13l10-6.5z" fill="#ffa62a" stroke="#7a3300" stroke-width="0.8" />
+    </svg>
+  </div>
 </nav>
 
 <style>
   .side {
-    flex: none;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 14px 0 4px;
+    color: #fff;
+  }
+  .task {
     position: relative;
     display: flex;
     flex-direction: column;
-    width: 104px;
-    padding-right: 9px;
-    background: linear-gradient(to bottom, var(--side-top), var(--side-bottom) 70%, var(--skin-low));
-    border-right: 1px solid var(--skin-edge);
-    box-shadow: inset -1px 0 rgb(255 255 255 / 0.25);
-    color: #fff;
-  }
-  .side.collapsed {
-    width: 10px;
-    padding-right: 0;
-  }
-  .tasks {
-    display: flex;
-    flex-direction: column;
-    padding-top: 6px;
-  }
-  .task {
-    display: flex;
-    flex-direction: column;
     align-items: flex-start;
-    padding: 6px 8px;
+    padding: 5px 6px 6px;
     border: 0;
-    border-bottom: 1px solid rgb(255 255 255 / 0.28);
-    box-shadow: 0 1px rgb(0 0 0 / 0.15);
     background: none;
     color: #fff;
-    font-weight: bold;
-    font-size: 11px;
-    line-height: 13px;
+    font: bold 12px/14px var(--font-ui);
     text-align: left;
-    text-shadow: 0 1px 1px rgb(0 0 0 / 0.4);
+    text-shadow: 0 1px 1px rgb(0 0 40 / 0.55);
     cursor: pointer;
   }
+  /* Separadores: línea clara con sombra, como los de WMP 9. */
+  .task::after {
+    content: "";
+    position: absolute;
+    left: 2px;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(to right, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.15));
+    box-shadow: 0 1px rgb(0 0 60 / 0.35);
+  }
   .task:hover {
-    background: rgb(255 255 255 / 0.14);
+    background: rgb(255 255 255 / 0.12);
   }
   .task.active {
-    background: linear-gradient(to right, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0.12));
-    color: #fff;
+    background: linear-gradient(to right, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.05));
+    box-shadow: inset 0 2px rgb(255 255 255 / 0.85);
   }
   .search {
-    padding: 8px 6px 0;
+    padding: 4px 0 6px 2px;
   }
   .search input {
     width: 100%;
     height: 19px;
-    padding: 0 5px;
+    padding: 0 6px;
     border: 1px solid var(--skin-edge);
     border-radius: 9px;
     background: #fff;
@@ -129,19 +143,18 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    /* Deja sitio al disco del ▶, que sobresale sobre el panel. */
-    padding: 8px 4px 30px;
+    gap: 6px;
+    padding: 0 0 40px;
   }
   .account {
     display: flex;
     align-items: center;
     gap: 4px;
     max-width: 100%;
-    padding: 2px 4px;
+    padding: 2px 5px;
     border: 0;
     border-radius: 3px;
-    background: rgb(0 0 0 / 0.2);
+    background: rgb(0 0 40 / 0.22);
     color: #fff;
     font-size: 10px;
     cursor: pointer;
@@ -161,30 +174,9 @@
   .account.expired .dot {
     background: radial-gradient(circle at 35% 35%, #ffd0c0, #d0401a);
   }
-  .handle {
-    position: absolute;
-    top: 50%;
-    right: 0;
-    width: 10px;
-    height: 46px;
-    margin-top: -23px;
-    padding: 0;
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--skin-edge);
-    border-right: 0;
-    border-radius: 5px 0 0 5px;
-    background: linear-gradient(to right, var(--skin-hi), var(--skin-mid));
-    color: #fff;
-    cursor: pointer;
-  }
-  .collapsed .handle {
-    border-radius: 0 5px 5px 0;
-    border: 1px solid var(--skin-edge);
-    border-left: 0;
-  }
-  .handle svg {
-    width: 6px;
-    height: 10px;
+  .emblem {
+    width: 34px;
+    height: 34px;
+    filter: drop-shadow(0 1px 2px rgb(0 0 40 / 0.5));
   }
 </style>

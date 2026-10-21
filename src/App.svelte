@@ -23,7 +23,8 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { SHAPE, shellPath } from "./lib/shape";
+  import { place, radii, regionPolygons, skinLayout } from "./lib/skin";
+  import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/strings";
   import type { SearchFilter } from "./lib/bindings";
 
@@ -38,31 +39,26 @@
     document.documentElement.dataset.theme = (settings.current?.theme ?? "Blue").toLowerCase();
   });
 
-  // Silueta de la ventana: se recalcula con el tamaño (sin forma al maximizar).
+  // Skin por piezas (lib/skin.ts): lateral, cuerpo, pestaña de la lista y píldora.
   let winW = $state(0);
   let winH = $state(0);
-  const outline = $derived(winW && winH && !maximized ? shellPath(winW, winH) : null);
-  let edgeEl = $state<SVGPathElement>();
+  const L = $derived(winW && winH ? skinLayout(winW, winH, !ui.sideCollapsed) : null);
 
-  // La misma silueta como región de la ventana (Windows): fuera de ella no se pinta
-  // nada ni se reciben clics. Se muestrea el trazado en píxeles físicos.
+  // La unión de las piezas es la región de la ventana (Windows): fuera de ellas no
+  // se pinta nada ni se reciben clics. Maximizada o compacta, rectangular.
   $effect(() => {
-    const path = edgeEl;
-    const shaped = !ui.compact && outline !== null && path !== undefined;
+    const shaped = !ui.compact && !maximized && L !== null;
+    const layout = L;
     const id = setTimeout(() => {
-      if (!shaped || !path) return void commands.windowSetShape(null);
-      const dpr = devicePixelRatio || 1;
-      const len = path.getTotalLength();
-      const n = Math.min(600, Math.max(120, Math.round(len / 6)));
-      const pts: [number, number][] = [];
-      for (let i = 0; i < n; i++) {
-        const p = path.getPointAtLength((i / n) * len);
-        pts.push([Math.round(p.x * dpr), Math.round(p.y * dpr)]);
-      }
-      void commands.windowSetShape(pts);
-    }, 60);
+      void commands.windowSetShape(shaped && layout ? regionPolygons(layout, devicePixelRatio || 1) : null);
+    }, 40);
     return () => clearTimeout(id);
   });
+
+  function resize(e: PointerEvent) {
+    e.preventDefault();
+    void appWindow()?.startResizeDragging("SouthEast");
+  }
 
   onMount(() => {
     void router.restore();
@@ -94,43 +90,44 @@
 {#if ui.compact}
   <CompactPlayer />
 {:else}
-<div
-  class="window"
-  class:maximized
-  class:inactive={!active}
-  bind:clientWidth={winW}
-  bind:clientHeight={winH}
-  style:clip-path={outline ? `path("${outline}")` : undefined}
-  style:--shape-top="{maximized ? 0 : SHAPE.top}px"
-  style:--shape-left="{maximized ? 0 : SHAPE.left}px"
-  style:--shape-bottom="{maximized ? 0 : SHAPE.bottom}px"
->
-  {#if outline}
-    <svg class="outline" width={winW} height={winH} aria-hidden="true">
-      <path d={outline} class="edge" bind:this={edgeEl} />
-      <path d={outline} class="hi" />
-    </svg>
-  {/if}
-  <TitleBar {title} {maximized} {active} />
-
-  <div class="body">
-  <SideTasks />
-  <main class="main" class:dark={router.route.name === "now"}>
-    {#if router.route.name === "now"}
-      <NowPlayingView />
-    {:else if router.route.name === "home"}
-      <HomeView />
-    {:else if router.route.name === "search"}
-      {#key `${router.route.filter}|${router.route.query}`}
-        <SearchView query={router.route.query} filter={router.route.filter as SearchFilter} />
-      {/key}
-    {:else}
-      <LibraryView />
+<div class="skin" class:maximized class:inactive={!active} bind:clientWidth={winW} bind:clientHeight={winH}>
+  {#if L}
+    {#if L.side}
+      <div class="piece side" style="{place(L.side)};border-radius:{radii(L.side)}"><SideTasks /></div>
     {/if}
-  </main>
-  </div>
+    <div class="piece body" style="{place(L.body)};border-radius:{radii(L.body)}" data-tauri-drag-region></div>
+    <div class="piece tab" style="{place(L.tab)};border-radius:{radii(L.tab)}"><PlaylistTab {maximized} /></div>
+    <div class="topbar" style={place(L.topBar)}><TitleBar {title} /></div>
+    <button
+      class="handle"
+      style="left:{L.content.x - 9}px;top:{L.content.y + L.content.h / 2 - 22}px"
+      title={ui.sideCollapsed ? t.side.show : t.side.hide}
+      aria-label={ui.sideCollapsed ? t.side.show : t.side.hide}
+      onclick={() => ui.toggleSide()}
+    >
+      <svg viewBox="0 0 6 10"><path d={ui.sideCollapsed ? "M1 1l4 4-4 4" : "M5 1L1 5l4 4"} fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+    </button>
 
-  <TransportBar />
+    <main class="content" class:dark={router.route.name === "now"} style={place(L.content)}>
+      {#if router.route.name === "now"}
+        <NowPlayingView />
+      {:else if router.route.name === "home"}
+        <HomeView />
+      {:else if router.route.name === "search"}
+        {#key `${router.route.filter}|${router.route.query}`}
+          <SearchView query={router.route.query} filter={router.route.filter as SearchFilter} />
+        {/key}
+      {:else}
+        <LibraryView />
+      {/if}
+    </main>
+
+    <TransportBar pod={L.pod} bar={L.bar} />
+    {#if !maximized}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="grip" title={t.top.resize} style="left:{winW - 16}px;top:{L.body.y + L.body.h - 16}px" onpointerdown={resize}></div>
+    {/if}
+  {/if}
 </div>
 {/if}
 
@@ -152,54 +149,88 @@
 {/if}
 
 <style>
-  /* Marco asimétrico del skin WMP 9: la ventana es transparente y la forma la dan
-     los radios (grande arriba a la izquierda, siguiendo el pod de ▶ abajo). */
-  /* Silueta asimétrica (ver lib/shape.ts): el fondo del skin rellena la forma y los
-     márgenes dejan sitio a la oreja, al borde abombado y al disco del ▶. */
-  .window {
+  /* Skin WMP 9 por piezas (ver lib/skin.ts). La ventana es transparente: lo que no
+     cubre ninguna pieza no se ve (y la región de Windows tampoco lo incluye). */
+  .skin {
     position: relative;
     height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding-top: var(--shape-top);
-    background: linear-gradient(to right, var(--skin-mid), var(--skin-low) 30%);
   }
-  .window.inactive {
-    filter: saturate(0.85);
+  .skin.maximized {
+    background: var(--skin-low);
   }
-  .outline {
+  .skin.inactive .piece {
+    filter: saturate(0.8);
+  }
+  .piece {
     position: absolute;
-    inset: 0;
-    z-index: 950;
-    pointer-events: none;
-    fill: none;
+    border: 1px solid var(--skin-edge);
   }
-  .outline .edge {
-    stroke: var(--skin-edge);
-    stroke-width: 4;
+  /* Lateral: azul, más oscura, por debajo del cuerpo. */
+  .side {
+    z-index: 1;
+    background: linear-gradient(to right, var(--side-bottom), var(--side-top) 55%, var(--side-bottom));
+    box-shadow: inset 2px 2px 1px rgb(255 255 255 / 0.45), inset -2px -2px 2px rgb(0 0 50 / 0.3);
   }
-  .outline .hi {
-    stroke: var(--skin-hi);
-    stroke-width: 1;
-    transform: translate(1px, 1px);
-    opacity: 0.6;
+  /* Cuerpo y pestaña: plata azulada metálica. */
+  .body,
+  .tab {
+    background: linear-gradient(to bottom, #eef2fc 0%, #cdd7f0 18%, #b4c3e8 60%, #9eb0dc 100%);
+    box-shadow: inset 1px 1px rgb(255 255 255 / 0.9), inset -1px -1px rgb(60 80 150 / 0.35);
   }
   .body {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-    margin-left: var(--shape-left);
+    z-index: 2;
   }
-  .main {
-    flex: 1;
+  .tab {
+    z-index: 3;
+    border-bottom: 0;
+    background: linear-gradient(to bottom, #f4f7ff 0%, #dbe3f6 40%, #cdd7f0 100%);
+  }
+  .topbar {
+    position: absolute;
+    z-index: 4;
+  }
+  .content {
+    position: absolute;
+    z-index: 5;
     display: flex;
     flex-direction: column;
     min-width: 0;
-    min-height: 0;
     background: var(--surface);
+    border: 1px solid #5b6fa6;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+    overflow: hidden;
   }
-  .main.dark {
+  .content.dark {
     background: var(--np-bg);
+    border-color: #000;
+  }
+  .handle {
+    position: absolute;
+    z-index: 6;
+    width: 9px;
+    height: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--skin-edge);
+    border-radius: 5px 0 0 5px;
+    background: linear-gradient(to right, #fff, #b4c3e8);
+    color: var(--skin-deep);
+    cursor: pointer;
+  }
+  .handle svg {
+    width: 6px;
+    height: 10px;
+  }
+  /* Esquina inferior derecha recta con agarre para cambiar el tamaño. */
+  .grip {
+    position: absolute;
+    z-index: 40;
+    width: 14px;
+    height: 14px;
+    cursor: nwse-resize;
+    background:
+      linear-gradient(135deg, transparent 0 55%, #6d82b8 55% 62%, transparent 62% 70%, #6d82b8 70% 77%, transparent 77% 85%, #6d82b8 85% 92%, transparent 92%);
   }
   .about {
     display: flex;

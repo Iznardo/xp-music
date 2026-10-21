@@ -1,125 +1,98 @@
 <script lang="ts">
-  // Franja superior del skin WMP 9: logo, menús integrados, título y botones de ventana.
-  // `data-tauri-drag-region` permite arrastrar y maximizar con doble clic.
-  import { appWindow } from "../../platform";
+  // Franja superior del cuerpo del skin WMP 9: botón redondo con todos los menús a
+  // la izquierda, zona para arrastrar y tres botones redondos a la derecha. Los
+  // botones de ventana están en la pestaña de la lista (PlaylistTab).
+  import { ui, type MenuItem } from "../../stores/ui.svelte";
+  import { menuBar } from "../../menus";
   import { t } from "../../strings";
-  import MenuBar from "./MenuBar.svelte";
 
-  let { title, maximized = false, active = true }: { title: string; maximized?: boolean; active?: boolean } =
-    $props();
+  let { title }: { title: string } = $props();
 
-  const win = appWindow();
+  function openMenu(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const items: MenuItem[] = menuBar().map((m) => ({ kind: "sub", label: m.label, items: m.items() }));
+    ui.openMenu({ x: r.left, y: r.bottom + 2 }, items);
+  }
 </script>
 
-<header class="titlebar" class:inactive={!active} data-tauri-drag-region>
-  <svg class="logo" viewBox="0 0 16 16" aria-hidden="true" data-tauri-drag-region>
-    <defs>
-      <radialGradient id="tb-disc" cx="40%" cy="30%" r="75%">
-        <stop offset="0" stop-color="#bfe0ff" />
-        <stop offset="0.5" stop-color="#2f7fe0" />
-        <stop offset="1" stop-color="#0b3a9c" />
-      </radialGradient>
-    </defs>
-    <circle cx="8" cy="8" r="7.2" fill="url(#tb-disc)" stroke="#e8f3ff" stroke-width="0.8" />
-    <path d="M6.2 4.6v6.8l5.4-3.4z" fill="#ff9d1a" stroke="#8a3a00" stroke-width="0.5" />
-  </svg>
-  <MenuBar dark />
+<header class="top" data-tauri-drag-region>
+  <button class="menu" title={t.top.menu} aria-label={t.top.menu} onclick={openMenu}>
+    <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" /><circle cx="8" cy="8" r="1.4" /></svg>
+  </button>
   <span class="title" data-tauri-drag-region>{title}</span>
-
-  <div class="buttons">
-    <button class="btn" title={t.window.minimize} aria-label={t.window.minimize} onclick={() => win?.minimize()}>
-      <svg viewBox="0 0 11 11"><rect x="2" y="7" width="7" height="2" fill="currentColor" /></svg>
+  <div class="rounds">
+    <button title={ui.sideCollapsed ? t.side.show : t.side.hide} aria-label={ui.sideCollapsed ? t.side.show : t.side.hide} onclick={() => ui.toggleSide()}>
+      <svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.4" /><rect x="3" y="3.5" width="3.5" height="9" /></svg>
     </button>
-    <button
-      class="btn"
-      title={maximized ? t.window.restore : t.window.maximize}
-      aria-label={maximized ? t.window.restore : t.window.maximize}
-      onclick={() => win?.toggleMaximize()}
-    >
-      {#if maximized}
-        <svg viewBox="0 0 11 11">
-          <path d="M3.5 1.5h6v6h-1M1.5 3.5h6v6h-6z" fill="none" stroke="currentColor" />
-        </svg>
-      {:else}
-        <svg viewBox="0 0 11 11"><rect x="1.5" y="1.5" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
-      {/if}
+    <button title={t.top.options} aria-label={t.top.options} onclick={() => (ui.optionsOpen = true)}>
+      <svg viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.6" /><circle cx="6" cy="4" r="1.6" /><circle cx="10" cy="8" r="1.6" /><circle cx="6" cy="12" r="1.6" /></svg>
     </button>
-    <button class="btn close" title={t.window.close} aria-label={t.window.close} onclick={() => win?.close()}>
-      <svg viewBox="0 0 11 11"><path d="M2.5 2.5l6 6M8.5 2.5l-6 6" stroke="currentColor" stroke-width="1.8" /></svg>
+    <button title={t.top.compact} aria-label={t.top.compact} onclick={() => ui.setCompact(true)}>
+      <svg viewBox="0 0 16 16"><rect x="2" y="5" width="12" height="6" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" /><circle cx="5.5" cy="8" r="1.6" /></svg>
     </button>
   </div>
 </header>
 
 <style>
-  .titlebar {
-    position: relative;
-    flex: none;
-    height: 26px;
+  .top {
+    height: 100%;
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 0 6px 0 46px;
-    background: linear-gradient(to bottom, var(--skin-hi) 0%, var(--skin-top) 12%, var(--skin-mid) 55%, var(--skin-low) 100%);
-    border-bottom: 1px solid var(--skin-edge);
+    gap: 8px;
+    padding: 0 8px 0 12px;
+  }
+  .menu,
+  .rounds button {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--skin-edge);
+    color: var(--skin-deep);
+    background: radial-gradient(circle at 50% 30%, #fff 0%, #dfe7f8 40%, #9fb3df 80%, #7b93c9 100%);
+    box-shadow: inset 0 -2px 3px rgb(0 0 40 / 0.25), 0 1px 1px rgb(0 0 40 / 0.35);
+    cursor: pointer;
+  }
+  .menu {
+    width: 21px;
+    height: 21px;
     color: #fff;
+    background: radial-gradient(circle at 50% 30%, #bfe0ff 0%, #4a8fe8 45%, #1747b0 100%);
   }
-  .titlebar.inactive {
-    filter: saturate(0.55) brightness(1.08);
-  }
-  /* El logo ocupa la "oreja" redonda de la silueta (lib/shape.ts). */
-  .logo {
-    position: absolute;
-    left: 3px;
-    top: -5px;
-    z-index: 960;
-    width: 38px;
-    height: 38px;
-    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
+  .menu svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
   }
   .title {
     flex: 1;
     min-width: 0;
-    padding-left: 6px;
-    font-family: var(--font-title);
-    font-weight: bold;
-    font-size: 12px;
-    text-align: center;
-    text-shadow: 0 1px 1px rgb(0 0 0 / 0.55);
+    color: var(--skin-deep);
+    font: bold 11px var(--font-ui);
+    text-shadow: 0 1px rgb(255 255 255 / 0.7);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .buttons {
+  .rounds {
     display: flex;
-    gap: 2px;
-    padding: 2px 3px;
-    border-radius: 9px;
-    background: rgb(0 0 0 / 0.18);
-    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.35), 0 1px rgb(255 255 255 / 0.25);
+    gap: 4px;
   }
-  .btn {
-    width: 17px;
-    height: 16px;
-    padding: 0;
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--skin-edge);
-    border-radius: 5px;
-    background: linear-gradient(to bottom, var(--skin-hi), var(--skin-mid) 60%, var(--skin-low));
-    color: #fff;
-    box-shadow: inset 0 1px rgb(255 255 255 / 0.45);
+  .rounds button {
+    width: 19px;
+    height: 19px;
   }
-  .btn:hover {
-    filter: brightness(1.2);
+  .rounds svg {
+    width: 11px;
+    height: 11px;
+    fill: currentColor;
   }
-  .btn:active {
+  .menu:hover,
+  .rounds button:hover {
+    filter: brightness(1.1);
+  }
+  .menu:active,
+  .rounds button:active {
     filter: brightness(0.85);
-  }
-  .btn.close {
-    background: linear-gradient(to bottom, #f3b49e, #d75c32 60%, #a8360f);
-  }
-  .btn svg {
-    width: 9px;
-    height: 9px;
   }
 </style>
