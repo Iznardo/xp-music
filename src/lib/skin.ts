@@ -18,9 +18,12 @@ export type Piece = Rect & { r: [number, number, number, number] };
 
 export const SKIN = {
   sideW: 118,
-  /// Altura a la que el borde izquierdo de la lateral empieza a curvarse hacia
-  /// arriba, en S, hasta fundirse con el borde superior del cuerpo.
-  sideTop: 84,
+  /// Borde superior de la lateral: va recto a esta altura y luego sube en S
+  /// (como el de la pestaña) hasta el borde superior del cuerpo.
+  sideTop: 48,
+  sideCorner: 12,
+  /// Tramo de la subida en S de la lateral (x de inicio y de llegada).
+  sideSlope: { from: 40, to: 160 },
   /// El cuerpo tapa el borde derecho de la lateral.
   sideOverlap: 10,
   /// La pestaña de la lista sobresale esto por encima del cuerpo.
@@ -67,7 +70,7 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
   const podX = bodyX + s.pod.dx;
   // La lateral ocupa desde arriba del cuerpo; su silueta la da `sideClip`.
   const side: Piece | null = sideOpen
-    ? { x: 0, y: bodyY, w: s.sideW, h: bodyBottom - bodyY, r: [0, 0, 0, 30] }
+    ? { x: 0, y: bodyY, w: s.sideSlope.to, h: bodyBottom - bodyY, r: [0, 0, 0, 30] }
     : null;
   const body: Piece = { x: bodyX, y: bodyY, w: w - bodyX, h: bodyBottom - bodyY, r: [sideOpen ? 0 : 16, 0, 0, 0] };
   // La pestaña empieza donde la curva ya ha llegado arriba.
@@ -77,16 +80,21 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
   const contentBottom = bodyBottom - s.bottomBar;
   let sideClip: string | null = null;
   if (side) {
-    const c = sideCurve(bodyX, bodyY);
+    const c = sideCurve(bodyY);
     const t = (y: number) => y - bodyY;
     const r3 = side.r[3];
+    const k = s.sideCorner;
     sideClip = [
       `M ${r3} ${side.h}`,
       `A ${r3} ${r3} 0 0 1 0 ${side.h - r3}`,
-      `L 0 ${t(c.p0[1])}`,
+      `L 0 ${t(s.sideTop + k)}`,
+      `A ${k} ${k} 0 0 1 ${k} ${t(s.sideTop)}`,
+      `L ${c.p0[0]} ${t(c.p0[1])}`,
       `C ${c.c1[0]} ${t(c.c1[1])} ${c.c2[0]} ${t(c.c2[1])} ${c.p3[0]} ${t(c.p3[1])}`,
-      `L ${side.w} 0`,
-      `L ${side.w} ${side.h}`,
+      // Más allá de su ancho, la lateral solo ocupa la franja superior (la subida).
+      `L ${c.p3[0]} ${s.topBar}`,
+      `L ${s.sideW} ${s.topBar}`,
+      `L ${s.sideW} ${side.h}`,
       "Z",
     ].join(" ");
   }
@@ -102,19 +110,26 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
       w: w - bodyX - (sideOpen ? s.sideOverlap : s.frame) - s.frame,
       h: contentBottom - contentTop,
     },
-    topBar: { x: bodyX, y: bodyY, w: w - s.tabW - bodyX, h: s.topBar },
+    // Con lateral, la franja empieza donde termina su subida.
+    topBar: (() => {
+      const x = sideOpen ? s.sideSlope.to : bodyX;
+      return { x, y: bodyY, w: w - s.tabW - x, h: s.topBar };
+    })(),
     bar: { x: podX + s.pod.w, y: contentBottom, w: w - podX - s.pod.w, h: bodyBottom - contentBottom },
   };
 }
 
-/// Curva en S de la lateral: del borde izquierdo (vertical) al borde superior del
-/// cuerpo (horizontal), convexa al salir y cóncava al llegar.
-function sideCurve(bodyX: number, bodyY: number) {
+/// Subida en S de la lateral: del tramo recto de su borde superior al borde
+/// superior del cuerpo, con tangentes horizontales en ambos extremos (la misma
+/// figura que la subida del cuerpo hacia la pestaña).
+function sideCurve(bodyY: number) {
+  const { from, to } = SKIN.sideSlope;
+  const m = (to - from) / 2;
   return {
-    p0: [0, SKIN.sideTop] as const,
-    c1: [0, bodyY + (SKIN.sideTop - bodyY) * 0.15] as const,
-    c2: [bodyX * 0.45, bodyY] as const,
-    p3: [bodyX, bodyY] as const,
+    p0: [from, SKIN.sideTop] as const,
+    c1: [from + m, SKIN.sideTop] as const,
+    c2: [to - m, bodyY] as const,
+    p3: [to, bodyY] as const,
   };
 }
 
@@ -152,8 +167,14 @@ export function outlinePath(l: SkinLayout): string {
   const s3 = tab.x;
   const sm = (s3 - s0) * 0.5;
   if (side) {
-    const c = sideCurve(bx, by);
-    d.push(`M 0 ${c.p0[1]}`, `C ${c.c1[0]} ${n(c.c1[1])} ${n(c.c2[0])} ${c.c2[1]} ${c.p3[0]} ${c.p3[1]}`);
+    const c = sideCurve(by);
+    const k = SKIN.sideCorner;
+    d.push(
+      `M 0 ${c.p0[1] + k}`,
+      `A ${k} ${k} 0 0 1 ${k} ${c.p0[1]}`,
+      `L ${c.p0[0]} ${c.p0[1]}`,
+      `C ${c.c1[0]} ${c.c1[1]} ${c.c2[0]} ${c.c2[1]} ${c.p3[0]} ${c.p3[1]}`,
+    );
   } else {
     d.push(`M 0 ${by + body.r[0]}`, `A ${body.r[0]} ${body.r[0]} 0 0 1 ${body.r[0]} ${by}`);
   }
