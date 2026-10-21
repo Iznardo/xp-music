@@ -135,9 +135,12 @@ pub fn viz_set_active(viz: State<'_, crate::viz::VizService>, active: bool) {
 /// pinta la interfaz; para que los clics en lo transparente lleguen a lo que hay
 /// detrás, un hilo mira dónde está el ratón y activa o desactiva
 /// `set_ignore_cursor_events`.
+///
+/// Es asíncrono a propósito: no corre en el hilo principal, que es el que atiende
+/// a la ventana (antes podía quedarse esperando al hilo de sondeo y colgarse).
 #[tauri::command]
 #[specta::specta]
-pub fn window_set_shape(
+pub async fn window_set_shape(
     window: WebviewWindow,
     polygons: Option<Vec<Vec<(i32, i32)>>>,
 ) -> AppResult<()> {
@@ -165,6 +168,10 @@ mod shape {
 
     struct Shape {
         window: WebviewWindow,
+        /// Se guarda al fijar la forma: pedírselo a la ventana desde el hilo de
+        /// sondeo pasa por el hilo principal y, con el cerrojo cogido, podía colgar
+        /// la app (AppHang).
+        hwnd: isize,
         rgn: HRGN,
         ignoring: bool,
     }
@@ -174,19 +181,21 @@ mod shape {
     static SHAPE: Mutex<Option<Shape>> = Mutex::new(None);
     static POLLER: OnceLock<()> = OnceLock::new();
 
+    /// Nunca se llama a la ventana con el cerrojo cogido.
     pub fn set(window: WebviewWindow, polygons: Option<Vec<Vec<(i32, i32)>>>) {
         let rgn = polygons.and_then(|p| unsafe { union(p) });
-        let mut guard = SHAPE.lock().unwrap();
-        if let Some(old) = guard.take() {
+        let hwnd = window.hwnd().map(|h| h.0 as isize).ok();
+        let old = SHAPE.lock().unwrap().take();
+        if let Some(old) = old {
             unsafe { DeleteObject(old.rgn) };
-            if old.ignoring {
-                let _ = old.window.set_ignore_cursor_events(false);
-            }
         }
-        match rgn {
-            Some(rgn) => {
-                *guard = Some(Shape {
+        // Al cambiar de forma, la ventana vuelve a recibir los clics.
+        let _ = window.set_ignore_cursor_events(false);
+        match (rgn, hwnd) {
+            (Some(rgn), Some(hwnd)) => {
+                *SHAPE.lock().unwrap() = Some(Shape {
                     window,
+                    hwnd,
                     rgn,
                     ignoring: false,
                 });
@@ -197,9 +206,10 @@ mod shape {
                         .ok();
                 });
             }
-            None => {
-                let _ = window.set_ignore_cursor_events(false);
-            }
+            (Some(rgn), None) => unsafe {
+                DeleteObject(rgn);
+            },
+            _ => {}
         }
     }
 
@@ -234,8 +244,8 @@ mod shape {
                 let Some(shape) = guard.as_mut() else {
                     continue;
                 };
-                let Ok(h) = shape.window.hwnd() else { continue };
-                let hwnd = h.0 as HWND;
+                // El HWND guardado: nada de pedírselo a la ventana con el cerrojo cogido.
+                let hwnd = shape.hwnd as HWND;
                 let mut pt = POINT { x: 0, y: 0 };
                 let mut rc = RECT {
                     left: 0,

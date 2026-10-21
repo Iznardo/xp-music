@@ -88,6 +88,9 @@ export const commands = {
 	 *  pinta la interfaz; para que los clics en lo transparente lleguen a lo que hay
 	 *  detrás, un hilo mira dónde está el ratón y activa o desactiva
 	 *  `set_ignore_cursor_events`.
+	 * 
+	 *  Es asíncrono a propósito: no corre en el hilo principal, que es el que atiende
+	 *  a la ventana (antes podía quedarse esperando al hilo de sondeo y colgarse).
 	 */
 	windowSetShape: (polygons: (([number, number])[])[] | null) => typedError<null, AppError>(__TAURI_INVOKE("window_set_shape", { polygons })),
 	/**  Errores y avisos del frontend al log de la app (la WebView no tiene consola visible). */
