@@ -277,15 +277,17 @@
   .tick {
     width: 10px;
     height: 8px;
-    fill: #6d82b8;
+    fill: var(--skin-deep);
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.6));
   }
   .seek {
     position: relative;
     flex: 1;
     height: 6px;
     border-radius: 3px;
-    background: #6f84b9;
-    box-shadow: inset 0 1px 2px rgb(0 0 40 / 0.6), 0 1px rgb(255 255 255 / 0.8);
+    /* Oscurece lo que haya debajo: se lee igual sobre azul, oliva o plata. */
+    background: rgb(0 0 30 / 0.38);
+    box-shadow: inset 0 1px 2px rgb(0 0 30 / 0.7), 0 1px rgb(255 255 255 / 0.7);
     cursor: pointer;
     touch-action: none;
   }

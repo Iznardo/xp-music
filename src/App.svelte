@@ -124,8 +124,8 @@
         <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 1} x2="0" y2={winH}>
           <!-- Sin efecto por encima de la píldora; dentro, brillo arriba y sombra abajo. -->
           <stop offset="0" stop-color="#fff" stop-opacity="0" />
-          <stop offset="0.01" stop-color="#fff" stop-opacity="0.4" />
-          <stop offset="1" stop-color="#000" stop-opacity="0.15" />
+          <stop offset="0.01" stop-color="#fff" stop-opacity="0.1" />
+          <stop offset="1" stop-color="#000" stop-opacity="0.1" />
         </linearGradient>
       </defs>
       <path d={outline} bind:this={outlineEl} class="shell-fill" />

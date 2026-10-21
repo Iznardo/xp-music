@@ -50,8 +50,6 @@ export const SKIN = {
   /// Empalme de la píldora con el cuerpo, por la derecha.
   podFillet: 18,
   frame: 7,
-  /// Radio de los empalmes cóncavos donde se unen las piezas.
-  fillet: 11,
 } as const;
 
 export type SkinLayout = {
@@ -75,9 +73,9 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
   const bodyY = s.tabRise;
   const bodyBottom = h - s.bottomGap;
   const podY = h - s.pod.h;
-  // Con lateral, la píldora arranca en el borde del cuerpo: su lado izquierdo es
-  // la continuación de la lateral.
-  const podX = sideOpen ? bodyX : bodyX + s.pod.dx;
+  // La píldora arranca en el borde del cuerpo: su lado izquierdo es la
+  // continuación de la lateral (o, sin ella, del borde izquierdo de la ventana).
+  const podX = bodyX;
   const podRight = bodyX + s.pod.dx + s.pod.w;
   // La lateral ocupa desde arriba del cuerpo; su silueta la da `sideClip`.
   const side: Piece | null = sideOpen
@@ -92,7 +90,7 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
     y: podY,
     w: podRight - podX,
     h: s.pod.h,
-    r: sideOpen ? [0, pr, pr, s.podCorner] : [pr, pr, pr, pr],
+    r: [0, pr, pr, s.podCorner],
   };
   const contentTop = bodyY + s.topBar;
   const contentBottom = bodyBottom - s.bottomBar;
@@ -167,15 +165,25 @@ function taperCurve(pod: Piece) {
 
 /// Lateral y píldora como una sola pieza (se pintan con un único relleno, sin
 /// costura): borde superior con su subida, estrechamiento en S y píldora.
-export function sidePodPath(l: SkinLayout): string | null {
+export function sidePodPath(l: SkinLayout): string {
   const { side, pod } = l;
-  if (!side) return null;
-  const c = sideCurve(side.y);
-  const tp = taperCurve(pod);
-  const k = SKIN.sideCorner;
   const pr = pod.h / 2;
   const cr = pod.x + pod.w - pr;
   const bk = pod.r[3];
+  if (!side) {
+    // Sin lateral, solo la píldora (pegada al borde izquierdo).
+    return [
+      `M ${pod.x} ${pod.y}`,
+      `L ${cr} ${pod.y}`,
+      `A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`,
+      `L ${pod.x + bk} ${pod.y + pod.h}`,
+      `A ${bk} ${bk} 0 0 1 ${pod.x} ${pod.y + pod.h - bk}`,
+      "Z",
+    ].join(" ");
+  }
+  const c = sideCurve(side.y);
+  const tp = taperCurve(pod);
+  const k = SKIN.sideCorner;
   return [
     `M 0 ${SKIN.sideTop + k}`,
     `A ${k} ${k} 0 0 1 ${k} ${SKIN.sideTop}`,
@@ -208,7 +216,6 @@ function lineCircleFillet(line: number, cx: number, cy: number, r: number, f: nu
 /// que se lean como una sola carcasa. Se pinta detrás de las piezas y es también
 /// la región de la ventana.
 export function outlinePath(l: SkinLayout): string {
-  const F = SKIN.fillet;
   const { body, tab, pod, side } = l;
   const bx = body.x;
   const by = body.y;
@@ -216,10 +223,8 @@ export function outlinePath(l: SkinLayout): string {
   const right = body.x + body.w;
   const pr = pod.h / 2;
   const cy = pod.y + pr;
-  const cl = pod.x + pr;
   const cr = pod.x + pod.w - pr;
   const fR = lineCircleFillet(bb, cr, cy, pr, SKIN.podFillet, 1);
-  const fL = lineCircleFillet(bb, cl, cy, pr, F, -1);
   const n = (v: number) => +v.toFixed(2);
   const d: string[] = [];
   // Curva en S del cuerpo hacia la pestaña.
@@ -261,12 +266,9 @@ export function outlinePath(l: SkinLayout): string {
       `C ${tp.c2[0]} ${tp.c2[1]} ${tp.c1[0]} ${tp.c1[1]} ${tp.p0[0]} ${tp.p0[1]}`,
     );
   } else {
-    d.push(
-      `L ${cl} ${pod.y + pod.h}`,
-      `A ${pr} ${pr} 0 0 1 ${n(fL.onCircle[0])} ${n(fL.onCircle[1])}`,
-      `A ${F} ${F} 0 0 0 ${n(fL.onLine[0])} ${bb}`,
-    );
-    d.push(`L ${bx} ${bb}`);
+    // Sin lateral: el borde izquierdo baja recto hasta la esquina de la píldora.
+    const k = pod.r[3];
+    d.push(`L ${pod.x + k} ${pod.y + pod.h}`, `A ${k} ${k} 0 0 1 ${pod.x} ${pod.y + pod.h - k}`);
   }
   d.push("Z");
   return d.join(" ");
