@@ -1,6 +1,7 @@
 // Playlists del usuario (para el árbol y el submenú "Añadir a playlist").
 
 import { commands, events, type PlaylistSummary } from "../bindings";
+import { shared } from "../resource.svelte";
 
 class LibraryStore {
   playlists = $state<PlaylistSummary[]>([]);
@@ -13,7 +14,8 @@ class LibraryStore {
   }
 
   async refresh(): Promise<void> {
-    const r = await commands.ytLibraryPlaylists();
+    // Varias partes la piden a la vez al arrancar: una sola petición para todas.
+    const r = await shared("library:playlists", () => commands.ytLibraryPlaylists());
     if (r.status === "ok") {
       this.playlists = r.data;
       this.loaded = true;

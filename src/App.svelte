@@ -6,13 +6,7 @@
   import DialogFrame from "./lib/components/xp/DialogFrame.svelte";
   import SideTasks from "./lib/components/wmp/SideTasks.svelte";
   import TransportBar from "./lib/components/wmp/TransportBar.svelte";
-  import LibraryView from "./lib/views/LibraryView.svelte";
-  import HomeView from "./lib/views/HomeView.svelte";
-  import SearchView from "./lib/views/SearchView.svelte";
-  import NowPlayingView from "./lib/views/NowPlayingView.svelte";
-  import OptionsDialog from "./lib/views/OptionsDialog.svelte";
-  import LoginView from "./lib/views/LoginView.svelte";
-  import CompactPlayer from "./lib/views/CompactPlayer.svelte";
+  import Lazy from "./lib/components/Lazy.svelte";
   import { commands } from "./lib/bindings";
   import { player } from "./lib/stores/player.svelte";
   import { settings } from "./lib/stores/settings.svelte";
@@ -26,7 +20,7 @@
   import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/strings";
-  import logo from "./assets/logo.png";
+  import logo from "./assets/logo.webp";
   import type { SearchFilter } from "./lib/bindings";
 
   let maximized = $state(false);
@@ -78,7 +72,26 @@
     void appWindow()?.startResizeDragging("SouthEast");
   }
 
+  // Vistas y diálogos en trozos aparte del bundle (carga diferida). Las vistas
+  // principales se precargan en segundo plano tras arrancar: cambiar de vista no
+  // espera nunca, pero el primer pintado solo descarga lo imprescindible.
+  const views = {
+    now: () => import("./lib/views/NowPlayingView.svelte"),
+    home: () => import("./lib/views/HomeView.svelte"),
+    search: () => import("./lib/views/SearchView.svelte"),
+    library: () => import("./lib/views/LibraryView.svelte"),
+    options: () => import("./lib/views/OptionsDialog.svelte"),
+    login: () => import("./lib/views/LoginView.svelte"),
+    compact: () => import("./lib/views/CompactPlayer.svelte"),
+  };
+
   onMount(() => {
+    const idle = setTimeout(() => {
+      void views.now();
+      void views.library();
+      void views.home();
+      void views.search();
+    }, 1500);
     void router.restore();
     void commands.windowIsCompact().then((c) => (ui.compact = c));
     void settings.init();
@@ -90,11 +103,14 @@
       else void library.refresh();
     });
     const win = appWindow();
-    if (!win) return;
+    if (!win) return () => clearTimeout(idle);
     const sync = async () => (maximized = await win.isMaximized());
     void sync();
     const unlisteners = [win.onResized(sync), win.onFocusChanged((e) => (active = e.payload))];
-    return () => unlisteners.forEach((p) => p.then((off) => off()));
+    return () => {
+      clearTimeout(idle);
+      unlisteners.forEach((p) => p.then((off) => off()));
+    };
   });
 
   // Si la sesión caduca y no se puede renovar sola, se ofrece reconectar.
@@ -106,7 +122,7 @@
 <svelte:window onkeydown={handleShortcut} />
 
 {#if ui.compact}
-  <CompactPlayer />
+  <Lazy load={views.compact} />
 {:else}
 <div class="skin" class:maximized class:inactive={!active} bind:clientWidth={winW} bind:clientHeight={winH}>
   {#if L}
@@ -164,15 +180,15 @@
 
     <main class="content" class:dark={router.route.name === "now"} style={place(L.content)}>
       {#if router.route.name === "now"}
-        <NowPlayingView />
+        <Lazy load={views.now} />
       {:else if router.route.name === "home"}
-        <HomeView />
+        <Lazy load={views.home} />
       {:else if router.route.name === "search"}
         {#key `${router.route.filter}|${router.route.query}`}
-          <SearchView query={router.route.query} filter={router.route.filter as SearchFilter} />
+          <Lazy load={views.search} props={{ query: router.route.query, filter: router.route.filter as SearchFilter }} />
         {/key}
       {:else}
-        <LibraryView />
+        <Lazy load={views.library} />
       {/if}
     </main>
 
@@ -187,8 +203,8 @@
 
 <ContextMenu />
 <Dialogs />
-{#if ui.optionsOpen}<OptionsDialog />{/if}
-{#if ui.loginOpen}<LoginView />{/if}
+{#if ui.optionsOpen}<Lazy load={views.options} />{/if}
+{#if ui.loginOpen}<Lazy load={views.login} />{/if}
 {#if ui.aboutOpen}
   <DialogFrame title={t.menuBar.about} onclose={() => (ui.aboutOpen = false)}>
     <div class="about">

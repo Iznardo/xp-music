@@ -7,7 +7,7 @@
   import TileGrid from "../components/wmp/TileGrid.svelte";
   import Loading from "../components/xp/Loading.svelte";
 
-  const res = new Resource<Page<Section>>(() => commands.ytHome(null));
+  const res = new Resource<Page<Section>>(() => commands.ytHome(null), () => "home");
   $effect(() => {
     if (auth.signedIn && !res.data) void res.load();
   });

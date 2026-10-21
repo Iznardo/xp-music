@@ -305,13 +305,39 @@ impl YtService {
     }
 
     /// Cuentas presentes en una cookie: (índice, nombre, handle, foto).
+    ///
+    /// Un solo token para todos los índices y las consultas de cuenta en
+    /// paralelo (antes: token + consulta, una tras otra, por cada índice).
     async fn accounts_in(
         cookie: &str,
     ) -> AppResult<Vec<(u32, String, Option<String>, Option<String>)>> {
+        const MAX_ACCOUNTS: u32 = 5;
+        let http = ytmapi_rs::Client::new().map_err(|e| AppError::internal(e.to_string()))?;
+        let token = ytmapi_rs::auth::BrowserToken::from_str(cookie, &http)
+            .await
+            .map_err(|e| super::innertube::map_error("login", &e))?;
+        let mut set = tokio::task::JoinSet::new();
+        for index in 0..MAX_ACCOUNTS {
+            let yt = ytmapi_rs::YtMusicBuilder::new_with_client(http.clone())
+                .with_auth_token(token.clone().with_auth_user(index))
+                .build()
+                .map_err(|e| AppError::internal(e.to_string()))?;
+            set.spawn(async move {
+                let v = run(&yt, Raw::new("account/account_menu", json!({}))).await;
+                (index, v)
+            });
+        }
+        let mut answers: Vec<(u32, AppResult<Value>)> = set.join_all().await;
+        answers.sort_by_key(|(i, _)| *i);
+
+        // Mismo criterio que antes, en orden de índice.
         let mut out = Vec::new();
-        for index in 0..5u32 {
-            let yt = Self::build_client(cookie, index).await?;
-            let v = run(&yt, Raw::new("account/account_menu", json!({}))).await?;
+        for (index, v) in answers {
+            let v = match v {
+                Ok(v) => v,
+                Err(e) if index == 0 => return Err(e),
+                Err(_) => break,
+            };
             match parse::account_info(&v) {
                 Some((name, handle, photos)) => {
                     // Con un índice inexistente Google devuelve la cuenta 0 otra vez.
@@ -1093,5 +1119,29 @@ mod dev_setup {
             .find(|a| a.name == wanted)
             .unwrap();
         println!("{:?}", yt.select_account(account).await.unwrap());
+    }
+}
+
+#[cfg(test)]
+mod bench_accounts {
+    //! Red real, solo lectura (menú de cuenta) con la sesión guardada en la app:
+    //! `cargo test --lib bench_cuentas -- --ignored --nocapture`.
+    use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn bench_cuentas() {
+        let dirs = crate::state::AppDirs::resolve().unwrap();
+        let store = SessionStore::new(&dirs.data);
+        let cookie = store.load().expect("sesión guardada").cookie_header;
+        for vuelta in 0..3 {
+            let t = std::time::Instant::now();
+            let accounts = YtService::accounts_in(&cookie).await.unwrap();
+            println!(
+                "vuelta {vuelta}: {} cuentas en {} ms",
+                accounts.len(),
+                t.elapsed().as_millis()
+            );
+        }
     }
 }

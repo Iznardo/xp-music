@@ -9,7 +9,7 @@
   import Loading from "../components/xp/Loading.svelte";
 
   let { id }: { id: string } = $props();
-  const res = new Resource<AlbumDetail>(() => commands.ytAlbum(id));
+  const res = new Resource<AlbumDetail>(() => commands.ytAlbum(id), () => `album:${id}`);
   void res.load();
 </script>
 

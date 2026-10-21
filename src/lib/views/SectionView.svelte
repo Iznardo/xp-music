@@ -40,7 +40,7 @@
         return { status: "ok", data: { kind: "history", sections } };
       }
     }
-  });
+  }, () => `section:${section}`);
   void res.load();
 
   let loadingMore = $state(false);

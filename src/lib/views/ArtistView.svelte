@@ -9,7 +9,7 @@
   import Loading from "../components/xp/Loading.svelte";
 
   let { id }: { id: string } = $props();
-  const res = new Resource<ArtistDetail>(() => commands.ytArtist(id));
+  const res = new Resource<ArtistDetail>(() => commands.ytArtist(id), () => `artist:${id}`);
   void res.load();
 
   async function radio(d: ArtistDetail) {

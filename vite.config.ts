@@ -24,6 +24,9 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: "es2022",
+    // Imágenes siempre como archivo aparte (no en base64 dentro del JS): el logo
+    // solo se descarga al abrir "Acerca de".
+    assetsInlineLimit: 0,
     outDir: "dist",
     emptyOutDir: true,
   },

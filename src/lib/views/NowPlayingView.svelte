@@ -19,7 +19,8 @@
   const st = $derived(player.state);
   const q = $derived(player.queue);
   const cover = $derived(thumbSrc(st?.track?.thumbnails, 544));
-  const small = $derived(thumbSrc(st?.track?.thumbnails, 120));
+  // Se muestra a 22 px: con 48 basta incluso en pantallas de alta densidad.
+  const small = $derived(thumbSrc(st?.track?.thumbnails, 48));
 
   // Visualización (005): "Cover" = solo portada.
   const preset = $derived<VizPreset>(settings.current?.visualization ?? "Cover");

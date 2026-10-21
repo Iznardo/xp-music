@@ -8,7 +8,7 @@
   import Loading from "../components/xp/Loading.svelte";
 
   let { id }: { id: string } = $props();
-  const res = new Resource<PlaylistDetail>(() => commands.ytPlaylist(id));
+  const res = new Resource<PlaylistDetail>(() => commands.ytPlaylist(id), () => `playlist:${id}`);
   void res.load();
 
   let loadingMore = $state(false);

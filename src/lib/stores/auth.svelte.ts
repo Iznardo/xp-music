@@ -1,13 +1,17 @@
 // Estado de la sesión de YouTube Music (se hidrata al montar; `auth://changed` lo mantiene).
 
 import { commands, events, type AuthStatus } from "../bindings";
+import { clearResourceCache } from "../resource.svelte";
 
 class AuthStore {
   status = $state<AuthStatus | null>(null);
 
   async init(): Promise<void> {
     await events.authChanged.listen((e) => {
+      const before = this.accountName;
       this.status = e.payload;
+      // Otra cuenta (o ninguna): lo que había en caché era de la anterior.
+      if (this.accountName !== before || !this.signedIn) clearResourceCache();
     });
     this.status = await commands.authStatus();
   }

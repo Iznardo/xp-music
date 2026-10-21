@@ -12,7 +12,7 @@
   let { query, filter }: { query: string; filter: SearchFilter } = $props();
   const filters: SearchFilter[] = ["All", "Songs", "Videos", "Albums", "Artists", "Playlists"];
 
-  const res = new Resource<Page<MediaItem>>(() => commands.ytSearch(query, filter));
+  const res = new Resource<Page<MediaItem>>(() => commands.ytSearch(query, filter), () => `search:${filter}:${query}`);
   onMount(() => {
     if (query) void res.load();
   });

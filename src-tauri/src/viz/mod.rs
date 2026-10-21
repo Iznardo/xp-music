@@ -26,11 +26,12 @@ const FRAME: Duration = Duration::from_millis(33);
 #[serde(rename_all = "camelCase")]
 #[tauri_specta(event_name = "viz://frame")]
 pub struct VizFrame {
-    /// 64 valores 0..1, de graves a agudos.
-    pub bands: Vec<f32>,
-    pub peaks: Vec<f32>,
-    /// 256 muestras -1..1.
-    pub wave: Vec<f32>,
+    /// 64 valores 0..255 (0..1 cuantizado), de graves a agudos. Un byte basta para
+    /// dibujar y el JSON que viaja 30 veces por segundo ocupa ~3 veces menos.
+    pub bands: Vec<u8>,
+    pub peaks: Vec<u8>,
+    /// 256 muestras -127..127 (-1..1 cuantizado).
+    pub wave: Vec<i8>,
     /// Nivel RMS suavizado 0..1.
     pub level: f32,
     /// Pulso de ritmo 0..1 (1 en cada golpe de graves, cae en ~0,2 s).
@@ -83,6 +84,22 @@ impl VizService {
                 let _ = h.join();
             }
         }
+    }
+}
+
+fn frame_of(analyzer: &Analyzer) -> VizFrame {
+    let u = |x: &f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
+    VizFrame {
+        bands: analyzer.bands.iter().map(u).collect(),
+        peaks: analyzer.peaks.iter().map(u).collect(),
+        wave: analyzer
+            .wave
+            .iter()
+            .map(|x| (x.clamp(-1.0, 1.0) * 127.0).round() as i8)
+            .collect(),
+        level: analyzer.level,
+        beat: analyzer.beat,
+        bass: analyzer.bass,
     }
 }
 
@@ -159,15 +176,7 @@ fn run(
         // En silencio sostenido no se emite nada (ahorro de IPC).
         let silent = analyzer.is_silent();
         if !(silent && was_silent) {
-            let frame = VizFrame {
-                bands: analyzer.bands.to_vec(),
-                peaks: analyzer.peaks.to_vec(),
-                wave: analyzer.wave.to_vec(),
-                level: analyzer.level,
-                beat: analyzer.beat,
-                bass: analyzer.bass,
-            };
-            let _ = frame.emit(&app);
+            let _ = frame_of(&analyzer).emit(&app);
         }
         was_silent = silent;
 
@@ -177,4 +186,28 @@ fn run(
     }
     // Se devuelve para la próxima activación.
     *stored.lock().unwrap() = tap;
+}
+
+#[cfg(test)]
+mod size_tests {
+    use super::*;
+
+    /// Tamaño de un fotograma tal y como viaja a la interfaz (30 por segundo).
+    #[test]
+    fn tamano_de_un_fotograma() {
+        let mut a = bands::Analyzer::new(48_000);
+        let x: Vec<f32> = (0..bands::FFT_SIZE)
+            .map(|i| (i as f32 * 0.07).sin() * 0.6 + (i as f32 * 0.31).sin() * 0.2)
+            .collect();
+        for _ in 0..10 {
+            a.analyze(&x);
+        }
+        let f = frame_of(&a);
+        let json = serde_json::to_string(&f).unwrap();
+        println!(
+            "fotograma: {} bytes ({} KB/s a 30 fps)",
+            json.len(),
+            json.len() * 30 / 1024
+        );
+    }
 }

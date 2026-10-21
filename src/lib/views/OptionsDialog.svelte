@@ -6,7 +6,7 @@
   import { ui } from "../stores/ui.svelte";
   import { updates } from "../stores/updates.svelte";
   import { t } from "../strings";
-  import logo from "../../assets/logo.png";
+  import logo from "../../assets/logo.webp";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
   import { VIZ_ORDER } from "../viz/presets";
 

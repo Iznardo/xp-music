@@ -399,11 +399,14 @@ export type UpdaterStatus = {
 };
 
 export type VizFrame = {
-	/**  64 valores 0..1, de graves a agudos. */
-	bands: (number | null)[],
-	peaks: (number | null)[],
-	/**  256 muestras -1..1. */
-	wave: (number | null)[],
+	/**
+	 *  64 valores 0..255 (0..1 cuantizado), de graves a agudos. Un byte basta para
+	 *  dibujar y el JSON que viaja 30 veces por segundo ocupa ~3 veces menos.
+	 */
+	bands: number[],
+	peaks: number[],
+	/**  256 muestras -127..127 (-1..1 cuantizado). */
+	wave: number[],
 	/**  Nivel RMS suavizado 0..1. */
 	level: number | null,
 	/**  Pulso de ritmo 0..1 (1 en cada golpe de graves, cae en ~0,2 s). */

@@ -209,7 +209,15 @@ function fakeViz() {
   });
   bands.forEach((b, i) => (peaks[i] = Math.max(b, peaks[i] - 0.01)));
   const wave = Array.from({ length: 256 }, (_, i) => 0.5 * beat * Math.sin(i * 0.15) + 0.2 * Math.sin(i * 0.9 + t * 20));
-  events.vizFrame.emit({ bands, peaks: [...peaks], wave, level: 0.3 + beat * 0.5, beat: beat > 0.9 ? 1 : beat * 0.8, bass: beat });
+  const u = (x: number) => Math.round(Math.min(1, Math.max(0, x)) * 255);
+  events.vizFrame.emit({
+    bands: bands.map(u),
+    peaks: peaks.map(u),
+    wave: wave.map((x) => Math.round(Math.max(-1, Math.min(1, x)) * 127)),
+    level: 0.3 + beat * 0.5,
+    beat: beat > 0.9 ? 1 : beat * 0.8,
+    bass: beat,
+  });
 }
 
 let auth: AuthStatus = { SignedIn: { name: "Alex Rivera", handle: "@alexrivera", photo: null } };
@@ -433,3 +441,14 @@ export const commands = {
 };
 
 void seq;
+
+// Solo en la vista de pruebas: acceso desde la consola para medir y depurar, y
+// registro de las llamadas al "backend" (para contar peticiones repetidas).
+const calls: string[] = [];
+for (const [name, fn] of Object.entries(commands)) {
+  (commands as Record<string, unknown>)[name] = (...args: unknown[]) => {
+    calls.push(name);
+    return (fn as (...a: unknown[]) => unknown)(...args);
+  };
+}
+(globalThis as { __mock?: unknown }).__mock = { commands, events, calls };

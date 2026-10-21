@@ -5,9 +5,11 @@ import type { VizFrame } from "../bindings";
 /// Fotograma ya normalizado (specta tipa los `f32` como `number | null`).
 export type VizData = { bands: number[]; peaks: number[]; wave: number[]; level: number; beat: number; bass: number };
 
+/// El backend envía bandas y picos como bytes 0..255 y la onda como -127..127.
 export function toData(f: VizFrame): VizData {
   const n = (x: number | null) => x ?? 0;
-  return { bands: f.bands.map(n), peaks: f.peaks.map(n), wave: f.wave.map(n), level: n(f.level), beat: n(f.beat), bass: n(f.bass) };
+  const u = (x: number) => x / 255;
+  return { bands: f.bands.map(u), peaks: f.peaks.map(u), wave: f.wave.map((x) => x / 127), level: n(f.level), beat: n(f.beat), bass: n(f.bass) };
 }
 
 export interface VizRenderer {

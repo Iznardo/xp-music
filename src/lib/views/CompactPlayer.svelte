@@ -51,7 +51,8 @@
   function fillet(line: number, below: boolean, cy: number) {
     const fcY = line + (below ? F : -F);
     const dy = fcY - cy;
-    const fx = CX + Math.sqrt((R + F) ** 2 - dy ** 2);
+    // Al montarse, la ventana aún puede tener el tamaño grande: sin raíces negativas.
+    const fx = CX + Math.sqrt(Math.max(0, (R + F) ** 2 - dy ** 2));
     const k = R / (R + F);
     return { fx, tx: CX + (fx - CX) * k, ty: cy + dy * k };
   }

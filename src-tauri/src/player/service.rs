@@ -35,6 +35,8 @@ const MAX_STREAM_RETRIES: u32 = 2;
 const SAVE_DEBOUNCE: Duration = Duration::from_secs(2);
 /// Cada cuánto se marca la posición para guardarla mientras suena.
 const POSITION_SAVE_EVERY_MS: u32 = 10_000;
+/// Posición guardada aparte de la cola (tabla `settings`).
+const POSITION_KEY: &str = "player.position_ms";
 /// Pistas siguientes que se resuelven por adelantado (yt-dlp tarda segundos).
 const PREFETCH_AHEAD: usize = 3;
 
@@ -87,6 +89,9 @@ pub struct PlayerService {
     reporter: Arc<dyn PlaybackReporter>,
     inner: Mutex<Inner>,
     dirty: AtomicBool,
+    /// La cola cambió desde el último guardado. Si solo cambió la posición, se
+    /// guarda ella sola (antes se reescribía la cola entera: MB cada 10 s).
+    queue_dirty: AtomicBool,
     /// Quien quiera enterarse de cada cambio de estado sin depender de la WebView
     /// (bandeja, controles multimedia de Windows, notificaciones).
     observers: Mutex<Vec<StateObserver>>,
@@ -151,6 +156,7 @@ impl PlayerService {
                 last_saved_position: position_ms,
             }),
             dirty: AtomicBool::new(false),
+            queue_dirty: AtomicBool::new(false),
             observers: Mutex::new(Vec::new()),
             prefetch_tx,
             hint_tx,
@@ -222,6 +228,7 @@ impl PlayerService {
 
     fn emit_queue(&self) {
         let _ = self.queue_snapshot().emit(&self.app);
+        self.queue_dirty.store(true, Ordering::Release);
         self.dirty.store(true, Ordering::Release);
     }
 
@@ -830,14 +837,21 @@ impl PlayerService {
     // ------------------------------------------------------------ persistencia
 
     pub fn save_now(&self) {
-        let json = {
+        let (position, queue_json) = {
             let i = self.lock();
-            serde_json::to_string(&Persisted {
-                queue: i.queue.clone(),
-                position_ms: i.position_ms,
-            })
+            let json = self.queue_dirty.swap(false, Ordering::AcqRel).then(|| {
+                serde_json::to_string(&Persisted {
+                    queue: i.queue.clone(),
+                    position_ms: i.position_ms,
+                })
+            });
+            (i.position_ms, json)
         };
-        let Ok(json) = json else { return };
+        // La posición, sola y pequeña: es lo que cambia cada pocos segundos.
+        if let Err(e) = self.db.kv_set(POSITION_KEY, &position.to_string()) {
+            tracing::warn!(error = %e, "no se pudo guardar la posición");
+        }
+        let Some(Ok(json)) = queue_json else { return };
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -891,17 +905,134 @@ fn restore(db: &Db) -> (Queue, u32) {
         .ok();
     match json.map(|j| serde_json::from_str::<Persisted>(&j)) {
         Some(Ok(p)) => {
-            tracing::info!(
-                tracks = p.queue.len(),
-                position_ms = p.position_ms,
-                "cola restaurada"
-            );
-            (p.queue, p.position_ms)
+            // La posición más reciente está guardada aparte.
+            let position_ms = db
+                .kv_get(POSITION_KEY)
+                .ok()
+                .flatten()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(p.position_ms);
+            tracing::info!(tracks = p.queue.len(), position_ms, "cola restaurada");
+            (p.queue, position_ms)
         }
         Some(Err(e)) => {
             tracing::warn!(error = %e, "cola guardada no válida; se empieza vacía");
             (Queue::new(), 0)
         }
         None => (Queue::new(), 0),
+    }
+}
+
+#[cfg(test)]
+mod bench {
+    //! Medidas de coste (no son pruebas de corrección):
+    //! `cargo test --lib bench_ -- --ignored --nocapture`.
+    use super::*;
+    use crate::domain::{AlbumRef, ArtistRef, BrowseId, Thumbnail};
+    use std::time::Instant;
+
+    pub(super) fn realistic_track(i: usize) -> Track {
+        let thumb = |w: u32| Thumbnail {
+            url: format!(
+                "https://lh3.googleusercontent.com/{}AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefghijklmnopqrstuvwxyz=w{w}-h{w}-l90-rj",
+                i
+            ),
+            width: w,
+            height: w,
+        };
+        Track {
+            id: TrackId(format!("vid{i:08}")),
+            title: format!("Canción número {i} (feat. Alguien)"),
+            artists: vec![ArtistRef {
+                id: Some(BrowseId(format!("UCartist{i}"))),
+                name: "Artista de prueba".into(),
+            }],
+            album: Some(AlbumRef {
+                id: Some(BrowseId(format!("MPREalbum{i}"))),
+                name: "Álbum de prueba".into(),
+            }),
+            duration_ms: Some(200_000),
+            thumbnails: vec![thumb(60), thumb(120), thumb(226), thumb(544)],
+            explicit: false,
+            like_status: None,
+            set_video_id: Some(format!("SV{i}")),
+        }
+    }
+
+    pub(super) fn time<F: FnMut()>(n: u32, mut f: F) -> f64 {
+        let t = Instant::now();
+        for _ in 0..n {
+            f();
+        }
+        t.elapsed().as_secs_f64() * 1000.0 / n as f64
+    }
+
+    #[test]
+    fn la_posicion_guardada_aparte_manda_al_restaurar() {
+        let db = Db::open_in_memory().unwrap();
+        let mut q = Queue::new();
+        q.set(
+            (0..3).map(realistic_track).collect(),
+            1,
+            QueueSource::Manual,
+        );
+        let json = serde_json::to_string(&Persisted {
+            queue: q,
+            position_ms: 100,
+        })
+        .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO queue_state (id, json, updated_at) VALUES (1, ?1, 0)",
+                [json],
+            )
+            .unwrap();
+        assert_eq!(restore(&db).1, 100);
+        db.kv_set(POSITION_KEY, "54321").unwrap();
+        let (queue, pos) = restore(&db);
+        assert_eq!((queue.len(), pos), (3, 54_321));
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_guardado_de_posicion_y_ajustes() {
+        let db = Db::open_in_memory().unwrap();
+        let mut q = Queue::new();
+        q.set(
+            (0..3000).map(realistic_track).collect(),
+            0,
+            QueueSource::Manual,
+        );
+        let json = serde_json::to_string(&Persisted {
+            queue: q.clone(),
+            position_ms: 1,
+        })
+        .unwrap();
+        let ms = time(20, || {
+            let json = serde_json::to_string(&Persisted {
+                queue: q.clone(),
+                position_ms: 1,
+            })
+            .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO queue_state (id, json, updated_at) VALUES (1, ?1, 0)
+                     ON CONFLICT(id) DO UPDATE SET json = excluded.json",
+                    [json],
+                )
+                .unwrap();
+        });
+        println!(
+            "ANTES guardar posición (cola de 3000): {ms:.2} ms y {} KB por guardado",
+            json.len() / 1024
+        );
+        let ms = time(2000, || {
+            db.kv_set(POSITION_KEY, "123456").unwrap();
+        });
+        println!("AHORA guardar posición: {ms:.4} ms y 6 bytes por guardado");
+        let ms = time(2000, || {
+            let _ = Settings::load(&db).unwrap();
+        });
+        println!("Settings::load: {:.4} ms por lectura", ms);
     }
 }
