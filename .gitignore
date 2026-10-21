@@ -22,10 +22,14 @@ src-tauri/signing.local.json
 # Sistema / editores
 .DS_Store
 Thumbs.db
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea/
 
 # Frontend / Tauri
 dist/
 src-tauri/gen/schemas/
+
+# Solo en local: documentación de trabajo, prototipos y configuración de herramientas
+.claude/
+specs/
+spike/

@@ -941,14 +941,14 @@ mod tests {
 
         let playlist = json!({
             "title": { "runs": [ { "text": "alternatives" } ] },
-            "subtitle": { "runs": [ { "text": "chema iznardo" }, { "text": " • " }, { "text": "10 tracks" } ] },
+            "subtitle": { "runs": [ { "text": "Alex Rivera" }, { "text": " • " }, { "text": "10 tracks" } ] },
             "navigationEndpoint": { "browseEndpoint": { "browseId": "VLPLxyz", "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_PLAYLIST" } } } }
         });
         let Some(MediaItem::Playlist(p)) = two_row_item(&playlist) else {
             panic!()
         };
         assert_eq!(p.id.0, "VLPLxyz");
-        assert_eq!(p.author.as_deref(), Some("chema iznardo"));
+        assert_eq!(p.author.as_deref(), Some("Alex Rivera"));
         assert_eq!(p.track_count, Some(10));
 
         let new_playlist_button = json!({ "title": { "runs": [ { "text": "New playlist" } ] }, "navigationEndpoint": { "createPlaylistEndpoint": {} } });

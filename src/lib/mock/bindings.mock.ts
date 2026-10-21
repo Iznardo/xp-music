@@ -109,7 +109,7 @@ const playlists: PlaylistSummary[] = [
   ...["Verano 2004", "Para conducir", "Bachata clásica", "Estudiar", "Fiesta", "Relax", "Lista enorme"].map((t, i) => ({
     id: `VLPLmock${i}`,
     title: t,
-    author: "chema iznardo",
+    author: "Alex Rivera",
     trackCount: t === "Lista enorme" ? 3000 : 10 + i * 7,
     thumbnails: cover(i + 2, t.split(" ")[0]!),
   })),
@@ -212,7 +212,7 @@ function fakeViz() {
   events.vizFrame.emit({ bands, peaks: [...peaks], wave, level: 0.3 + beat * 0.5, beat: beat > 0.9 ? 1 : beat * 0.8, bass: beat });
 }
 
-let auth: AuthStatus = { SignedIn: { name: "chema iznardo", handle: "@chemaiz4", photo: null } };
+let auth: AuthStatus = { SignedIn: { name: "Alex Rivera", handle: "@alexrivera", photo: null } };
 
 const v = <T>(x: T) => Promise.resolve(x);
 
@@ -333,7 +333,7 @@ export const commands = {
   authScanBrowser: (_p: string) =>
     ok<SessionAccount[]>([
       { source: { Browser: { profile: "C:\\zen", container: "", containerName: "Sin contenedor" } }, index: 0, name: "Cuenta principal", handle: "@principal", photo: null },
-      { source: { Browser: { profile: "C:\\zen", container: "^userContextId=1", containerName: "Personal" } }, index: 1, name: "chema iznardo", handle: "@chemaiz4", photo: null },
+      { source: { Browser: { profile: "C:\\zen", container: "^userContextId=1", containerName: "Personal" } }, index: 1, name: "Alex Rivera", handle: "@alexrivera", photo: null },
     ]),
   authScanCookie: (_c: string) => ok<SessionAccount[]>([]),
   authSelectAccount: (a: SessionAccount) => {

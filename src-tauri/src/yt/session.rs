@@ -494,7 +494,7 @@ mod tests {
             netscape: String::new(),
             auth_user: 1,
             source: None,
-            account_name: Some("chema".into()),
+            account_name: Some("alex".into()),
             account_handle: None,
             account_photo: None,
             imported_at: 1,

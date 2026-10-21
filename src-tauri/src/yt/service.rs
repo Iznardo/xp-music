@@ -954,8 +954,8 @@ mod live_tests {
                 a.name, a.handle, a.index, a.source
             );
         }
-        let wanted =
-            std::env::var("XP_MUSIC_ACCOUNT_NAME").unwrap_or_else(|_| "chema iznardo".into());
+        let wanted = std::env::var("XP_MUSIC_ACCOUNT_NAME")
+            .expect("XP_MUSIC_ACCOUNT_NAME con el nombre de tu cuenta");
         let account = accounts
             .into_iter()
             .find(|a| a.name == wanted)
@@ -1083,8 +1083,8 @@ mod dev_setup {
         let db = Arc::new(Db::open(&dirs.data.join("xp-music.db")).unwrap());
         let yt = YtService::new(None, db, dirs.data.clone());
         let profile = yt.detect_browsers().into_iter().next().unwrap();
-        let wanted =
-            std::env::var("XP_MUSIC_ACCOUNT_NAME").unwrap_or_else(|_| "chema iznardo".into());
+        let wanted = std::env::var("XP_MUSIC_ACCOUNT_NAME")
+            .expect("XP_MUSIC_ACCOUNT_NAME con el nombre de tu cuenta");
         let account = yt
             .scan_browser(profile.path)
             .await
