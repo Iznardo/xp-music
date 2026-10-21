@@ -125,10 +125,16 @@ pub fn viz_set_active(viz: State<'_, crate::viz::VizService>, active: bool) {
     viz.set_active(active);
 }
 
-/// Da a la ventana la forma del skin (`SetWindowRgn`): la unión de los polígonos
-/// de sus piezas. Fuera de ella no se pinta nada ni se reciben clics. Puntos en
-/// píxeles físicos relativos al área de cliente; `None` = ventana rectangular
-/// (maximizada, modo compacto).
+/// Forma del skin para los clics (specs/008): la unión de los polígonos de sus
+/// piezas, en píxeles físicos relativos al área de cliente; `None` = ventana
+/// rectangular (maximizada, modo compacto).
+///
+/// No se recorta la ventana con `SetWindowRgn`: con región, Windows deja de
+/// componer bien la transparencia por píxel y los bordes curvos salen en escalera
+/// (y con píxeles blancos). La ventana es transparente y los bordes suavizados los
+/// pinta la interfaz; para que los clics en lo transparente lleguen a lo que hay
+/// detrás, un hilo mira dónde está el ratón y activa o desactiva
+/// `set_ignore_cursor_events`.
 #[tauri::command]
 #[specta::specta]
 pub fn window_set_shape(
@@ -136,98 +142,128 @@ pub fn window_set_shape(
     polygons: Option<Vec<Vec<(i32, i32)>>>,
 ) -> AppResult<()> {
     #[cfg(windows)]
-    {
-        let hwnd = window
-            .hwnd()
-            .map_err(|e| AppError::internal(e.to_string()))?
-            .0 as isize;
-        let _ = window.run_on_main_thread(move || unsafe { set_region(hwnd, polygons) });
-    }
+    shape::set(window, polygons);
     #[cfg(not(windows))]
     let _ = (window, polygons);
     Ok(())
 }
 
 #[cfg(windows)]
-unsafe fn set_region(hwnd: isize, polygons: Option<Vec<Vec<(i32, i32)>>>) {
+mod shape {
+    use std::sync::{Mutex, OnceLock};
+    use std::time::Duration;
+
+    use tauri::WebviewWindow;
     use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
     use windows_sys::Win32::Graphics::Gdi::{
-        ClientToScreen, CombineRgn, CreatePolygonRgn, CreateRectRgn, DeleteObject, OffsetRgn,
-        RGN_COPY, RGN_OR, SetWindowRgn, WINDING,
+        CombineRgn, CreatePolygonRgn, DeleteObject, HRGN, PtInRegion, RGN_OR, ScreenToClient,
+        WINDING,
     };
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetClientRect, GetCursorPos, IsWindowVisible,
+    };
 
-    let hwnd = hwnd as HWND;
-    let polygons: Vec<_> = polygons
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|p| p.len() >= 3)
-        .collect();
-    if polygons.is_empty() {
-        unsafe { SetWindowRgn(hwnd, std::ptr::null_mut(), 1) };
-        return;
+    struct Shape {
+        window: WebviewWindow,
+        rgn: HRGN,
+        ignoring: bool,
     }
-    // La región va en coordenadas de ventana; sin decoración, Windows aún deja un
-    // marco invisible para redimensionar, así que se suma el desfase del cliente.
-    let mut win = RECT {
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-    };
-    let mut origin = POINT { x: 0, y: 0 };
-    unsafe {
-        GetWindowRect(hwnd, &mut win);
-        ClientToScreen(hwnd, &mut origin);
+    // La región solo se usa desde el hilo de sondeo y bajo el mutex.
+    unsafe impl Send for Shape {}
+
+    static SHAPE: Mutex<Option<Shape>> = Mutex::new(None);
+    static POLLER: OnceLock<()> = OnceLock::new();
+
+    pub fn set(window: WebviewWindow, polygons: Option<Vec<Vec<(i32, i32)>>>) {
+        let rgn = polygons.and_then(|p| unsafe { union(p) });
+        let mut guard = SHAPE.lock().unwrap();
+        if let Some(old) = guard.take() {
+            unsafe { DeleteObject(old.rgn) };
+            if old.ignoring {
+                let _ = old.window.set_ignore_cursor_events(false);
+            }
+        }
+        match rgn {
+            Some(rgn) => {
+                *guard = Some(Shape {
+                    window,
+                    rgn,
+                    ignoring: false,
+                });
+                POLLER.get_or_init(|| {
+                    std::thread::Builder::new()
+                        .name("window-shape".into())
+                        .spawn(poll)
+                        .ok();
+                });
+            }
+            None => {
+                let _ = window.set_ignore_cursor_events(false);
+            }
+        }
     }
-    let (dx, dy) = (origin.x - win.left, origin.y - win.top);
-    unsafe {
-        let mut total: windows_sys::Win32::Graphics::Gdi::HRGN = std::ptr::null_mut();
-        for poly in polygons {
-            let pts: Vec<POINT> = poly
-                .into_iter()
-                .map(|(x, y)| POINT {
-                    x: x + dx,
-                    y: y + dy,
-                })
-                .collect();
-            let rgn = CreatePolygonRgn(pts.as_ptr(), pts.len() as i32, WINDING);
+
+    unsafe fn union(polygons: Vec<Vec<(i32, i32)>>) -> Option<HRGN> {
+        let mut total: HRGN = std::ptr::null_mut();
+        for poly in polygons.into_iter().filter(|p| p.len() >= 3) {
+            let pts: Vec<POINT> = poly.into_iter().map(|(x, y)| POINT { x, y }).collect();
+            let rgn = unsafe { CreatePolygonRgn(pts.as_ptr(), pts.len() as i32, WINDING) };
             if rgn.is_null() {
                 continue;
             }
             if total.is_null() {
                 total = rgn;
             } else {
-                CombineRgn(total, total, rgn, RGN_OR);
-                DeleteObject(rgn);
+                unsafe {
+                    CombineRgn(total, total, rgn, RGN_OR);
+                    DeleteObject(rgn);
+                }
             }
         }
-        if total.is_null() {
-            return;
+        (!total.is_null()).then_some(total)
+    }
+
+    /// ~25 veces por segundo: ¿está el ratón sobre una parte transparente?
+    fn poll() {
+        loop {
+            std::thread::sleep(Duration::from_millis(40));
+            // Se decide con el cerrojo puesto y se aplica sin él: el cambio pasa por
+            // el hilo principal, que también puede estar esperando este cerrojo.
+            let change = {
+                let mut guard = SHAPE.lock().unwrap();
+                let Some(shape) = guard.as_mut() else {
+                    continue;
+                };
+                let Ok(h) = shape.window.hwnd() else { continue };
+                let hwnd = h.0 as HWND;
+                let mut pt = POINT { x: 0, y: 0 };
+                let mut rc = RECT {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                };
+                let ignore = unsafe {
+                    if IsWindowVisible(hwnd) == 0 || GetCursorPos(&mut pt) == 0 {
+                        continue;
+                    }
+                    ScreenToClient(hwnd, &mut pt);
+                    GetClientRect(hwnd, &mut rc);
+                    let in_client =
+                        pt.x >= rc.left && pt.x < rc.right && pt.y >= rc.top && pt.y < rc.bottom;
+                    // Solo importa dentro del rectángulo de la ventana.
+                    if !in_client {
+                        continue;
+                    }
+                    PtInRegion(shape.rgn, pt.x, pt.y) == 0
+                };
+                if ignore == shape.ignoring {
+                    continue;
+                }
+                shape.ignoring = ignore;
+                (shape.window.clone(), ignore)
+            };
+            let _ = change.0.set_ignore_cursor_events(change.1);
         }
-        // La región de Windows recorta por píxeles enteros (bordes en escalera). Se
-        // agranda 2 px hacia fuera: el borde suavizado que pinta la interfaz cae
-        // dentro, sobre fondo transparente, y se ve limpio.
-        let grown = CreateRectRgn(0, 0, 0, 0);
-        let tmp = CreateRectRgn(0, 0, 0, 0);
-        CombineRgn(grown, total, std::ptr::null_mut(), RGN_COPY);
-        for (ox, oy) in [
-            (2, 0),
-            (-2, 0),
-            (0, 2),
-            (0, -2),
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1),
-        ] {
-            CombineRgn(tmp, total, std::ptr::null_mut(), RGN_COPY);
-            OffsetRgn(tmp, ox, oy);
-            CombineRgn(grown, grown, tmp, RGN_OR);
-        }
-        DeleteObject(tmp);
-        DeleteObject(total);
-        // Con éxito, Windows pasa a ser dueño de la región (no hay que borrarla).
-        SetWindowRgn(hwnd, grown, 1);
     }
 }

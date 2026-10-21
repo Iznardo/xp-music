@@ -78,10 +78,16 @@ export const commands = {
 	/**  Cambia entre modo completo y compacto (FR-004-13). */
 	windowSetCompact: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("window_set_compact", { enabled })),
 	/**
-	 *  Da a la ventana la forma del skin (`SetWindowRgn`): la unión de los polígonos
-	 *  de sus piezas. Fuera de ella no se pinta nada ni se reciben clics. Puntos en
-	 *  píxeles físicos relativos al área de cliente; `None` = ventana rectangular
-	 *  (maximizada, modo compacto).
+	 *  Forma del skin para los clics (specs/008): la unión de los polígonos de sus
+	 *  piezas, en píxeles físicos relativos al área de cliente; `None` = ventana
+	 *  rectangular (maximizada, modo compacto).
+	 * 
+	 *  No se recorta la ventana con `SetWindowRgn`: con región, Windows deja de
+	 *  componer bien la transparencia por píxel y los bordes curvos salen en escalera
+	 *  (y con píxeles blancos). La ventana es transparente y los bordes suavizados los
+	 *  pinta la interfaz; para que los clics en lo transparente lleguen a lo que hay
+	 *  detrás, un hilo mira dónde está el ratón y activa o desactiva
+	 *  `set_ignore_cursor_events`.
 	 */
 	windowSetShape: (polygons: (([number, number])[])[] | null) => typedError<null, AppError>(__TAURI_INVOKE("window_set_shape", { polygons })),
 	/**  Errores y avisos del frontend al log de la app (la WebView no tiene consola visible). */

@@ -130,7 +130,8 @@
       </defs>
       <path d={outline} bind:this={outlineEl} class="shell-fill" />
       {#if sidePod}
-        <path d={sidePod} fill="url(#side-fill)" />
+        <!-- El trazo del mismo color tapa el hilo claro del plateado de debajo en el borde. -->
+        <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
         <!-- Brillo de arriba abajo en la zona de los controles, sin cortes. -->
         <path d={sidePod} fill="url(#side-shade)" />
       {/if}
