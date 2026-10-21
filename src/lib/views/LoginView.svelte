@@ -97,7 +97,6 @@
       </fieldset>
       <fieldset>
         <legend>{t.login.pasteTitle}</legend>
-        <p class="help">{t.login.pasteHelp}</p>
         <div class="row">
           <input class="xp-input grow" type="password" bind:value={pasted} placeholder="SAPISID=…; SID=…" />
           <button class="xp-btn" disabled={busy || !pasted} onclick={scanPasted}>{t.login.paste}</button>
