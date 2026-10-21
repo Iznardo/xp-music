@@ -264,6 +264,7 @@ ${msg}`,
     no: "No",
     newPlaylistTitle: "Nueva lista de reproducción",
     newPlaylistLabel: "Nombre de la lista:",
-    aboutText: "Reproductor de YouTube Music con aspecto de Windows XP.\nHecho con Rust, Tauri y Svelte.",
+    aboutText:
+      "Reproductor de YouTube Music con aspecto de Windows XP.\nHecho con Rust, Tauri y Svelte.\n\nNo está afiliado a Google, YouTube ni Microsoft.\nUsa yt-dlp (Unlicense) y Deno (MIT).",
   },
 } as const;

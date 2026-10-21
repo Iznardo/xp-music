@@ -4,6 +4,7 @@
   "private": true,
   "description": "Reproductor de YouTube Music con estÃ©tica Windows Media Player / XP",
   "author": "iznardo",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

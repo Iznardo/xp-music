@@ -3,6 +3,7 @@ name = "xp-music"
 version = "0.1.0"
 description = "Reproductor de YouTube Music con estética Windows Media Player / XP"
 authors = ["iznardo"]
+license = "MIT"
 edition = "2024"
 publish = false
 
