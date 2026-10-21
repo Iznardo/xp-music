@@ -21,12 +21,6 @@ class UpdatesStore {
     this.status = await commands.updateStatus();
   }
 
-  async setToken(token: string | null): Promise<void> {
-    const r = await commands.updateSetToken(token);
-    if (r.status === "error") ui.error(r.error);
-    await this.refresh();
-  }
-
   /// Comprobación pedida por el usuario.
   async check(): Promise<void> {
     this.busy = true;

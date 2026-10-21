@@ -111,8 +111,6 @@ export const commands = {
 	/**  Abre la carpeta de registros en el Explorador. */
 	toolsOpenLogsDir: () => typedError<null, AppError>(__TAURI_INVOKE("tools_open_logs_dir")),
 	updateStatus: () => __TAURI_INVOKE<UpdaterStatus>("update_status"),
-	/**  Guarda (o borra, con `None`) el token de GitHub en el Administrador de credenciales. */
-	updateSetToken: (token: string | null) => typedError<null, AppError>(__TAURI_INVOKE("update_set_token", { token })),
 	updateCheck: () => typedError<{
 	version: string,
 	notes: string | null,
@@ -409,7 +407,6 @@ export type UpdateInfo = {
 export type UpdaterStatus = {
 	/**  Esta compilación trae la clave pública del updater. */
 	enabled: boolean,
-	hasToken: boolean,
 	pending: UpdateInfo | null,
 };
 

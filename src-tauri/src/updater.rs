@@ -1,15 +1,14 @@
-//! Actualización de la propia app desde el repo privado de GitHub (specs/007).
+//! Actualización de la propia app desde las releases públicas de GitHub (specs/007).
 //!
-//! Las descargas de assets de un repo privado solo funcionan por la API con token,
-//! así que primero se busca `latest.json` en la última release y se configura el
-//! updater de Tauri en tiempo de ejecución con esa URL y las cabeceras.
-//! La clave pública del updater se inyecta al compilar (`XP_MUSIC_UPDATER_PUBKEY`,
-//! lo hace `scripts/release.ps1`); sin ella la comprobación queda desactivada.
+//! `latest.json` de la última release dice qué versión hay y dónde está el
+//! instalador; el updater de Tauri comprueba su firma con la clave pública, que
+//! se inyecta al compilar (`XP_MUSIC_UPDATER_PUBKEY`, lo hace `scripts/release.ps1`).
+//! Sin ella la comprobación queda desactivada.
 
 use std::sync::Mutex;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -17,9 +16,9 @@ use tauri_specta::Event;
 
 use crate::error::{AppError, AppResult, ErrorCode};
 
-const REPO: &str = "Iznardo/xp-music";
-const KEYRING_SERVICE: &str = "xp-music";
-const KEYRING_USER: &str = "github-token";
+/// Siempre apunta a la última release publicada.
+const LATEST_JSON: &str =
+    "https://github.com/Iznardo/xp-music/releases/latest/download/latest.json";
 const LAST_CHECK_KEY: &str = "update.last_check";
 
 pub const PUBKEY: Option<&str> = option_env!("XP_MUSIC_UPDATER_PUBKEY");
@@ -38,42 +37,12 @@ pub struct UpdateInfo {
 pub struct UpdaterStatus {
     /// Esta compilación trae la clave pública del updater.
     pub enabled: bool,
-    pub has_token: bool,
     pub pending: Option<UpdateInfo>,
 }
 
 #[derive(Default)]
 pub struct UpdaterState {
     pending: Mutex<Option<(UpdateInfo, Update)>>,
-}
-
-// ---------------------------------------------------------------- token
-
-fn entry() -> AppResult<keyring::Entry> {
-    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
-        .map_err(|e| AppError::internal(format!("Administrador de credenciales: {e}")))
-}
-
-fn token() -> Option<String> {
-    entry()
-        .ok()?
-        .get_password()
-        .ok()
-        .filter(|t| !t.trim().is_empty())
-}
-
-// ---------------------------------------------------------------- comprobación
-
-#[derive(Deserialize)]
-struct Release {
-    assets: Vec<Asset>,
-}
-
-#[derive(Deserialize)]
-struct Asset {
-    name: String,
-    /// URL de la API (la única que sirve con token en un repo privado).
-    url: String,
 }
 
 fn not_configured() -> AppError {
@@ -83,73 +52,11 @@ fn not_configured() -> AppError {
     )
 }
 
-/// URL de la API del `latest.json` de la última release.
-async fn latest_json_url(token: &str) -> AppResult<url::Url> {
-    let net = |e: reqwest::Error| {
-        // El mensaje de reqwest no incluye cabeceras: no se filtra el token.
-        tracing::warn!(error = %e, "consulta de releases");
-        AppError::new(ErrorCode::Network, "No se pudo consultar GitHub.")
-    };
-    let resp = reqwest::Client::new()
-        .get(format!(
-            "https://api.github.com/repos/{REPO}/releases/latest"
-        ))
-        .bearer_auth(token)
-        .header(
-            "User-Agent",
-            concat!("xp-music/", env!("CARGO_PKG_VERSION")),
-        )
-        .header("Accept", "application/vnd.github+json")
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .map_err(net)?;
-    match resp.status().as_u16() {
-        401 | 403 => {
-            return Err(AppError::new(
-                ErrorCode::NotAuthenticated,
-                "GitHub rechazó el token de actualizaciones (¿caducado o sin permiso de lectura?).",
-            ));
-        }
-        // Sin releases todavía.
-        404 => {
-            return Err(AppError::new(
-                ErrorCode::NotFound,
-                "Aún no hay versiones publicadas.",
-            ));
-        }
-        _ => {}
-    }
-    let rel: Release = resp
-        .error_for_status()
-        .map_err(net)?
-        .json()
-        .await
-        .map_err(net)?;
-    let asset = rel
-        .assets
-        .into_iter()
-        .find(|a| a.name == "latest.json")
-        .ok_or_else(|| {
-            AppError::new(
-                ErrorCode::NotFound,
-                "La última versión no trae latest.json.",
-            )
-        })?;
-    url::Url::parse(&asset.url).map_err(|e| AppError::internal(e.to_string()))
-}
-
 pub async fn check(app: &AppHandle) -> AppResult<Option<UpdateInfo>> {
     if PUBKEY.is_none() {
         return Err(not_configured());
     }
-    let Some(token) = token() else {
-        return Err(AppError::new(
-            ErrorCode::NotAuthenticated,
-            "Falta el token de GitHub para buscar actualizaciones.",
-        ));
-    };
-    let endpoint = latest_json_url(&token).await?;
+    let endpoint = url::Url::parse(LATEST_JSON).map_err(|e| AppError::internal(e.to_string()))?;
     let upd_err = |e: tauri_plugin_updater::Error| {
         tracing::warn!(error = %e, "updater");
         AppError::new(
@@ -161,11 +68,7 @@ pub async fn check(app: &AppHandle) -> AppResult<Option<UpdateInfo>> {
         .updater_builder()
         .endpoints(vec![endpoint])
         .map_err(upd_err)?
-        .header("Authorization", format!("Bearer {token}"))
-        .map_err(upd_err)?
-        // Assets por la API: sin esta cabecera devuelve el JSON del asset, no el fichero.
-        .header("Accept", "application/octet-stream")
-        .map_err(upd_err)?
+        .timeout(Duration::from_secs(60))
         .build()
         .map_err(upd_err)?;
     let found = updater.check().await.map_err(upd_err)?;
@@ -185,9 +88,9 @@ pub async fn check(app: &AppHandle) -> AppResult<Option<UpdateInfo>> {
     Ok(pending.as_ref().map(|(i, _)| i.clone()))
 }
 
-/// Comprobación al arrancar, como mucho una vez al día y sin molestar si no hay token.
+/// Comprobación al arrancar, como mucho una vez al día.
 pub fn spawn_startup_check(app: AppHandle, db: std::sync::Arc<crate::storage::Db>) {
-    if PUBKEY.is_none() || token().is_none() {
+    if PUBKEY.is_none() {
         return;
     }
     tauri::async_runtime::spawn(async move {
@@ -223,31 +126,12 @@ pub fn spawn_startup_check(app: AppHandle, db: std::sync::Arc<crate::storage::Db
 pub fn update_status(state: tauri::State<'_, UpdaterState>) -> UpdaterStatus {
     UpdaterStatus {
         enabled: PUBKEY.is_some(),
-        has_token: token().is_some(),
         pending: state
             .pending
             .lock()
             .unwrap()
             .as_ref()
             .map(|(i, _)| i.clone()),
-    }
-}
-
-/// Guarda (o borra, con `None`) el token de GitHub en el Administrador de credenciales.
-#[tauri::command]
-#[specta::specta]
-pub fn update_set_token(token: Option<String>) -> AppResult<()> {
-    let e = entry()?;
-    match token.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty()) {
-        Some(t) => e
-            .set_password(&t)
-            .map_err(|e| AppError::internal(format!("No se pudo guardar el token: {e}"))),
-        None => match e.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(AppError::internal(format!(
-                "No se pudo borrar el token: {e}"
-            ))),
-        },
     }
 }
 

@@ -102,7 +102,6 @@ fn specta_builder() -> Builder<tauri::Wry> {
             tools::tools_update_now,
             tools::tools_open_logs_dir,
             updater::update_status,
-            updater::update_set_token,
             updater::update_check,
             updater::update_install,
         ])

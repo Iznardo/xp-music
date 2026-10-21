@@ -6,15 +6,27 @@ import { Runtime } from "./runtime.js";
 
 const host = window.parent;
 
-// Defensa extra: el marco no debería ver la IPC de Tauri (va sin origen y la app
-// no le da permisos), pero si la viera se anula antes de cargar ningún skin.
-const exposed = ["__TAURI_INTERNALS__", "__TAURI__", "ipc", "__TAURI_IPC__"].filter((k) => k in window);
+// Defensa extra: el marco va sin origen, su CSP no le deja conectar más que con
+// skin.localhost y la app no le da permisos; aun así, WebView2 inyecta en todos
+// los marcos los objetos de la IPC de Tauri y su canal `chrome.webview`. Se
+// anulan antes de cargar ningún skin. `__TAURI_INTERNALS__` e `ipc` no se dejan
+// borrar, pero sin `chrome.webview` y con esta CSP no llegan a nada: el marco lo
+// comprueba al cargar y solo avisa si la IPC respondiera.
+const exposed = ["__TAURI_INTERNALS__", "__TAURI__", "ipc", "__TAURI_IPC__", "__TAURI_POST_MESSAGE__"].filter((k) => k in window);
 for (const k of exposed) {
   try {
     delete (/** @type {any} */ (window))[k];
     Object.defineProperty(window, k, { value: undefined, configurable: false, writable: false });
   } catch {
-    /* no configurable: se queda, pero sin permisos */
+    /* no configurable: queda, pero sin canal */
+  }
+}
+const chromeObj = /** @type {any} */ (window).chrome;
+if (chromeObj?.webview) {
+  try {
+    Object.defineProperty(chromeObj, "webview", { value: undefined, configurable: false, writable: false });
+  } catch {
+    /* queda, pero la CSP no le deja salir */
   }
 }
 /** @param {any} msg */
@@ -41,7 +53,17 @@ window.addEventListener("unhandledrejection", (e) => send({ t: "log", level: "wa
 
 /** @param {{ url: string, prefs?: Record<string, string>, state?: any, queue?: any }} m */
 async function init(m) {
-  if (exposed.length) send({ t: "log", level: "warn", msg: `el marco veía ${exposed.join(", ")} (anulado)` });
+  // Comprobación activa: la IPC de la app no debe responder desde aquí.
+  fetch("http://ipc.localhost/plugin%3Aapp%7Cversion", { method: "POST", body: "{}" })
+    .then((r) => send({ t: "log", level: "error", msg: `aislamiento: la IPC respondió desde el marco (${r.status})` }))
+    .catch(() => {});
+  // El otro camino de la IPC (window.ipc → chrome.webview) tampoco debe funcionar.
+  try {
+    /** @type {any} */ (window).ipc?.postMessage("{}");
+    send({ t: "log", level: "error", msg: "aislamiento: window.ipc.postMessage no falló" });
+  } catch {
+    /* lo esperado */
+  }
   try {
     const res = await fetch(m.url);
     if (!res.ok) throw new Error(`No se pudo leer el skin (${res.status}).`);

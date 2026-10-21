@@ -37,7 +37,6 @@
   let versions = $state<ToolVersions | null>(null);
   let updateMsg = $state("");
   let checking = $state(false);
-  let tokenInput = $state("");
   $effect(() => {
     if (tab === "about" && !versions) void commands.toolsVersions().then((v) => (versions = v));
   });
@@ -163,16 +162,10 @@
             {#if updates.status && !updates.status.enabled}
               <p class="hint">{t.options.about.disabled}</p>
             {:else}
-              <label class="hk">
-                <span>{t.options.about.tokenLabel}</span>
-                <input class="xp-input" type="password" autocomplete="off" bind:value={tokenInput} placeholder={updates.status?.hasToken ? "••••••••" : "github_pat_…"} />
-              </label>
               <div class="row">
-                <button class="xp-btn" disabled={!tokenInput.trim()} onclick={() => updates.setToken(tokenInput).then(() => (tokenInput = ""))}>{t.options.about.save}</button>
-                <button class="xp-btn" disabled={!updates.status?.hasToken} onclick={() => updates.setToken(null)}>{t.options.about.remove}</button>
-                <button class="xp-btn" disabled={updates.busy || !updates.status?.hasToken} onclick={() => updates.check()}>{t.options.about.checkApp}</button>
+                <button class="xp-btn" disabled={updates.busy} onclick={() => updates.check()}>{t.options.about.checkApp}</button>
               </div>
-              <p class="hint">{updates.message || (updates.status?.hasToken ? t.options.about.tokenSaved : t.options.about.tokenMissing)}</p>
+              {#if updates.message}<p class="hint">{updates.message}</p>{/if}
             {/if}
           </fieldset>
           <p class="hint">{t.options.about.notice}</p>

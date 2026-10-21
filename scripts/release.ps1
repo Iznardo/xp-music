@@ -129,7 +129,7 @@ if (-not $Notes) { $Notes = "XP Music $v" }
 gh release create $tag $installer.FullName $sigFile --repo $repo --title "XP Music $v" --notes $Notes
 if ($LASTEXITCODE -ne 0) { Fail 'No se pudo crear la release.' }
 
-# En un repo privado el updater descarga por la API: hace falta la URL de API del asset.
+# Repo público: el updater descarga el instalador por su enlace normal.
 $rel = gh api "repos/$repo/releases/tags/$tag" | ConvertFrom-Json
 $asset = $rel.assets | Where-Object { $_.name -like "*_${v}_x64-setup.exe" } | Select-Object -First 1
 if (-not $asset) { Fail 'No se encuentra el instalador en la release.' }
@@ -140,7 +140,7 @@ $latest = [ordered]@{
     platforms = [ordered]@{
         'windows-x86_64' = [ordered]@{
             signature = (Get-Content $sigFile -Raw).Trim()
-            url = $asset.url
+            url = $asset.browser_download_url
         }
     }
 }

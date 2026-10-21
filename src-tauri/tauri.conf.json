@@ -45,7 +45,9 @@
     ],
     "resources": {
       "../tools/deno.exe": "tools/deno.exe",
-      "../tools/yt-dlp/": "tools/yt-dlp/"
+      "../tools/yt-dlp/": "tools/yt-dlp/",
+      "../LICENSE": "LICENSE.txt",
+      "../THIRD-PARTY-NOTICES.txt": "THIRD-PARTY-NOTICES.txt"
     },
     "publisher": "iznardo",
     "copyright": "© 2026 iznardo",
