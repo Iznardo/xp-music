@@ -1,3 +1,17 @@
+<script lang="ts" module>
+  // Varias visualizaciones pueden convivir un instante (al cambiar de preset se
+  // monta la nueva antes de desmontar la vieja): el analizador del backend se
+  // enciende con la primera visible y se apaga cuando no queda ninguna.
+  import { commands as cmds } from "../bindings";
+  let visible = 0;
+  export function vizVisible(delta: 1 | -1) {
+    const before = visible;
+    visible = Math.max(0, visible + delta);
+    if (before === 0 && visible > 0) void cmds.vizSetActive(true);
+    if (before > 0 && visible === 0) void cmds.vizSetActive(false);
+  }
+</script>
+
 <script lang="ts">
   // Lienzo de visualización (specs/005). El analizador del backend solo corre
   // mientras este componente está montado y la página es visible (AC-005-02).
@@ -56,7 +70,15 @@
       dirty = true;
     });
 
-    const sync = () => void commands.vizSetActive(document.visibilityState === "visible");
+    // Cuenta como visible mientras la página lo está.
+    let counted = false;
+    const sync = () => {
+      const now = document.visibilityState === "visible";
+      if (now !== counted) {
+        counted = now;
+        vizVisible(now ? 1 : -1);
+      }
+    };
     sync();
     document.addEventListener("visibilitychange", sync);
 
@@ -65,7 +87,7 @@
       ro.disconnect();
       document.removeEventListener("visibilitychange", sync);
       void unlisten.then((off) => off());
-      void commands.vizSetActive(false);
+      if (counted) vizVisible(-1);
       renderer.dispose();
     };
   });

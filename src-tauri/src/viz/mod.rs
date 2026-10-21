@@ -16,6 +16,7 @@ use specta::Type;
 use tauri::AppHandle;
 use tauri_specta::Event;
 
+use crate::audio::output::PcmTap;
 use crate::player::service::PlayerService;
 use bands::{Analyzer, FFT_SIZE};
 
@@ -43,6 +44,10 @@ pub struct VizService {
     player: Arc<PlayerService>,
     active: Arc<AtomicBool>,
     worker: Mutex<Option<thread::JoinHandle<()>>>,
+    /// La derivación de PCM solo se entrega una vez por salida abierta: se guarda
+    /// aquí entre activaciones (cambiar de preset, salir y volver a Reproducción
+    /// actual). Sin esto, la segunda vez el analizador se quedaba sin audio.
+    tap: Arc<Mutex<Option<PcmTap>>>,
 }
 
 impl VizService {
@@ -52,6 +57,7 @@ impl VizService {
             player,
             active: Arc::new(AtomicBool::new(false)),
             worker: Mutex::new(None),
+            tap: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -65,9 +71,10 @@ impl VizService {
             let active = Arc::clone(&self.active);
             let player = Arc::clone(&self.player);
             let app = self.app.clone();
+            let stored = Arc::clone(&self.tap);
             *worker = thread::Builder::new()
                 .name("viz-analyzer".into())
-                .spawn(move || run(active, player, app))
+                .spawn(move || run(active, player, app, stored))
                 .ok();
         } else {
             self.active.store(false, Ordering::Release);
@@ -79,8 +86,13 @@ impl VizService {
     }
 }
 
-fn run(active: Arc<AtomicBool>, player: Arc<PlayerService>, app: AppHandle) {
-    let mut tap = player.take_tap();
+fn run(
+    active: Arc<AtomicBool>,
+    player: Arc<PlayerService>,
+    app: AppHandle,
+    stored: Arc<Mutex<Option<PcmTap>>>,
+) {
+    let mut tap = player.take_tap().or_else(|| stored.lock().unwrap().take());
     let mut analyzer = Analyzer::new(tap.as_ref().map_or(48_000, |t| t.sample_rate));
     // Ventana deslizante mono de FFT_SIZE muestras (ring + copia lineal).
     let mut ring = vec![0.0f32; FFT_SIZE];
@@ -88,6 +100,9 @@ fn run(active: Arc<AtomicBool>, player: Arc<PlayerService>, app: AppHandle) {
     let mut linear = vec![0.0f32; FFT_SIZE];
     let mut chunk = vec![0.0f32; 8192];
     let mut was_silent = false;
+    // Diagnóstico: una línea a los 5 s de activarse (¿llega audio? ¿hay golpes?).
+    let activated = Instant::now();
+    let (mut reported, mut samples_seen, mut beats) = (false, 0usize, 0u32);
 
     // Lo viejo del tap no interesa.
     if let Some(t) = tap.as_mut() {
@@ -119,12 +134,26 @@ fn run(active: Arc<AtomicBool>, player: Arc<PlayerService>, app: AppHandle) {
                 got += n / ch;
             }
         }
+        samples_seen += got;
         if got > 0 {
             linear[..FFT_SIZE - write].copy_from_slice(&ring[write..]);
             linear[FFT_SIZE - write..].copy_from_slice(&ring[..write]);
             analyzer.analyze(&linear);
         } else {
             analyzer.decay();
+        }
+
+        if analyzer.beat >= 1.0 {
+            beats += 1;
+        }
+        if !reported && activated.elapsed() >= Duration::from_secs(5) {
+            reported = true;
+            tracing::info!(
+                con_audio = tap.is_some(),
+                muestras = samples_seen,
+                golpes = beats,
+                "visualización activa"
+            );
         }
 
         // En silencio sostenido no se emite nada (ahorro de IPC).
@@ -146,4 +175,6 @@ fn run(active: Arc<AtomicBool>, player: Arc<PlayerService>, app: AppHandle) {
             thread::sleep(left);
         }
     }
+    // Se devuelve para la próxima activación.
+    *stored.lock().unwrap() = tap;
 }

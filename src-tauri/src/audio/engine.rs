@@ -758,6 +758,72 @@ mod tests {
         None
     }
 
+    /// Visualización con música real (silenciada): llega audio a la derivación
+    /// aunque el volumen esté a 0 y se detectan golpes, también tras soltar y
+    /// recuperar la derivación. `cargo test --lib -- --ignored --nocapture viz_real`.
+    #[test]
+    #[ignore]
+    fn viz_real_detecta_golpes() {
+        use crate::viz::bands::{Analyzer, FFT_SIZE};
+        use ringbuf::traits::{Consumer, Observer};
+        let resolver = YtDlpResolver::new(ToolPaths::locate().expect("tools/"), None);
+        let s = resolver
+            .resolve(&TrackId("yQd4xQBlBa0".into()), FormatPreference::Aac128)
+            .unwrap();
+        let (tx, rx) = unbounded();
+        let engine = EngineHandle::spawn(tx);
+        engine.send(EngineCmd::SetVolume {
+            volume: 0.0,
+            muted: true,
+        });
+        engine.send(EngineCmd::SetTap(true));
+        engine.send(EngineCmd::Load {
+            stream: s,
+            start_ms: 30_000,
+            autoplay: true,
+        });
+        wait_for(&rx, Duration::from_secs(15), |e| {
+            matches!(e, EngineEvent::TrackStarted { .. })
+        })
+        .expect("no empezó a sonar");
+        let mut tap = None;
+        for _ in 0..50 {
+            tap = engine.take_tap();
+            if tap.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let mut tap = tap.expect("sin derivación de PCM");
+        let ch = tap.channels as usize;
+        let mut a = Analyzer::new(tap.sample_rate);
+        let mut ring = vec![0.0f32; FFT_SIZE];
+        let mut buf = vec![0.0f32; 8192];
+        let (mut beats, mut max_level) = (0, 0.0f32);
+        for _ in 0..(8 * 30) {
+            std::thread::sleep(Duration::from_millis(33));
+            while tap.consumer.occupied_len() >= ch {
+                let n = tap.consumer.pop_slice(&mut buf[..(8192 / ch) * ch]);
+                for f in buf[..n].chunks_exact(ch) {
+                    ring.rotate_left(1);
+                    ring[FFT_SIZE - 1] = (f[0] + f[ch - 1]) * 0.5;
+                }
+            }
+            a.analyze(&ring);
+            max_level = max_level.max(a.level);
+            if a.beat >= 1.0 {
+                beats += 1;
+            }
+        }
+        println!("8 s silenciado: nivel máx {max_level:.2}, golpes {beats}");
+        engine.shutdown();
+        assert!(
+            max_level > 0.1,
+            "no llega audio a la visualización con volumen 0"
+        );
+        assert!(beats >= 6, "pocos golpes detectados: {beats}");
+    }
+
     /// Audio real por los altavoces (volumen 30 %):
     /// `cargo test --lib -- --ignored --nocapture motor_real`.
     #[test]
