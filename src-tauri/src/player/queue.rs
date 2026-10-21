@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::types::{InsertPosition, QueueSnapshot, QueueSource, RepeatMode};
-use crate::domain::Track;
+use crate::domain::{LikeStatus, Track, TrackId};
 
 /// "Anterior" con más de este tiempo reproducido reinicia la canción.
 pub const RESTART_THRESHOLD_MS: u32 = 3_000;
@@ -156,6 +156,16 @@ impl Queue {
                 p
             });
         }
+    }
+
+    /// Marca el "Me gusta" de una canción en todas sus apariciones; `true` si estaba.
+    pub fn set_like(&mut self, id: &TrackId, status: LikeStatus) -> bool {
+        let mut found = false;
+        for t in self.tracks.iter_mut().filter(|t| &t.id == id) {
+            t.like_status = Some(status);
+            found = true;
+        }
+        found
     }
 
     pub fn clear(&mut self) {
@@ -463,5 +473,19 @@ mod tests {
         let json = serde_json::to_string(&q).unwrap();
         let back: Queue = serde_json::from_str(&json).unwrap();
         assert_eq!(cur(&back), "t1");
+    }
+
+    #[test]
+    fn me_gusta_marca_todas_las_apariciones() {
+        let mut q = Queue::new();
+        let a = tr("a");
+        q.set(vec![a.clone(), tr("b"), a], 0, QueueSource::Manual);
+        assert!(q.set_like(&TrackId("a".into()), LikeStatus::Like));
+        let likes: Vec<_> = q.tracks_in_order().map(|x| x.like_status).collect();
+        assert_eq!(
+            likes,
+            [Some(LikeStatus::Like), None, Some(LikeStatus::Like)]
+        );
+        assert!(!q.set_like(&TrackId("zzz".into()), LikeStatus::Like));
     }
 }

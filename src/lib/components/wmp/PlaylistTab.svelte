@@ -7,7 +7,7 @@
   import { library } from "../../stores/library.svelte";
   import { ui, type MenuItem } from "../../stores/ui.svelte";
   import { router } from "../../router.svelte";
-  import { playPlaylist } from "../../actions";
+  import { addToNewPlaylist, playPlaylist } from "../../actions";
   import { t } from "../../strings";
 
   let { maximized = false }: { maximized?: boolean } = $props();
@@ -38,6 +38,7 @@
       { kind: "check", label: t.views.autoplay, checked: q?.autoplay ?? true, action: () => void commands.queueSetAutoplay(!(q?.autoplay ?? true)) },
       { kind: "item", label: t.views.clearQueue, disabled: !count, action: () => void commands.queueClear() },
       { kind: "sep" },
+      { kind: "item", label: t.menu.newPlaylist, action: () => void addToNewPlaylist([]) },
       { kind: "item", label: t.tab.library, action: () => router.go({ name: "library", section: "playlists" }) },
     ];
     // Que el menú salga alineado con el desplegable, como un combo de XP.

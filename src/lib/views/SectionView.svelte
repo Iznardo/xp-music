@@ -4,7 +4,7 @@
   import type { LibrarySection } from "../router.svelte";
   import { Resource } from "../resource.svelte";
   import { library } from "../stores/library.svelte";
-  import { playTracks } from "../actions";
+  import { addToNewPlaylist, playTracks } from "../actions";
   import { t } from "../strings";
   import TrackTable from "../components/wmp/TrackTable.svelte";
   import TileGrid from "../components/wmp/TileGrid.svelte";
@@ -43,6 +43,11 @@
   }, () => `section:${section}`);
   void res.load();
 
+  // Las listas salen de la biblioteca: una lista nueva aparece al momento.
+  const tiles = $derived<MediaItem[]>(
+    section === "playlists" ? library.playlists.map((p) => ({ Playlist: p }) as MediaItem) : res.data?.kind === "tiles" ? res.data.items : [],
+  );
+
   let loadingMore = $state(false);
   async function more() {
     const d = res.data;
@@ -71,7 +76,10 @@
       <span class="count">{t.status.items(tracks.length)}</span>
       <button class="xp-btn" onclick={() => playTracks(tracks, 0, section === "liked" ? { Playlist: "VLLM" } : "Library")}>{t.menu.playAll}</button>
     {:else if res.data?.kind === "tiles"}
-      <span class="count">{t.status.items(res.data.items.length)}</span>
+      <span class="count">{t.status.items(tiles.length)}</span>
+      {#if section === "playlists"}
+        <button class="xp-btn" onclick={() => void addToNewPlaylist([])}>{t.menu.newPlaylist}</button>
+      {/if}
     {/if}
   </div>
 
@@ -85,7 +93,7 @@
         onmore={more}
       />
     {:else if res.data?.kind === "tiles"}
-      <div class="scroll"><TileGrid items={res.data.items} /></div>
+      <div class="scroll"><TileGrid items={tiles} /></div>
     {:else if res.data?.kind === "history"}
       <div class="history">
         {#each res.data.sections as s}

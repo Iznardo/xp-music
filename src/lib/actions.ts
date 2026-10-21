@@ -15,6 +15,13 @@ async function check<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"
   return r.data;
 }
 
+/// Para órdenes sin resultado: ¿ha ido bien? (Su `data` es `null`, igual que un fallo en `check`.)
+async function succeeded(p: Promise<{ status: "ok"; data: unknown } | { status: "error"; error: { message: string } }>): Promise<boolean> {
+  const r = await p;
+  if (r.status === "error") ui.error(r.error.message);
+  return r.status === "ok";
+}
+
 export async function playTracks(tracks: Track[], index = 0, source: QueueSource = "Manual") {
   if (!tracks.length) return;
   await check(commands.queueSet(tracks, index, source));
@@ -59,14 +66,14 @@ export async function addToQueue(tracks: Track[]) {
 }
 
 export async function setLike(track: Track, like: boolean) {
-  if ((await check(commands.ytRate(track.id, like ? "Like" : "Indifferent"))) !== null) {
+  if (await succeeded(commands.ytRate(track.id, like ? "Like" : "Indifferent"))) {
     track.likeStatus = like ? "Like" : "Indifferent";
     ui.status = like ? t.status.liked : t.status.unliked;
   }
 }
 
 export async function addToPlaylist(tracks: Track[], playlistId: string, title: string) {
-  if ((await check(commands.ytAddToPlaylist(playlistId, tracks.map((x) => x.id)))) !== null) {
+  if (await succeeded(commands.ytAddToPlaylist(playlistId, tracks.map((x) => x.id)))) {
     ui.status = t.status.addedToPlaylist(tracks.length, title);
   }
 }
@@ -78,6 +85,15 @@ export async function addToNewPlaylist(tracks: Track[]) {
   if (!id) return;
   if (tracks.length) await addToPlaylist(tracks, id, title.trim());
   await library.refresh();
+}
+
+/// "Nueva lista…" y tus listas, para añadirles canciones.
+export function playlistChoices(tracks: Track[]): MenuItem[] {
+  return [
+    { kind: "item", label: t.menu.newPlaylist, action: () => addToNewPlaylist(tracks) },
+    ...(library.editable.length ? [{ kind: "sep" } as MenuItem] : []),
+    ...library.editable.map((p) => ({ kind: "item", label: p.title, action: () => addToPlaylist(tracks, p.id, p.title) }) as MenuItem),
+  ];
 }
 
 /// Menú contextual de una o varias canciones (FR-004-09).
@@ -98,15 +114,7 @@ export function trackMenu(tracks: Track[], opts: { onPlay?: () => void; queueInd
     const liked = one.likeStatus === "Like";
     items.push({ kind: "item", label: liked ? t.menu.unlike : t.menu.like, action: () => setLike(one, !liked) });
   }
-  items.push({
-    kind: "sub",
-    label: t.menu.addToPlaylist,
-    items: [
-      { kind: "item", label: t.menu.newPlaylist, action: () => addToNewPlaylist(tracks) },
-      ...(library.editable.length ? [{ kind: "sep" } as MenuItem] : []),
-      ...library.editable.map((p) => ({ kind: "item", label: p.title, action: () => addToPlaylist(tracks, p.id, p.title) }) as MenuItem),
-    ],
-  });
+  items.push({ kind: "sub", label: t.menu.addToPlaylist, items: playlistChoices(tracks) });
   if (one) {
     items.push({ kind: "sep" });
     const album = one.album?.id;

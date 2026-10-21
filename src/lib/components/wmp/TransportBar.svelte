@@ -6,7 +6,7 @@
   import { player } from "../../stores/player.svelte";
   import { ui } from "../../stores/ui.svelte";
   import { router } from "../../router.svelte";
-  import { artistNames, fmtTime } from "../../actions";
+  import { artistNames, fmtTime, playlistChoices, setLike } from "../../actions";
   import { t } from "../../strings";
   import Slider from "../xp/Slider.svelte";
   import { place, radii, type Piece, type Rect } from "../../skin";
@@ -22,6 +22,16 @@
   const playedPct = $derived(duration ? Math.min(100, (shown / duration) * 100) : 0);
 
   const nextRepeat: Record<RepeatMode, RepeatMode> = { Off: "All", All: "One", One: "Off" };
+
+  const track = $derived(st?.track ?? null);
+  const liked = $derived(track?.likeStatus === "Like");
+
+  function addMenu(e: MouseEvent) {
+    if (!track) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    // Hacia arriba: la barra está al borde inferior de la ventana.
+    ui.openMenu({ x: r.left, y: r.top - 4 - 22 * (playlistChoices([track]).length + 1) }, playlistChoices([track]));
+  }
 
   const statusText = $derived.by(() => {
     if (ui.status) return ui.status;
@@ -158,6 +168,19 @@
   <button class="lcd" onclick={() => router.go({ name: "now" })} title={t.tabs.now.replace("\n", " ")}>
     <span class="lcd-text">{lcdText}</span>
     <span class="lcd-time">{fmtTime(shown) || "00:00"}{duration ? ` / ${fmtTime(duration)}` : ""}</span>
+  </button>
+  <button
+    class="flat heart"
+    class:on={liked}
+    disabled={!track}
+    title={liked ? t.menu.unlike : t.menu.like}
+    aria-pressed={liked}
+    onclick={() => track && setLike(track, !liked)}
+  >
+    <svg viewBox="0 0 16 16"><path d="M8 13.5S2 9.8 2 5.8C2 4 3.4 2.7 5 2.7c1.3 0 2.4.8 3 1.9.6-1.1 1.7-1.9 3-1.9 1.6 0 3 1.3 3 3.1 0 4-6 7.7-6 7.7z" stroke="currentColor" stroke-width="1.3" style:fill={liked ? "currentColor" : "none"} /></svg>
+  </button>
+  <button class="flat" disabled={!track} title={t.menu.addToPlaylist} aria-label={t.menu.addToPlaylist} aria-haspopup="menu" onclick={addMenu}>
+    <svg viewBox="0 0 16 16"><path d="M2 4h8M2 8h8M2 12h5M12 9v6M9 12h6" stroke="currentColor" stroke-width="1.4" style:fill="none" /></svg>
   </button>
   <button
     class="flat"
@@ -401,6 +424,17 @@
   }
   .flat.on {
     color: #148a14;
+  }
+  .flat.heart.on {
+    color: #d0213f;
+  }
+  .flat:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .flat:disabled:hover {
+    border-color: transparent;
+    background: none;
   }
   .one {
     position: absolute;

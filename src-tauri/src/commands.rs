@@ -358,8 +358,15 @@ pub async fn yt_radio(yt: YtState<'_>, seed: TrackId) -> AppResult<Vec<Track>> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn yt_rate(yt: YtState<'_>, id: TrackId, status: LikeStatus) -> AppResult<()> {
-    yt.rate(id, status).await
+pub async fn yt_rate(
+    yt: YtState<'_>,
+    player: Player<'_>,
+    id: TrackId,
+    status: LikeStatus,
+) -> AppResult<()> {
+    yt.rate(id.clone(), status).await?;
+    player.set_like(&id, status);
+    Ok(())
 }
 
 #[tauri::command]

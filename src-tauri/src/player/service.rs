@@ -23,7 +23,7 @@ use super::types::{
 };
 use crate::audio::engine::{EngineCmd, EngineEvent, EngineHandle, EngineState};
 use crate::audio::resolver::{FormatPreference, ResolvedStream, StreamResolver, Upgrade};
-use crate::domain::{Track, TrackId};
+use crate::domain::{LikeStatus, Track, TrackId};
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::settings::Settings;
 use crate::storage::Db;
@@ -647,6 +647,14 @@ impl PlayerService {
         self.lock().queue.clear();
         self.stop();
         self.emit_queue();
+    }
+
+    /// "Me gusta" dado o quitado: la canción de la cola (y la que suena) lo refleja.
+    pub fn set_like(&self, id: &TrackId, status: LikeStatus) {
+        if self.lock().queue.set_like(id, status) {
+            self.emit_queue();
+            self.emit_state();
+        }
     }
 
     pub fn queue_set_autoplay(&self, enabled: bool) {
