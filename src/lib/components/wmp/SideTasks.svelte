@@ -144,7 +144,7 @@
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 0 0 40px;
+    padding: 0 0 6px;
   }
   .account {
     display: flex;

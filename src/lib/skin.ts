@@ -41,6 +41,13 @@ export const SKIN = {
   /// Barra inferior del cuerpo (controles a la derecha de la píldora).
   bottomBar: 58,
   pod: { dx: 22, w: 360, h: 88 },
+  /// Con lateral, su parte de abajo se estrecha en S durante esta altura hasta
+  /// la esquina inferior izquierda de la píldora (lateral y controles, una pieza).
+  taper: 110,
+  /// Radio de la esquina inferior izquierda de la píldora unida a la lateral.
+  podCorner: 40,
+  /// Empalme de la píldora con el cuerpo, por la derecha.
+  podFillet: 18,
   frame: 7,
   /// Radio de los empalmes cóncavos donde se unen las piezas.
   fillet: 11,
@@ -67,26 +74,36 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
   const bodyY = s.tabRise;
   const bodyBottom = h - s.bottomGap;
   const podY = h - s.pod.h;
-  const podX = bodyX + s.pod.dx;
+  // Con lateral, la píldora arranca en el borde del cuerpo: su lado izquierdo es
+  // la continuación de la lateral.
+  const podX = sideOpen ? bodyX : bodyX + s.pod.dx;
+  const podRight = bodyX + s.pod.dx + s.pod.w;
   // La lateral ocupa desde arriba del cuerpo; su silueta la da `sideClip`.
   const side: Piece | null = sideOpen
-    ? { x: 0, y: bodyY, w: s.sideSlope.to, h: bodyBottom - bodyY, r: [0, 0, 0, 30] }
+    ? { x: 0, y: bodyY, w: s.sideSlope.to, h: podY - bodyY, r: [0, 0, 0, 0] }
     : null;
   const body: Piece = { x: bodyX, y: bodyY, w: w - bodyX, h: bodyBottom - bodyY, r: [sideOpen ? 0 : 16, 0, 0, 0] };
   // La pestaña empieza donde la curva ya ha llegado arriba.
   const tab: Piece = { x: w - s.tabW + s.tabInset, y: 0, w: s.tabW - s.tabInset, h: s.tabH, r: [0, 12, 0, 0] };
-  const pod: Piece = { x: podX, y: podY, w: s.pod.w, h: s.pod.h, r: [s.pod.h / 2, s.pod.h / 2, s.pod.h / 2, s.pod.h / 2] };
+  const pr = s.pod.h / 2;
+  const pod: Piece = {
+    x: podX,
+    y: podY,
+    w: podRight - podX,
+    h: s.pod.h,
+    r: sideOpen ? [0, pr, pr, s.podCorner] : [pr, pr, pr, pr],
+  };
   const contentTop = bodyY + s.topBar;
   const contentBottom = bodyBottom - s.bottomBar;
   let sideClip: string | null = null;
   if (side) {
     const c = sideCurve(bodyY);
     const t = (y: number) => y - bodyY;
-    const r3 = side.r[3];
     const k = s.sideCorner;
+    const tp = taperCurve(bodyX, podY);
     sideClip = [
-      `M ${r3} ${side.h}`,
-      `A ${r3} ${r3} 0 0 1 0 ${side.h - r3}`,
+      `M ${tp.p3[0]} ${side.h}`,
+      `C ${tp.c2[0]} ${t(tp.c2[1])} ${tp.c1[0]} ${t(tp.c1[1])} ${tp.p0[0]} ${t(tp.p0[1])}`,
       `L 0 ${t(s.sideTop + k)}`,
       `A ${k} ${k} 0 0 1 ${k} ${t(s.sideTop)}`,
       `L ${c.p0[0]} ${t(c.p0[1])}`,
@@ -115,7 +132,7 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
       const x = sideOpen ? s.sideSlope.to : bodyX;
       return { x, y: bodyY, w: w - s.tabW - x, h: s.topBar };
     })(),
-    bar: { x: podX + s.pod.w, y: contentBottom, w: w - podX - s.pod.w, h: bodyBottom - contentBottom },
+    bar: { x: podRight, y: contentBottom, w: w - podRight, h: bodyBottom - contentBottom },
   };
 }
 
@@ -130,6 +147,19 @@ function sideCurve(bodyY: number) {
     c1: [from + m, SKIN.sideTop] as const,
     c2: [to - m, bodyY] as const,
     p3: [to, bodyY] as const,
+  };
+}
+
+/// Estrechamiento en S de la parte de abajo de la lateral: del borde izquierdo
+/// (vertical) al lado izquierdo de la píldora (vertical), que empieza en `x`.
+function taperCurve(x: number, podY: number) {
+  const y0 = podY - SKIN.taper;
+  const m = SKIN.taper / 2;
+  return {
+    p0: [0, y0] as const,
+    c1: [0, y0 + m] as const,
+    c2: [x, podY - m] as const,
+    p3: [x, podY] as const,
   };
 }
 
@@ -158,7 +188,7 @@ export function outlinePath(l: SkinLayout): string {
   const cy = pod.y + pr;
   const cl = pod.x + pr;
   const cr = pod.x + pod.w - pr;
-  const fR = lineCircleFillet(bb, cr, cy, pr, F, 1);
+  const fR = lineCircleFillet(bb, cr, cy, pr, SKIN.podFillet, 1);
   const fL = lineCircleFillet(bb, cl, cy, pr, F, -1);
   const n = (v: number) => +v.toFixed(2);
   const d: string[] = [];
@@ -187,16 +217,26 @@ export function outlinePath(l: SkinLayout): string {
     `L ${right} ${bb}`,
     // Cuerpo → píldora (derecha), la píldora por debajo, píldora → cuerpo (izquierda).
     `L ${n(fR.onLine[0])} ${bb}`,
-    `A ${F} ${F} 0 0 0 ${n(fR.onCircle[0])} ${n(fR.onCircle[1])}`,
+    `A ${SKIN.podFillet} ${SKIN.podFillet} 0 0 0 ${n(fR.onCircle[0])} ${n(fR.onCircle[1])}`,
     `A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`,
-    `L ${cl} ${pod.y + pod.h}`,
-    `A ${pr} ${pr} 0 0 1 ${n(fL.onCircle[0])} ${n(fL.onCircle[1])}`,
-    `A ${F} ${F} 0 0 0 ${n(fL.onLine[0])} ${bb}`,
   );
   if (side) {
-    const r3 = side.r[3];
-    d.push(`L ${r3} ${bb}`, `A ${r3} ${r3} 0 0 1 0 ${bb - r3}`);
+    // La píldora termina por la izquierda en una esquina redonda y sube por la
+    // lateral, que se estrecha en S hasta su borde izquierdo.
+    const k = pod.r[3];
+    const tp = taperCurve(pod.x, pod.y);
+    d.push(
+      `L ${pod.x + k} ${pod.y + pod.h}`,
+      `A ${k} ${k} 0 0 1 ${pod.x} ${pod.y + pod.h - k}`,
+      `L ${tp.p3[0]} ${tp.p3[1]}`,
+      `C ${tp.c2[0]} ${tp.c2[1]} ${tp.c1[0]} ${tp.c1[1]} ${tp.p0[0]} ${tp.p0[1]}`,
+    );
   } else {
+    d.push(
+      `L ${cl} ${pod.y + pod.h}`,
+      `A ${pr} ${pr} 0 0 1 ${n(fL.onCircle[0])} ${n(fL.onCircle[1])}`,
+      `A ${F} ${F} 0 0 0 ${n(fL.onLine[0])} ${bb}`,
+    );
     d.push(`L ${bx} ${bb}`);
   }
   d.push("Z");

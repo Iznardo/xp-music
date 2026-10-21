@@ -119,7 +119,7 @@
     {#if L.side}
       <div
         class="piece side"
-        style="{place(L.side)};clip-path:path('{L.sideClip}');padding-top:{SKIN.sideTop - L.side.y + 4}px;padding-right:{L.side.w - SKIN.sideW}px"
+        style="{place(L.side)};clip-path:path('{L.sideClip}');padding-top:{SKIN.sideTop - L.side.y + 4}px;padding-right:{L.side.w - SKIN.sideW}px;padding-bottom:{SKIN.taper - 10}px"
       >
         <SideTasks />
       </div>

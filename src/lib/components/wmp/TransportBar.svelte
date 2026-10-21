@@ -76,7 +76,7 @@
   }
 </script>
 
-<div class="pod" style="{place(pod)};border-radius:{radii(pod)}">
+<div class="pod" class:joined={pod.r[0] === 0} style="{place(pod)};border-radius:{radii(pod)}">
   <button
     class="play"
     class:on={playing}
@@ -189,6 +189,10 @@
     border: 1px solid var(--skin-edge);
     box-shadow: inset 0 2px 1px rgb(255 255 255 / 0.9), inset 0 -3px 6px rgb(30 50 120 / 0.25), 0 2px 4px rgb(0 0 40 / 0.35);
     user-select: none;
+  }
+  /* Unida a la lateral: su lado izquierdo es el contorno de la ventana. */
+  .pod.joined {
+    border-left: 0;
   }
   .play {
     position: absolute;
