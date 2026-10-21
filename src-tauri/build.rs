@@ -12,6 +12,8 @@ fn main() {
         println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
         println!("cargo:rustc-link-arg=/WX");
     }
+    // Los iconos van incrustados en el ejecutable: si cambian, hay que recompilar.
+    println!("cargo:rerun-if-changed=icons");
     tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
         .expect("error en tauri-build");
 }
