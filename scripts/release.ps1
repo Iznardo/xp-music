@@ -65,6 +65,13 @@ if ($Bump -ne 'none') {
 $extra = @{ bundle = @{ windows = @{} } }
 if (Test-Path $signingPath) {
     $sig = Get-Content $signingPath -Raw | ConvertFrom-Json
+    # Tauri busca signtool en el registro del SDK, y con algunas instalaciones esa
+    # entrada apunta a una carpeta sin él (falla al comprobar deno/yt-dlp antes de
+    # firmarlos). Con TAURI_WINDOWS_SIGNTOOL_PATH usa el que se le indica.
+    $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+        Sort-Object FullName | Select-Object -Last 1
+    if (-not $signtool) { Fail 'No se encuentra signtool.exe (instala el Windows SDK).' }
+    $env:TAURI_WINDOWS_SIGNTOOL_PATH = $signtool.FullName
     $extra.bundle.windows = @{
         certificateThumbprint = $sig.certificateThumbprint
         digestAlgorithm = 'sha256'
@@ -77,6 +84,8 @@ if (Test-Path $keyPath) {
     $extra.bundle.createUpdaterArtifacts = $true
     $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content $keyPath -Raw).Trim()
     $env:XP_MUSIC_UPDATER_PUBKEY = (Get-Content "$keyPath.pub" -Raw).Trim()
+    # El bundler comprueba la firma de los artefactos con la clave de la config.
+    $extra.plugins = @{ updater = @{ pubkey = $env:XP_MUSIC_UPDATER_PUBKEY } }
     if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
         $sec = Read-Host 'Contraseña de la clave del updater' -AsSecureString
         $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
@@ -103,7 +112,9 @@ Write-Host "Instalador: $($installer.FullName) ($([math]::Round($installer.Lengt
 
 # --- 5. Verificar firma -------------------------------------------------------
 if (Test-Path $signingPath) {
-    foreach ($f in $installer.FullName, (Join-Path $root 'src-tauri\target\release\xp-music.exe')) {
+    # Solo el instalador: Tauri firma el ejecutable al empaquetarlo y luego deja en
+    # target\release la copia sin firmar (la de dentro del instalador sí lo está).
+    foreach ($f in @($installer.FullName)) {
         $a = Get-AuthenticodeSignature $f
         if ($a.Status -ne 'Valid' -or $a.SignerCertificate.Subject -ne 'CN=iznardo') {
             Fail "Firma no válida en $f ($($a.Status))."
