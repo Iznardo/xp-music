@@ -88,7 +88,7 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    padding: 5px 6px 6px;
+    padding: 5px 4px 6px;
     border: 0;
     background: none;
     color: var(--side-text);
