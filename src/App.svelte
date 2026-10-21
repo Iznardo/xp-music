@@ -109,10 +109,10 @@
     <svg class="shell" width={winW} height={winH} aria-hidden="true">
       <defs>
         <linearGradient id="shell-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#eef2fc" />
-          <stop offset="0.25" stop-color="#cdd7f0" />
-          <stop offset="0.75" stop-color="#b4c3e8" />
-          <stop offset="1" stop-color="#9eb0dc" />
+          <stop offset="0" class="sh-1" />
+          <stop offset="0.25" class="sh-2" />
+          <stop offset="0.75" class="sh-3" />
+          <stop offset="1" class="sh-4" />
         </linearGradient>
         <!-- Lateral y píldora: el mismo color de punta a punta (son una pieza). -->
         <linearGradient id="side-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={SKIN.sideW} y2="0">
@@ -232,6 +232,18 @@
     z-index: 1;
     border: 0;
   }
+  :global(.sh-1) {
+    stop-color: var(--shell-1);
+  }
+  :global(.sh-2) {
+    stop-color: var(--shell-2);
+  }
+  :global(.sh-3) {
+    stop-color: var(--shell-3);
+  }
+  :global(.sh-4) {
+    stop-color: var(--shell-4);
+  }
   :global(.sf-edge) {
     stop-color: var(--side-bottom);
   }
@@ -279,7 +291,7 @@
     place-items: center;
     border: 1px solid var(--skin-edge);
     border-radius: 5px 0 0 5px;
-    background: linear-gradient(to right, #fff, #b4c3e8);
+    background: linear-gradient(to right, #fff, var(--shell-3));
     color: var(--skin-deep);
     cursor: pointer;
   }

@@ -120,6 +120,16 @@
   --skin-edge: #06143f;
   --side-top: #6d9cf0;
   --side-bottom: #2d5cc4;
+  /* Carcasa (cuerpo, pestaña y barra inferior) de arriba abajo. */
+  --shell-1: #eef2fc;
+  --shell-2: #cdd7f0;
+  --shell-3: #b4c3e8;
+  --shell-4: #9eb0dc;
+  /* Texto de la lateral sobre su color. */
+  --side-text: #fff;
+  --side-text-shadow: 0 1px 1px rgb(0 0 40 / 0.55);
+  --side-line: rgb(255 255 255 / 0.75);
+  --side-line-shadow: rgb(0 0 60 / 0.35);
 }
 :root[data-theme="olive"] {
   --skin-hi: #d8e6b4;
@@ -130,6 +140,14 @@
   --skin-edge: #1f2810;
   --side-top: #b6c98a;
   --side-bottom: #75893f;
+  --shell-1: #f4f7ea;
+  --shell-2: #dfe6c9;
+  --shell-3: #cbd5ad;
+  --shell-4: #b3c08f;
+  --side-text: #fff;
+  --side-text-shadow: 0 1px 1px rgb(30 40 0 / 0.6);
+  --side-line: rgb(255 255 255 / 0.7);
+  --side-line-shadow: rgb(40 50 10 / 0.35);
 }
 :root[data-theme="silver"] {
   --skin-hi: #ffffff;
@@ -140,6 +158,15 @@
   --skin-edge: #33343f;
   --side-top: #e6e7ee;
   --side-bottom: #9fa1b3;
+  --shell-1: #f7f7f9;
+  --shell-2: #e2e3e9;
+  --shell-3: #cdced8;
+  --shell-4: #b4b6c3;
+  /* Sobre plata clara el texto va oscuro, con reflejo claro. */
+  --side-text: #20222e;
+  --side-text-shadow: 0 1px 0 rgb(255 255 255 / 0.8);
+  --side-line: rgb(60 62 80 / 0.35);
+  --side-line-shadow: rgb(255 255 255 / 0.7);
 }
 :root {
   --lcd-bg: #000;

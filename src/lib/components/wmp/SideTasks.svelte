@@ -91,7 +91,7 @@
     display: flex;
     flex-direction: column;
     padding: 4px 14px 0 4px;
-    color: #fff;
+    color: var(--side-text);
   }
   .task {
     position: relative;
@@ -101,10 +101,10 @@
     padding: 5px 6px 6px;
     border: 0;
     background: none;
-    color: #fff;
+    color: var(--side-text);
     font: bold 12px/14px var(--font-ui);
     text-align: left;
-    text-shadow: 0 1px 1px rgb(0 0 40 / 0.55);
+    text-shadow: var(--side-text-shadow);
     cursor: pointer;
   }
   /* Separadores: línea clara con sombra, como los de WMP 9. */
@@ -115,8 +115,8 @@
     right: 0;
     bottom: 0;
     height: 1px;
-    background: linear-gradient(to right, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.15));
-    box-shadow: 0 1px rgb(0 0 60 / 0.35);
+    background: linear-gradient(to right, var(--side-line), transparent);
+    box-shadow: 0 1px var(--side-line-shadow);
   }
   .task:hover {
     background: rgb(255 255 255 / 0.12);
