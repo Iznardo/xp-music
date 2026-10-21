@@ -44,9 +44,10 @@
   let h = $state(150);
   const R = 68; // lóbulo del disco
   const CX = 72;
-  const TOP = 24; // banda del cuerpo
+  const TOP = 28; // banda del cuerpo (arriba)
+  const BOTTOM_GAP = 14; // y su borde inferior, a esta distancia del final
   const F = 14; // empalmes
-  const TAB_Y = 6; // pestaña de arriba a la derecha
+  const TAB_Y = 3; // pestaña de arriba a la derecha (con aire para los tornillos)
   function fillet(line: number, below: boolean, cy: number) {
     const fcY = line + (below ? F : -F);
     const dy = fcY - cy;
@@ -56,7 +57,7 @@
   }
   const outline = $derived.by(() => {
     const cy = h / 2;
-    const bot = h - 20;
+    const bot = h - BOTTOM_GAP;
     const t = fillet(TOP, false, cy);
     const b = fillet(bot, true, cy);
     const n = (v: number) => v.toFixed(1);
@@ -273,8 +274,9 @@
     position: absolute;
     left: 152px;
     right: 16px;
-    top: 30px;
-    bottom: 22px;
+    top: 35px;
+    /* Aire bajo los botones (y su sombra) hasta el borde del cuerpo. */
+    bottom: 24px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -447,7 +449,8 @@
   /* En la pestaña que sube arriba a la derecha. */
   .screws {
     position: absolute;
-    top: 9px;
+    /* Centrados en la pestaña (de 3 a 28 px), sin tocar sus bordes. */
+    top: 8px;
     right: 22px;
     display: flex;
     gap: 4px;
