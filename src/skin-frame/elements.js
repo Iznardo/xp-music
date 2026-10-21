@@ -246,6 +246,10 @@ export class El {
     let mask = img;
     if (this._clippingImage) mask = (await this._rt.images.get(this._clippingImage, this._clipping || "#ff00ff")) ?? img;
     this._mask = mask;
+    // Con clippingColor/clippingImage, WMP recorta también lo que hay dentro:
+    // hay skins con imágenes que rellenan con el color clave fuera de la forma.
+    const clip = (this._clipping || this._clippingImage) && mask ? `url("${mask.url}")` : "";
+    Object.assign(this._dom.style, { maskImage: clip, maskRepeat: "no-repeat", maskPosition: "0 0", maskMode: "alpha" });
     this._layout();
     this._rt.shapeDirty();
   }
