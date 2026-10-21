@@ -220,9 +220,14 @@
     background-position: center;
     filter: blur(40px) saturate(1.4) brightness(0.45);
   }
+  /* Centrada en el escenario de forma absoluta: con la rejilla, la altura en %
+     dependía del propio contenido y la portada quedaba desplazada y cortada. */
   .art {
-    position: relative;
+    position: absolute;
+    inset: 0;
+    margin: auto;
     height: min(78%, 420px);
+    max-width: 90%;
     aspect-ratio: 1;
     border: 1px solid #333;
     background: #0a0a0a;
