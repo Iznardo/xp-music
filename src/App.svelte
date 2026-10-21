@@ -23,7 +23,7 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { place, radii, regionPolygons, skinLayout } from "./lib/skin";
+  import { outlinePath, place, radii, skinLayout } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/strings";
   import type { SearchFilter } from "./lib/bindings";
@@ -43,14 +43,26 @@
   let winW = $state(0);
   let winH = $state(0);
   const L = $derived(winW && winH ? skinLayout(winW, winH, !ui.sideCollapsed) : null);
+  const outline = $derived(L ? outlinePath(L) : "");
+  let outlineEl = $state<SVGPathElement>();
 
-  // La unión de las piezas es la región de la ventana (Windows): fuera de ellas no
+  // El contorno (con sus empalmes) es la región de la ventana (Windows): fuera no
   // se pinta nada ni se reciben clics. Maximizada o compacta, rectangular.
   $effect(() => {
-    const shaped = !ui.compact && !maximized && L !== null;
-    const layout = L;
+    const path = outlineEl;
+    const shaped = !ui.compact && !maximized && !!outline && path !== undefined;
+    void outline;
     const id = setTimeout(() => {
-      void commands.windowSetShape(shaped && layout ? regionPolygons(layout, devicePixelRatio || 1) : null);
+      if (!shaped || !path) return void commands.windowSetShape(null);
+      const dpr = devicePixelRatio || 1;
+      const len = path.getTotalLength();
+      const n = Math.min(1200, Math.max(200, Math.round(len / 3)));
+      const pts: [number, number][] = [];
+      for (let i = 0; i < n; i++) {
+        const q = path.getPointAtLength((i / n) * len);
+        pts.push([Math.round(q.x * dpr), Math.round(q.y * dpr)]);
+      }
+      void commands.windowSetShape([pts]);
     }, 40);
     return () => clearTimeout(id);
   });
@@ -92,6 +104,18 @@
 {:else}
 <div class="skin" class:maximized class:inactive={!active} bind:clientWidth={winW} bind:clientHeight={winH}>
   {#if L}
+    <!-- Carcasa: el contorno completo con los empalmes, detrás de las piezas. -->
+    <svg class="shell" width={winW} height={winH} aria-hidden="true">
+      <defs>
+        <linearGradient id="shell-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#eef2fc" />
+          <stop offset="0.25" stop-color="#cdd7f0" />
+          <stop offset="0.75" stop-color="#b4c3e8" />
+          <stop offset="1" stop-color="#9eb0dc" />
+        </linearGradient>
+      </defs>
+      <path d={outline} bind:this={outlineEl} class="shell-fill" />
+    </svg>
     {#if L.side}
       <div class="piece side" style="{place(L.side)};border-radius:{radii(L.side)}"><SideTasks /></div>
     {/if}
@@ -160,6 +184,20 @@
   }
   .skin.inactive .piece {
     filter: saturate(0.8);
+  }
+  .shell {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .skin.maximized .shell {
+    display: none;
+  }
+  .shell-fill {
+    fill: url(#shell-fill);
+    stroke: var(--skin-edge);
+    stroke-width: 2;
   }
   .piece {
     position: absolute;
