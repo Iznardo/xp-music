@@ -1,8 +1,8 @@
 {
   "name": "xp-music",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "Reproductor de YouTube Music con estÃ©tica Windows Media Player / XP",
+  "description": "Reproductor de YouTube Music con estÃƒÂ©tica Windows Media Player / XP",
   "author": "iznardo",
   "license": "MIT",
   "type": "module",
