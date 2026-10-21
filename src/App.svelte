@@ -26,6 +26,7 @@
   import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/strings";
+  import logo from "./assets/logo.png";
   import type { SearchFilter } from "./lib/bindings";
 
   let maximized = $state(false);
@@ -191,7 +192,7 @@
 {#if ui.aboutOpen}
   <DialogFrame title={t.menuBar.about} onclose={() => (ui.aboutOpen = false)}>
     <div class="about">
-      <svg viewBox="0 0 16 16" width="40" height="40"><circle cx="8" cy="8" r="7" fill="#f4f4f4" stroke="#1d4ec4" /><path d="M6 4.5v7l5.5-3.5z" fill="#1d9b2c" /></svg>
+      <img src={logo} alt="" width="48" height="48" />
       <div>
         <b>{t.appName}</b> 0.1.0
         <p>{t.dialogs.aboutText}</p>

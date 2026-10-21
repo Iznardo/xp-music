@@ -6,6 +6,7 @@
   import { ui } from "../stores/ui.svelte";
   import { updates } from "../stores/updates.svelte";
   import { t } from "../strings";
+  import logo from "../../assets/logo.png";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
   import { VIZ_ORDER } from "../viz/presets";
 
@@ -146,7 +147,7 @@
         </fieldset>
       {:else if tab === "about"}
         <div class="about">
-          <p class="brand"><b>XP Music</b> — {t.options.about.version} {versions?.app ?? "…"}</p>
+          <p class="brand"><img src={logo} alt="" width="32" height="32" /><span><b>XP Music</b> — {t.options.about.version} {versions?.app ?? "…"}</span></p>
           <fieldset>
             <legend>{t.options.about.components}</legend>
             <p>yt-dlp: {versions ? (versions.ytDlp ?? t.options.about.unknown) : "…"} {versions?.ytDlpUpdated ? t.options.about.ytDlpUpdated : ""}</p>
@@ -241,6 +242,9 @@
     margin: 2px 0;
   }
   .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 1.15em;
   }
   .row {
