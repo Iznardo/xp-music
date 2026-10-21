@@ -12,7 +12,7 @@ use crate::settings::Settings;
 use crate::state::AppState;
 
 /// Tamaño del modo compacto (píxeles lógicos).
-const COMPACT: (f64, f64) = (420.0, 118.0);
+const COMPACT: (f64, f64) = (460.0, 150.0);
 const MIN_FULL: (f64, f64) = (640.0, 420.0);
 
 /// Tamaño, posición y si estaba maximizada antes de entrar en modo compacto.

@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Modo compacto con skin propio (FR-004-13): cápsula oscura y brillante, siempre encima.
+  // Modo compacto (FR-004-13): un reproductor MP3 plateado de los 2000. Disco con la
+  // portada girando, pantalla LCD azul retroiluminada y botones "físicos".
   import { commands } from "../bindings";
   import { player } from "../stores/player.svelte";
   import { ui } from "../stores/ui.svelte";
@@ -9,93 +10,148 @@
   import { t } from "../strings";
 
   const st = $derived(player.state);
-  const playing = $derived(st?.status === "Playing" || st?.status === "Buffering" || st?.status === "Loading");
+  const playing = $derived(st?.status === "Playing" || st?.status === "Buffering");
   const duration = $derived(st?.durationMs ?? 0);
-  const pct = $derived(duration ? Math.min(100, ((st?.positionMs ?? 0) / duration) * 100) : 0);
+  const position = $derived(st?.positionMs ?? 0);
+  const pct = $derived(duration ? Math.min(100, (position / duration) * 100) : 0);
   const cover = $derived(thumbSrc(st?.track?.thumbnails, 120));
+  const title = $derived(st?.track?.title ?? t.views.nothingPlaying);
+  const artist = $derived(st?.track ? artistNames(st.track) : "XP Music");
+  const volume = $derived(Math.round((st?.volume ?? 0.8) * 100));
+
+  // El título se desplaza si no cabe, como en las pantallas de la época.
+  let titleBox = $state(0);
+  let titleText = $state(0);
+  const scroll = $derived(titleText > titleBox + 2);
+
+  function lcdTime(ms: number) {
+    const s = Math.floor(ms / 1000);
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  }
 
   let seekEl: HTMLDivElement;
   function seek(e: MouseEvent) {
     if (!duration) return;
     const r = seekEl.getBoundingClientRect();
-    void commands.playerSeek(Math.round(((e.clientX - r.left) / r.width) * duration));
+    void commands.playerSeek(Math.round(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * duration));
+  }
+
+  function vol(delta: number) {
+    void commands.playerSetVolume(Math.min(1, Math.max(0, ((st?.volume ?? 0.8) * 100 + delta) / 100)));
   }
 </script>
 
-<div class="skin" data-tauri-drag-region>
-  <div class="orb" data-tauri-drag-region>
-    {#if cover}<img src={cover} alt="" data-tauri-drag-region />{:else}<span class="noart" data-tauri-drag-region>♪</span>{/if}
+<div class="device" data-tauri-drag-region>
+  <!-- Disco: la portada gira mientras suena. -->
+  <div class="disc" class:spin={playing} data-tauri-drag-region>
+    {#if cover}
+      <img src={cover} alt="" data-tauri-drag-region />
+    {:else}
+      <span class="noart" data-tauri-drag-region>♪</span>
+    {/if}
+    <span class="hole" data-tauri-drag-region></span>
   </div>
+  <span class="shine" aria-hidden="true"></span>
 
-  <div class="body" data-tauri-drag-region>
-    <div class="top" data-tauri-drag-region>
-      <div class="text" data-tauri-drag-region>
-        <span class="title" data-tauri-drag-region>{st?.track?.title ?? t.views.nothingPlaying}</span>
-        <span class="artist" data-tauri-drag-region>{st?.track ? artistNames(st.track) : ""}</span>
+  <div class="main" data-tauri-drag-region>
+    <div class="lcd" data-tauri-drag-region>
+      <div class="row1" data-tauri-drag-region>
+        <span class="state" aria-hidden="true">{playing ? "▶" : st?.track ? "❚❚" : "■"}</span>
+        <div class="marquee" bind:clientWidth={titleBox} data-tauri-drag-region>
+          <span class="title" class:scroll bind:clientWidth={titleText} data-tauri-drag-region>
+            {title}{#if scroll}<span class="gap">•</span>{title}{/if}
+          </span>
+        </div>
       </div>
-      <div class="win">
-        <button title={t.window.minimize} aria-label={t.window.minimize} onclick={() => appWindow()?.minimize()}>–</button>
-        <button title={t.transport.full} aria-label={t.transport.full} onclick={() => ui.setCompact(false)}>⤢</button>
-        <button class="close" title={t.window.close} aria-label={t.window.close} onclick={() => appWindow()?.close()}>✕</button>
+      <div class="artist" data-tauri-drag-region>{artist}</div>
+      <div class="row3">
+        <span class="time">{lcdTime(position)}</span>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="seek" bind:this={seekEl} role="slider" tabindex="-1" aria-label={t.transport.seek} aria-valuenow={position} onclick={seek}>
+          <div class="fill" style:width="{pct}%"></div>
+        </div>
+        <span class="time">{duration ? lcdTime(duration) : "--:--"}</span>
+        <span class="vol" title={t.transport.volume}>
+          <svg viewBox="0 0 12 10" aria-hidden="true"><path d="M0 3h2.5L6 0v10L2.5 7H0z" /></svg>{st?.muted ? "--" : String(volume).padStart(2, "0")}
+        </span>
       </div>
     </div>
 
-    <div class="controls">
-      <button class="b" title={t.transport.previous} aria-label={t.transport.previous} onclick={() => commands.playerPrevious()}>
+    <div class="keys">
+      <button class="key" title={t.transport.previous} aria-label={t.transport.previous} onclick={() => commands.playerPrevious()}>
         <svg viewBox="0 0 16 16"><rect x="3" y="4" width="2" height="8" /><path d="M13 4v8L6 8z" /></svg>
       </button>
-      <button class="b play" title={playing ? t.transport.pause : t.transport.play} aria-label={playing ? t.transport.pause : t.transport.play} onclick={() => commands.playerToggle()}>
-        {#if playing}
-          <svg viewBox="0 0 16 16"><rect x="4" y="3" width="3" height="10" rx=".5" /><rect x="9" y="3" width="3" height="10" rx=".5" /></svg>
-        {:else}
-          <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" /></svg>
-        {/if}
+      <button class="key big" title={playing ? t.transport.pause : t.transport.play} aria-label={playing ? t.transport.pause : t.transport.play} onclick={() => commands.playerToggle()}>
+        <svg viewBox="0 0 24 16"><path d="M3 3v10l7-5z" /><rect x="13" y="3" width="3" height="10" rx=".5" /><rect x="18" y="3" width="3" height="10" rx=".5" /></svg>
       </button>
-      <button class="b" title={t.transport.next} aria-label={t.transport.next} onclick={() => commands.playerNext()}>
+      <button class="key" title={t.transport.next} aria-label={t.transport.next} onclick={() => commands.playerNext()}>
         <svg viewBox="0 0 16 16"><path d="M3 4v8l7-4z" /><rect x="11" y="4" width="2" height="8" /></svg>
       </button>
-      <div class="seek" bind:this={seekEl} role="slider" tabindex="-1" aria-label={t.transport.seek} aria-valuenow={st?.positionMs ?? 0} onclick={seek} onkeydown={() => {}}>
-        <div class="fill" style:width="{pct}%"></div>
+      <button class="key" title={t.transport.stop} aria-label={t.transport.stop} onclick={() => commands.playerStop()}>
+        <svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1" /></svg>
+      </button>
+      <span class="spacer" data-tauri-drag-region></span>
+      <div class="rocker" role="group" aria-label={t.transport.volume}>
+        <button title="{t.transport.volume} −" aria-label="{t.transport.volume} −" onclick={() => vol(-5)}>−</button>
+        <button title="{t.transport.volume} +" aria-label="{t.transport.volume} +" onclick={() => vol(5)}>+</button>
       </div>
-      <span class="time">{fmtTime(st?.positionMs) || "0:00"}</span>
     </div>
+  </div>
+
+  <div class="screws">
+    <button title={t.window.minimize} aria-label={t.window.minimize} onclick={() => appWindow()?.minimize()}>
+      <svg viewBox="0 0 8 8"><path d="M1.5 4h5" /></svg>
+    </button>
+    <button title={t.transport.full} aria-label={t.transport.full} onclick={() => ui.setCompact(false)}>
+      <svg viewBox="0 0 8 8"><path d="M1.5 1.5h5v5h-5z" /></svg>
+    </button>
+    <button title={t.window.close} aria-label={t.window.close} onclick={() => appWindow()?.close()}>
+      <svg viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" /></svg>
+    </button>
   </div>
 </div>
 
 <style>
-  .skin {
+  /* Cuerpo de aluminio cepillado. */
+  .device {
     position: absolute;
     inset: 4px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 0 12px 0 8px;
-    border-radius: 52px 18px 18px 52px;
-    background: linear-gradient(to bottom, var(--wmp-top) 0%, var(--wmp-mid) 48%, var(--wmp-deep) 100%);
-    border: 1px solid #000;
-    box-shadow: inset 0 1px rgb(255 255 255 / 0.35), inset 0 -2px 6px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.6);
-    color: var(--wmp-text);
+    gap: 12px;
+    padding: 0 14px 0 12px;
+    border-radius: 24px;
+    background:
+      repeating-linear-gradient(90deg, rgb(255 255 255 / 0.06) 0 1px, rgb(0 0 0 / 0.025) 1px 2px),
+      linear-gradient(to bottom, #f7f8fa 0%, #dfe2e7 30%, #c9cdd4 70%, #b3b8c1 100%);
+    border: 1px solid #8a8f99;
+    box-shadow:
+      inset 0 1px 0 #fff,
+      inset 0 -2px 3px rgb(0 0 0 / 0.18),
+      0 3px 8px rgb(0 0 0 / 0.45);
     overflow: hidden;
+    user-select: none;
   }
-  /* Brillo de cristal en la mitad superior. */
-  .skin::before {
-    content: "";
+  /* Reflejo diagonal del metal. */
+  .shine {
     position: absolute;
-    inset: 1px 1px 50% 40px;
-    border-radius: 0 16px 0 0;
-    background: linear-gradient(to bottom, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0));
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 0.35) 45%, transparent 60%);
     pointer-events: none;
   }
-  .orb {
+
+  /* --- Disco con la portada --- */
+  .disc {
+    position: relative;
     flex: none;
-    width: 92px;
-    height: 92px;
+    width: 108px;
+    height: 108px;
     border-radius: 50%;
-    padding: 4px;
-    background: radial-gradient(circle at 50% 30%, #c7e6ff, #3d8ff0 45%, #0a2f86);
-    box-shadow: 0 0 10px rgb(80 160 255 / 0.55), inset 0 -3px 6px rgb(0 0 40 / 0.5);
+    padding: 3px;
+    background: conic-gradient(from 0deg, #d9dde3, #9aa1ab, #eef0f3, #9aa1ab, #d9dde3);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(0 0 0 / 0.25);
   }
-  .orb img,
+  .disc img,
   .noart {
     display: grid;
     place-items: center;
@@ -103,115 +159,243 @@
     height: 100%;
     border-radius: 50%;
     object-fit: cover;
-    background: #0c1630;
-    font-size: 30px;
+    background: radial-gradient(circle, #2a3a66, #0c1630);
+    font-size: 34px;
     color: #9fc7ff;
   }
-  .body {
+  .spin img,
+  .spin .noart {
+    animation: spin 6s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  /* Agujero central y brillo fijo encima (no gira). */
+  .hole {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #6d737d 0 35%, #e6e9ed 40% 70%, #9aa1ab 75%);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3);
+  }
+  .disc::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: linear-gradient(140deg, rgb(255 255 255 / 0.35) 0%, transparent 40%, transparent 70%, rgb(0 0 0 / 0.2));
+    pointer-events: none;
+  }
+
+  .main {
+    position: relative;
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
-  .top {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-  }
-  .text {
-    flex: 1;
-    min-width: 0;
+
+  /* --- Pantalla LCD azul retroiluminada --- */
+  .lcd {
+    position: relative;
     display: flex;
     flex-direction: column;
-  }
-  .title,
-  .artist {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .title {
-    font: bold 13px var(--font-title);
-    color: #fff;
-  }
-  .artist {
-    color: var(--wmp-dim);
-  }
-  .win {
-    display: flex;
     gap: 2px;
+    padding: 6px 10px 6px;
+    border-radius: 6px;
+    border: 2px solid #6f7580;
+    border-top-color: #5a606a;
+    border-bottom-color: #e9ecf0;
+    background:
+      repeating-linear-gradient(0deg, rgb(0 0 30 / 0.12) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at 50% 30%, #4f8cf5 0%, #2a5fd8 55%, #1a3fa6 100%);
+    box-shadow: inset 0 2px 6px rgb(0 0 40 / 0.6);
+    color: #f4f8ff;
+    font-family: Consolas, "Lucida Console", "Courier New", monospace;
+    text-shadow: 0 0 4px rgb(190 225 255 / 0.85);
+    overflow: hidden;
   }
-  .win button {
-    width: 18px;
-    height: 16px;
-    padding: 0;
-    border: 1px solid var(--wmp-line);
-    border-radius: 3px;
-    background: rgb(255 255 255 / 0.08);
-    color: var(--wmp-text);
-    font: 10px/1 Tahoma;
-    cursor: pointer;
-  }
-  .win button:hover {
-    background: rgb(255 255 255 / 0.2);
-  }
-  .win .close:hover {
-    background: #c42b1c;
-    border-color: #ff9b8f;
-  }
-  .controls {
+  .row1 {
     display: flex;
     align-items: center;
     gap: 6px;
   }
-  .b {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border-radius: 50%;
-    border: 1px solid #0a1224;
-    color: #20345e;
-    background: radial-gradient(circle at 50% 30%, #fff 0%, #d9e3f6 35%, #8ea5d3 70%, #5d78b2 100%);
-    cursor: pointer;
+  .state {
+    flex: none;
+    font-size: 10px;
   }
-  .b svg {
-    width: 12px;
-    height: 12px;
-    fill: currentColor;
-  }
-  .b.play {
-    width: 32px;
-    height: 32px;
-    color: #fff;
-    background: radial-gradient(circle at 50% 28%, #c7e6ff 0%, #4ea6ff 30%, #1460d8 65%, #0a2f86 100%);
-    box-shadow: 0 0 6px rgb(80 160 255 / 0.5);
-  }
-  .b.play svg {
-    width: 15px;
-    height: 15px;
-  }
-  .b:hover {
-    filter: brightness(1.12);
-  }
-  .seek {
+  .marquee {
     flex: 1;
-    height: 6px;
-    border-radius: 3px;
-    background: #000;
-    box-shadow: inset 0 1px 2px #000, 0 1px var(--wmp-top);
-    cursor: pointer;
+    min-width: 0;
     overflow: hidden;
+    white-space: nowrap;
+  }
+  .title {
+    display: inline-block;
+    /* Su ancho natural: así se sabe si cabe o hay que desplazarlo. */
+    width: max-content;
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .title.scroll {
+    animation: marquee 14s linear infinite;
+  }
+  .gap {
+    padding: 0 18px;
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .artist {
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.9;
+  }
+  .row3 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    font-size: 11px;
+  }
+  .time {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Barra segmentada, como los LCD de la época. */
+  .seek {
+    position: relative;
+    flex: 1;
+    height: 7px;
+    background: rgb(0 0 40 / 0.35);
+    cursor: pointer;
   }
   .fill {
     height: 100%;
-    background: linear-gradient(to bottom, #9cf09c, #2fb62f 55%, #178417);
+    background: repeating-linear-gradient(90deg, #f4f8ff 0 4px, transparent 4px 6px);
+    box-shadow: 0 0 4px rgb(190 225 255 / 0.7);
   }
-  .time {
-    min-width: 34px;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+  .vol {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .vol svg {
+    width: 10px;
+    height: 9px;
+    fill: currentColor;
+  }
+
+  /* --- Botones físicos --- */
+  .keys {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .key,
+  .rocker button {
+    display: grid;
+    place-items: center;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #7e848e;
+    border-radius: 12px;
+    background: linear-gradient(to bottom, #ffffff 0%, #e4e7ec 45%, #c3c8d0 100%);
+    box-shadow: inset 0 1px 0 #fff, 0 2px 0 #8d939d, 0 3px 3px rgb(0 0 0 / 0.3);
+    color: #3a3f48;
+    cursor: pointer;
+    transition: transform 0.05s, box-shadow 0.05s;
+  }
+  .key {
+    width: 36px;
+  }
+  .key.big {
+    width: 54px;
+  }
+  .key svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+  .key.big svg {
+    width: 22px;
+    height: 15px;
+  }
+  /* Al pulsar, el botón se hunde. */
+  .key:active,
+  .rocker button:active {
+    transform: translateY(2px);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25), 0 0 0 #8d939d;
+    background: linear-gradient(to bottom, #d9dde3, #eef0f3);
+  }
+  .spacer {
+    flex: 1;
+    align-self: stretch;
+  }
+  .rocker {
+    display: flex;
+  }
+  .rocker button {
+    width: 26px;
+    font: bold 14px/1 var(--font-ui);
+  }
+  .rocker button:first-child {
+    border-radius: 12px 0 0 12px;
+  }
+  .rocker button:last-child {
+    border-radius: 0 12px 12px 0;
+    border-left: 0;
+  }
+
+  /* --- Botoncitos de ventana, como tornillos --- */
+  .screws {
+    position: absolute;
+    top: 6px;
+    right: 14px;
+    display: flex;
+    gap: 4px;
+  }
+  .screws button {
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid #80868f;
+    background: radial-gradient(circle at 40% 35%, #ffffff, #c8ccd3 60%, #9aa1ab);
+    box-shadow: 0 1px 1px rgb(0 0 0 / 0.3);
+    cursor: pointer;
+  }
+  .screws svg {
+    width: 8px;
+    height: 8px;
+    fill: none;
+    stroke: #3a3f48;
+    stroke-width: 1.4;
+  }
+  .screws button:hover {
+    filter: brightness(1.08);
+  }
+  .screws button:last-child:hover {
+    background: radial-gradient(circle at 40% 35%, #ffd5c8, #e06a45 60%, #a8360f);
   }
 </style>
