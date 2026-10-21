@@ -32,6 +32,14 @@ export async function playWithRadio(track: Track) {
   if (rest.length) await commands.queueAdd(rest, "End");
 }
 
+/// Carga una lista de reproducción entera en la cola y empieza a sonar.
+export async function playPlaylist(id: string) {
+  ui.status = t.views.loading;
+  const d = await check(commands.ytPlaylist(id));
+  ui.status = "";
+  if (d?.tracks.items.length) await playTracks(d.tracks.items, 0, { Playlist: id });
+}
+
 let lastHint: string | null = null;
 /// Avisa al reproductor de que esta canción probablemente se va a pedir.
 export function hintTrack(id: string | undefined) {

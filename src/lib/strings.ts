@@ -62,6 +62,11 @@ ${notes}` : ""}
     search: "Buscar",
     options: "Opciones",
   },
+  tab: {
+    showQueue: "Ver la lista de reproducción actual",
+    noLists: "No tienes listas de reproducción",
+    library: "Organizar listas en la Biblioteca…",
+  },
   top: { menu: "Menú", compact: "Modo compacto", fullscreen: "Pantalla completa", options: "Opciones", resize: "Cambiar tamaño" },
   tabs: {
     now: "Reproducción\nactual",

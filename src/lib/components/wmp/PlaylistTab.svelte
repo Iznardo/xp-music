@@ -1,23 +1,57 @@
 <script lang="ts">
   // Pestaña que sobresale arriba a la derecha (skin WMP 9): selector de la lista
   // actual y los botones de ventana, pequeños y desplazados como en el original.
+  import { commands } from "../../bindings";
   import { appWindow } from "../../platform";
   import { player } from "../../stores/player.svelte";
+  import { library } from "../../stores/library.svelte";
+  import { ui, type MenuItem } from "../../stores/ui.svelte";
   import { router } from "../../router.svelte";
+  import { playPlaylist } from "../../actions";
   import { t } from "../../strings";
 
   let { maximized = false }: { maximized?: boolean } = $props();
   const win = appWindow();
-  const count = $derived(player.queue?.tracks.length ?? 0);
+  const q = $derived(player.queue);
+  const count = $derived(q?.tracks.length ?? 0);
+  // Si la cola salió de una de tus listas, se muestra su nombre (como en WMP).
+  const playingList = $derived.by(() => {
+    const src = q?.source;
+    return src && typeof src === "object" && src.Playlist ? src.Playlist : null;
+  });
+  const label = $derived(library.playlists.find((p) => p.id === playingList)?.title ?? t.views.queue);
+
+  function open(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const lists: MenuItem[] = library.playlists.map((p) => ({
+      kind: "check",
+      label: p.title,
+      checked: p.id === playingList,
+      action: () => void playPlaylist(p.id),
+    }));
+    const items: MenuItem[] = [
+      { kind: "item", label: t.tab.showQueue, bold: true, action: () => router.go({ name: "now" }) },
+      { kind: "sep" },
+      ...(lists.length ? lists : [{ kind: "item", label: t.tab.noLists, disabled: true, action: () => {} } as MenuItem]),
+      { kind: "sep" },
+      { kind: "check", label: t.menu.shuffleAll, checked: q?.shuffle ?? false, action: () => void commands.playerSetShuffle(!q?.shuffle) },
+      { kind: "check", label: t.views.autoplay, checked: q?.autoplay ?? true, action: () => void commands.queueSetAutoplay(!(q?.autoplay ?? true)) },
+      { kind: "item", label: t.views.clearQueue, disabled: !count, action: () => void commands.queueClear() },
+      { kind: "sep" },
+      { kind: "item", label: t.tab.library, action: () => router.go({ name: "library", section: "playlists" }) },
+    ];
+    // Que el menú salga alineado con el desplegable, como un combo de XP.
+    ui.openMenu({ x: r.left, y: r.bottom + 1 }, items);
+  }
 </script>
 
 <div class="tab" data-tauri-drag-region>
-  <button class="combo" onclick={() => router.go({ name: "now" })} title={t.views.queue}>
+  <button class="combo" onclick={open} title={label} aria-haspopup="menu">
     <svg class="doc" viewBox="0 0 16 16" aria-hidden="true">
       <path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#5a6f9e" />
       <path d="M5 6h6M5 8.5h6M5 11h4" stroke="#5a6f9e" />
     </svg>
-    <span class="label">{t.views.queue}</span>
+    <span class="label">{label}</span>
     <span class="count">{count}</span>
     <span class="arrow"><svg viewBox="0 0 8 5"><path d="M0 0h8L4 5z" /></svg></span>
   </button>
