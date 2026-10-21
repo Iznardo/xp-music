@@ -15,7 +15,7 @@ use crate::state::AppState;
 const COMPACT: (f64, f64) = (460.0, 150.0);
 const MIN_FULL: (f64, f64) = (640.0, 420.0);
 
-/// Tamaño, posición y si estaba maximizada antes de entrar en modo compacto.
+/// Tamaño, posición y si estaba maximizada antes de pasar a una ventana pequeña.
 type Restore = (PhysicalSize<u32>, PhysicalPosition<i32>, bool);
 
 #[derive(Default)]
@@ -24,6 +24,8 @@ pub struct UiState {
     /// Tamaño y posición en modo completo, para volver a ellos.
     restore: Mutex<Option<Restore>>,
     compact: Mutex<bool>,
+    /// Modo máscara (skin de WMP).
+    skin: Mutex<bool>,
 }
 
 #[tauri::command]
@@ -56,6 +58,49 @@ pub fn window_is_compact(ui: State<'_, UiState>) -> bool {
     *ui.compact.lock().unwrap()
 }
 
+fn window_err(e: tauri::Error) -> AppError {
+    tracing::warn!(error = %e, "no se pudo cambiar el modo de ventana");
+    AppError::internal("No se pudo cambiar el tamaño de la ventana.")
+}
+
+/// Ventana pequeña de tamaño fijo (modo compacto o máscara). Guarda el tamaño y
+/// la posición del modo completo la primera vez, para volver a ellos.
+fn shrink(
+    window: &WebviewWindow,
+    ui: &UiState,
+    size: LogicalSize<f64>,
+    on_top: bool,
+) -> tauri::Result<()> {
+    let mut restore = ui.restore.lock().unwrap();
+    if restore.is_none() {
+        let maximized = window.is_maximized()?;
+        if maximized {
+            window.unmaximize()?;
+        }
+        *restore = Some((window.outer_size()?, window.outer_position()?, maximized));
+    }
+    window.set_min_size(None::<LogicalSize<f64>>)?;
+    window.set_size(size)?;
+    window.set_resizable(false)?;
+    window.set_always_on_top(on_top)?;
+    Ok(())
+}
+
+/// Vuelve al tamaño y la posición del modo completo.
+fn restore_full(window: &WebviewWindow, ui: &UiState) -> tauri::Result<()> {
+    window.set_always_on_top(false)?;
+    window.set_resizable(true)?;
+    window.set_min_size(Some(LogicalSize::new(MIN_FULL.0, MIN_FULL.1)))?;
+    if let Some((size, pos, maximized)) = ui.restore.lock().unwrap().take() {
+        window.set_size(size)?;
+        window.set_position(pos)?;
+        if maximized {
+            window.maximize()?;
+        }
+    }
+    Ok(())
+}
+
 /// Cambia entre modo completo y compacto (FR-004-13).
 #[tauri::command]
 #[specta::specta]
@@ -64,45 +109,46 @@ pub fn window_set_compact(
     ui: State<'_, UiState>,
     enabled: bool,
 ) -> AppResult<()> {
-    let err = |e: tauri::Error| {
-        tracing::warn!(error = %e, "no se pudo cambiar el modo de ventana");
-        AppError::internal("No se pudo cambiar el tamaño de la ventana.")
-    };
     let mut compact = ui.compact.lock().unwrap();
     if *compact == enabled {
         return Ok(());
     }
     if enabled {
-        let maximized = window.is_maximized().map_err(err)?;
-        if maximized {
-            window.unmaximize().map_err(err)?;
-        }
-        *ui.restore.lock().unwrap() = Some((
-            window.outer_size().map_err(err)?,
-            window.outer_position().map_err(err)?,
-            maximized,
-        ));
-        window.set_min_size(None::<LogicalSize<f64>>).map_err(err)?;
-        window
-            .set_size(LogicalSize::new(COMPACT.0, COMPACT.1))
-            .map_err(err)?;
-        window.set_resizable(false).map_err(err)?;
-        window.set_always_on_top(true).map_err(err)?;
+        shrink(&window, &ui, LogicalSize::new(COMPACT.0, COMPACT.1), true).map_err(window_err)?;
+        *ui.skin.lock().unwrap() = false;
     } else {
-        window.set_always_on_top(false).map_err(err)?;
-        window.set_resizable(true).map_err(err)?;
-        window
-            .set_min_size(Some(LogicalSize::new(MIN_FULL.0, MIN_FULL.1)))
-            .map_err(err)?;
-        if let Some((size, pos, maximized)) = ui.restore.lock().unwrap().take() {
-            window.set_size(size).map_err(err)?;
-            window.set_position(pos).map_err(err)?;
-            if maximized {
-                window.maximize().map_err(err)?;
-            }
-        }
+        restore_full(&window, &ui).map_err(window_err)?;
     }
     *compact = enabled;
+    Ok(())
+}
+
+/// Modo máscara: la ventana toma el tamaño de la vista del skin (píxeles
+/// lógicos); `None` vuelve al modo completo.
+#[tauri::command]
+#[specta::specta]
+pub fn window_set_skin(
+    window: WebviewWindow,
+    ui: State<'_, UiState>,
+    size: Option<(f64, f64)>,
+) -> AppResult<()> {
+    let mut skin = ui.skin.lock().unwrap();
+    match size {
+        Some((w, h)) => {
+            if !(w.is_finite() && h.is_finite()) {
+                return Err(AppError::internal("Tamaño de máscara no válido."));
+            }
+            let size = LogicalSize::new(w.clamp(16.0, 4096.0), h.clamp(16.0, 4096.0));
+            shrink(&window, &ui, size, false).map_err(window_err)?;
+            *ui.compact.lock().unwrap() = false;
+            *skin = true;
+        }
+        None if *skin => {
+            restore_full(&window, &ui).map_err(window_err)?;
+            *skin = false;
+        }
+        None => {}
+    }
     Ok(())
 }
 

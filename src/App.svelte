@@ -14,6 +14,7 @@
   import { library } from "./lib/stores/library.svelte";
   import { ui } from "./lib/stores/ui.svelte";
   import { updates } from "./lib/stores/updates.svelte";
+  import { skins } from "./lib/stores/skins.svelte";
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
@@ -48,7 +49,8 @@
   // El contorno (con sus empalmes) es la forma para los clics: en lo transparente
   // pasan a lo de detrás. Maximizada, rectangular; el modo compacto pone la suya.
   $effect(() => {
-    if (ui.compact) return;
+    // La máscara pone su forma; al salir de ella se vuelve a poner esta.
+    if (ui.compact || skins.active) return;
     const path = outlineEl;
     const shaped = !ui.compact && !maximized && !!outline && path !== undefined;
     void outline;
@@ -83,6 +85,8 @@
     options: () => import("./lib/views/OptionsDialog.svelte"),
     login: () => import("./lib/views/LoginView.svelte"),
     compact: () => import("./lib/views/CompactPlayer.svelte"),
+    skin: () => import("./lib/views/SkinPlayer.svelte"),
+    skinPicker: () => import("./lib/views/SkinPicker.svelte"),
   };
 
   onMount(() => {
@@ -121,7 +125,9 @@
 
 <svelte:window onkeydown={handleShortcut} />
 
-{#if ui.compact}
+{#if skins.active && skins.current}
+  {#key skins.current}<Lazy load={views.skin} props={{ id: skins.current }} />{/key}
+{:else if ui.compact}
   <Lazy load={views.compact} />
 {:else}
 <div class="skin" class:maximized class:inactive={!active} bind:clientWidth={winW} bind:clientHeight={winH}>
@@ -205,6 +211,7 @@
 <Dialogs />
 {#if ui.optionsOpen}<Lazy load={views.options} />{/if}
 {#if ui.loginOpen}<Lazy load={views.login} />{/if}
+{#if skins.pickerOpen}<Lazy load={views.skinPicker} />{/if}
 {#if ui.aboutOpen}
   <DialogFrame title={t.menuBar.about} onclose={() => (ui.aboutOpen = false)}>
     <div class="about">

@@ -422,6 +422,10 @@ export const commands = {
   windowIsCompact: () => v(false),
   windowSetCompact: (_e: boolean) => ok(null),
   windowSetShape: (_p: [number, number][][] | null) => ok(null),
+  windowSetSkin: (_s: [number | null, number | null] | null) => ok(null),
+  // Con XP_SKINS_DIR, Vite sirve la carpeta de máscaras (vite.config.ts).
+  skinsList: async () => ({ status: "ok" as const, data: (await (await fetch("/skin/list")).json()) as { id: string; name: string; bytes: number }[] }),
+  skinsOpenDir: () => ok(null),
   vizSetActive: (on: boolean) => {
     clearInterval(vizTimer);
     if (on) vizTimer = setInterval(fakeViz, 33);

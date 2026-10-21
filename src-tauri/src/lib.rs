@@ -6,6 +6,7 @@ mod logging;
 mod os;
 mod player;
 mod settings;
+mod skins;
 mod state;
 mod storage;
 mod tools;
@@ -92,6 +93,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
             ui_state::window_is_compact,
             ui_state::window_set_compact,
             ui_state::window_set_shape,
+            ui_state::window_set_skin,
+            skins::skins_list,
+            skins::skins_open_dir,
             ui_state::ui_log,
             ui_state::viz_set_active,
             tools::tools_versions,
@@ -187,6 +191,10 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol("thumb", move |_ctx, request, responder| {
             let thumbs = Arc::clone(&thumbs);
             std::thread::spawn(move || responder.respond(thumbs.handle(&request)));
+        })
+        // Máscaras de WMP: http://skin.localhost/frame/… y /wmz/<id>
+        .register_asynchronous_uri_scheme_protocol("skin", |_ctx, request, responder| {
+            std::thread::spawn(move || responder.respond(skins::handle(&request)));
         })
         .manage(AppState {
             db: Arc::clone(&db),

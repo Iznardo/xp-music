@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Banco de skins</title>
+    <style>
+      body {
+        margin: 12px;
+        font: 12px Tahoma, sans-serif;
+        background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 16px 16px;
+      }
+      #out {
+        white-space: pre-wrap;
+        background: #fff;
+        padding: 8px;
+      }
+      #stage {
+        position: relative;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <pre id="out">Cargando…</pre>
+    <script type="module" src="bench.js"></script>
+  </body>
+</html>

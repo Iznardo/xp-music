@@ -1,21 +1,8 @@
-<script lang="ts" module>
-  // Varias visualizaciones pueden convivir un instante (al cambiar de preset se
-  // monta la nueva antes de desmontar la vieja): el analizador del backend se
-  // enciende con la primera visible y se apaga cuando no queda ninguna.
-  import { commands as cmds } from "../bindings";
-  let visible = 0;
-  export function vizVisible(delta: 1 | -1) {
-    const before = visible;
-    visible = Math.max(0, visible + delta);
-    if (before === 0 && visible > 0) void cmds.vizSetActive(true);
-    if (before > 0 && visible === 0) void cmds.vizSetActive(false);
-  }
-</script>
-
 <script lang="ts">
   // Lienzo de visualización (specs/005). El analizador del backend solo corre
   // mientras este componente está montado y la página es visible (AC-005-02).
   import { onMount } from "svelte";
+  import { vizVisible } from "./active";
   import { commands, events, type VizPreset } from "../bindings";
   import { EMPTY_FRAME, toData, type VizData, type VizRenderer } from "./types";
   import { Bars, Waves } from "./canvas2d";

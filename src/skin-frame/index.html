@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        user-select: none;
+        -webkit-user-select: none;
+        font: 11px Tahoma, sans-serif;
+      }
+      #root {
+        position: relative;
+        height: 100%;
+      }
+      #root div,
+      #root canvas {
+        box-sizing: border-box;
+      }
+      .wmp-list {
+        position: absolute;
+        inset: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-width: thin;
+      }
+      .wmp-row {
+        display: flex;
+        gap: 6px;
+        padding: 1px 3px;
+        white-space: nowrap;
+      }
+      .wmp-row span:first-child {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .wmp-row.sel {
+        background: rgb(255 255 255 / 0.2);
+      }
+      .marquee {
+        display: inline-block;
+        padding-left: 100%;
+        animation: marquee 12s linear infinite;
+      }
+      @keyframes marquee {
+        to {
+          transform: translateX(-100%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

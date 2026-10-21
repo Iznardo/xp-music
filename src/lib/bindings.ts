@@ -93,6 +93,13 @@ export const commands = {
 	 *  a la ventana (antes podía quedarse esperando al hilo de sondeo y colgarse).
 	 */
 	windowSetShape: (polygons: (([number, number])[])[] | null) => typedError<null, AppError>(__TAURI_INVOKE("window_set_shape", { polygons })),
+	/**
+	 *  Modo máscara: la ventana toma el tamaño de la vista del skin (píxeles
+	 *  lógicos); `None` vuelve al modo completo.
+	 */
+	windowSetSkin: (size: [number | null, number | null] | null) => typedError<null, AppError>(__TAURI_INVOKE("window_set_skin", { size })),
+	skinsList: () => typedError<SkinInfo[], AppError>(__TAURI_INVOKE("skins_list")),
+	skinsOpenDir: () => typedError<null, AppError>(__TAURI_INVOKE("skins_open_dir")),
 	/**  Errores y avisos del frontend al log de la app (la WebView no tiene consola visible). */
 	uiLog: (level: string, message: string) => __TAURI_INVOKE<void>("ui_log", { level, message }),
 	/**  Activa el analizador solo mientras la visualización está a la vista (FR-005-03). */
@@ -341,6 +348,14 @@ export type Settings = {
 	pauseOnLock: boolean,
 	/**  Atajos globales (006). Formato `Ctrl+Alt+P`; `None` = sin atajo. */
 	hotkeys: HotkeySettings,
+};
+
+export type SkinInfo = {
+	/**  Ruta relativa dentro de la carpeta de máscaras, con `/`. */
+	id: string,
+	/**  Nombre del archivo sin `.wmz`. */
+	name: string,
+	bytes: number,
 };
 
 export type Theme = "Blue" | "Olive" | "Silver";

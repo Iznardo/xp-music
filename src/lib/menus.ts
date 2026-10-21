@@ -5,6 +5,7 @@ import { router } from "./router.svelte";
 import { player } from "./stores/player.svelte";
 import { ui, type MenuItem } from "./stores/ui.svelte";
 import { auth } from "./stores/auth.svelte";
+import { skins } from "./stores/skins.svelte";
 import { appWindow } from "./platform";
 import { t } from "./strings";
 
@@ -23,7 +24,7 @@ export const shortcuts: { keys: string; run: () => void }[] = [
   { keys: "F8", run: () => void commands.playerSetMuted(!player.state?.muted) },
   { keys: "F9", run: () => vol(-0.05) },
   { keys: "F10", run: () => vol(0.05) },
-  { keys: "Ctrl+1", run: () => void ui.setCompact(false) },
+  { keys: "Ctrl+1", run: () => void (skins.active ? skins.exit() : ui.setCompact(false)) },
   { keys: "Ctrl+2", run: () => void ui.setCompact(true) },
   { keys: "Ctrl+E", run: () => document.querySelector<HTMLInputElement>(".taskbar .search input")?.focus() },
 ];
@@ -65,8 +66,10 @@ export function menuBar(): { label: string; items: () => MenuItem[] }[] {
         { kind: "check", label: t.menuBar.home, checked: router.tab === "home", action: () => router.go({ name: "home" }) },
         { kind: "item", label: t.menuBar.search, shortcut: "Ctrl+E", action: () => shortcuts.find((s) => s.keys === "Ctrl+E")?.run() },
         { kind: "sep" },
-        { kind: "check", label: t.menuBar.fullMode, checked: !ui.compact, action: () => void ui.setCompact(false) },
+        { kind: "check", label: t.menuBar.fullMode, checked: !ui.compact && !skins.active, action: () => void ui.setCompact(false) },
         { kind: "check", label: t.menuBar.compactMode, checked: ui.compact, action: () => void ui.setCompact(true) },
+        { kind: "check", label: t.menuBar.skinMode, checked: skins.active, action: () => void skins.enter() },
+        { kind: "item", label: t.menuBar.skinChooser, action: () => (skins.pickerOpen = true) },
       ],
     },
     {

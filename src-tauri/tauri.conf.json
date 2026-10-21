@@ -28,7 +28,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data: http://thumb.localhost https://*.googleusercontent.com https://*.ggpht.com https://i.ytimg.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data: http://thumb.localhost https://*.googleusercontent.com https://*.ggpht.com https://i.ytimg.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src http://skin.localhost"
     }
   },
   "bundle": {
