@@ -171,10 +171,6 @@
     </main>
 
     <TransportBar pod={L.pod} bar={L.bar} />
-    <!-- Borde exterior por encima de todo: la carcasa se lee como una sola pieza. -->
-    {#if !maximized}
-      <svg class="edge" width={winW} height={winH} aria-hidden="true"><path d={outline} /></svg>
-    {/if}
     {#if !maximized}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="grip" title={t.top.resize} style="left:{winW - 16}px;top:{L.body.y + L.body.h - 16}px" onpointerdown={resize}></div>
@@ -252,18 +248,6 @@
   }
   .tab {
     z-index: 3;
-  }
-  .edge {
-    position: absolute;
-    inset: 0;
-    z-index: 50;
-    pointer-events: none;
-    fill: none;
-    stroke: var(--skin-edge);
-    stroke-width: 2;
-  }
-  .skin.maximized .edge {
-    display: none;
   }
   .topbar {
     position: absolute;

@@ -152,7 +152,8 @@ pub fn window_set_shape(
 unsafe fn set_region(hwnd: isize, polygons: Option<Vec<Vec<(i32, i32)>>>) {
     use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
     use windows_sys::Win32::Graphics::Gdi::{
-        ClientToScreen, CombineRgn, CreatePolygonRgn, DeleteObject, RGN_OR, SetWindowRgn, WINDING,
+        ClientToScreen, CombineRgn, CreatePolygonRgn, CreateRectRgn, DeleteObject, OffsetRgn,
+        RGN_COPY, RGN_OR, SetWindowRgn, WINDING,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
 
@@ -201,9 +202,32 @@ unsafe fn set_region(hwnd: isize, polygons: Option<Vec<Vec<(i32, i32)>>>) {
                 DeleteObject(rgn);
             }
         }
-        // Con éxito, Windows pasa a ser dueño de la región (no hay que borrarla).
-        if !total.is_null() {
-            SetWindowRgn(hwnd, total, 1);
+        if total.is_null() {
+            return;
         }
+        // La región de Windows recorta por píxeles enteros (bordes en escalera). Se
+        // agranda 2 px hacia fuera: el borde suavizado que pinta la interfaz cae
+        // dentro, sobre fondo transparente, y se ve limpio.
+        let grown = CreateRectRgn(0, 0, 0, 0);
+        let tmp = CreateRectRgn(0, 0, 0, 0);
+        CombineRgn(grown, total, std::ptr::null_mut(), RGN_COPY);
+        for (ox, oy) in [
+            (2, 0),
+            (-2, 0),
+            (0, 2),
+            (0, -2),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        ] {
+            CombineRgn(tmp, total, std::ptr::null_mut(), RGN_COPY);
+            OffsetRgn(tmp, ox, oy);
+            CombineRgn(grown, grown, tmp, RGN_OR);
+        }
+        DeleteObject(tmp);
+        DeleteObject(total);
+        // Con éxito, Windows pasa a ser dueño de la región (no hay que borrarla).
+        SetWindowRgn(hwnd, grown, 1);
     }
 }
