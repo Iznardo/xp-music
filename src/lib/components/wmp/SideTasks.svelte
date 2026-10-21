@@ -90,7 +90,7 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 14px 14px 0 4px;
+    padding: 4px 14px 0 4px;
     color: #fff;
   }
   .task {

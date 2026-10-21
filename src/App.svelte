@@ -23,7 +23,7 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { outlinePath, place, radii, skinLayout } from "./lib/skin";
+  import { SKIN, outlinePath, place, skinLayout } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/strings";
   import type { SearchFilter } from "./lib/bindings";
@@ -117,14 +117,19 @@
       <path d={outline} bind:this={outlineEl} class="shell-fill" />
     </svg>
     {#if L.side}
-      <div class="piece side" style="{place(L.side)};border-radius:{radii(L.side)}"><SideTasks /></div>
+      <div
+        class="piece side"
+        style="{place(L.side)};clip-path:path('{L.sideClip}');padding-top:{SKIN.sideTop - L.side.y + 4}px"
+      >
+        <SideTasks />
+      </div>
     {/if}
-    <div class="piece body" style="{place(L.body)};border-radius:{radii(L.body)}" data-tauri-drag-region></div>
-    <div class="piece tab" style="{place(L.tab)};border-radius:{radii(L.tab)}"><PlaylistTab {maximized} /></div>
+    <div class="piece body" style={place(L.body)} data-tauri-drag-region></div>
+    <div class="piece tab" style={place(L.tab)}><PlaylistTab {maximized} /></div>
     <div class="topbar" style={place(L.topBar)}><TitleBar {title} /></div>
     <button
       class="handle"
-      style="left:{L.content.x - 9}px;top:{L.content.y + L.content.h / 2 - 22}px"
+      style="left:{Math.max(0, L.content.x - 9)}px;top:{L.content.y + L.content.h / 2 - 22}px"
       title={ui.sideCollapsed ? t.side.show : t.side.hide}
       aria-label={ui.sideCollapsed ? t.side.show : t.side.hide}
       onclick={() => ui.toggleSide()}
@@ -147,6 +152,10 @@
     </main>
 
     <TransportBar pod={L.pod} bar={L.bar} />
+    <!-- Borde exterior por encima de todo: la carcasa se lee como una sola pieza. -->
+    {#if !maximized}
+      <svg class="edge" width={winW} height={winH} aria-hidden="true"><path d={outline} /></svg>
+    {/if}
     {#if !maximized}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="grip" title={t.top.resize} style="left:{winW - 16}px;top:{L.body.y + L.body.h - 16}px" onpointerdown={resize}></div>
@@ -196,8 +205,6 @@
   }
   .shell-fill {
     fill: url(#shell-fill);
-    stroke: var(--skin-edge);
-    stroke-width: 2;
   }
   .piece {
     position: absolute;
@@ -206,22 +213,33 @@
   /* Lateral: azul, más oscura, por debajo del cuerpo. */
   .side {
     z-index: 1;
+    border: 0;
     background: linear-gradient(to right, var(--side-bottom), var(--side-top) 55%, var(--side-bottom));
     box-shadow: inset 2px 2px 1px rgb(255 255 255 / 0.45), inset -2px -2px 2px rgb(0 0 50 / 0.3);
   }
-  /* Cuerpo y pestaña: plata azulada metálica. */
+  /* Cuerpo y pestaña no pintan nada propio: el plateado es el de la carcasa, así
+     no hay costuras entre ellos. */
   .body,
   .tab {
-    background: linear-gradient(to bottom, #eef2fc 0%, #cdd7f0 18%, #b4c3e8 60%, #9eb0dc 100%);
-    box-shadow: inset 1px 1px rgb(255 255 255 / 0.9), inset -1px -1px rgb(60 80 150 / 0.35);
+    border: 0;
   }
   .body {
     z-index: 2;
   }
   .tab {
     z-index: 3;
-    border-bottom: 0;
-    background: linear-gradient(to bottom, #f4f7ff 0%, #dbe3f6 40%, #cdd7f0 100%);
+  }
+  .edge {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    fill: none;
+    stroke: var(--skin-edge);
+    stroke-width: 2;
+  }
+  .skin.maximized .edge {
+    display: none;
   }
   .topbar {
     position: absolute;
