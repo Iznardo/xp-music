@@ -26,6 +26,9 @@ uniform float level;
 uniform float beat;
 uniform float bass;
 uniform float time;
+// Fotogramas de 60 fps que representa este (2 a 30 fps): el rastro avanza igual
+// a cualquier ritmo de dibujo.
+uniform float step;
 uniform vec2 res;
 vec3 hsv(float h, float s, float v) {
   vec3 k = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
@@ -40,11 +43,11 @@ void main() {
   vec2 c = uv - 0.5;
   c.x *= res.x / res.y;
   // Rastro: lo anterior gira, se aleja y se apaga poco a poco.
-  float ang = 0.006 + level * 0.01;
+  float ang = (0.006 + level * 0.01) * step;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
-  vec2 q = rot * c * (0.985 - level * 0.01);
+  vec2 q = rot * c * pow(0.985 - level * 0.01, step);
   q.x /= res.x / res.y;
-  vec3 trail = texture(prev, q + 0.5).rgb * 0.955;
+  vec3 trail = texture(prev, q + 0.5).rgb * pow(0.955, step);
 
   float r = length(c);
   float a = atan(c.y, c.x);
@@ -68,12 +71,12 @@ void main() {
   a = abs(a - seg * 0.5);
   vec2 k = vec2(cos(a), sin(a)) * r;
   // Túnel: lo anterior se acerca y gira.
-  float zoom = 0.94 - bass * 0.04 - beat * 0.06;
-  float ang = 0.03 * sin(time * 0.3) + level * 0.04;
+  float zoom = pow(0.94 - bass * 0.04 - beat * 0.06, step);
+  float ang = (0.03 * sin(time * 0.3) + level * 0.04) * step;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
   vec2 q = rot * k * zoom;
   q.x /= res.x / res.y;
-  vec3 trail = texture(prev, q + 0.5).rgb * (0.93 + level * 0.04);
+  vec3 trail = texture(prev, q + 0.5).rgb * pow(0.93 + level * 0.04, step);
 
   vec3 col = vec3(0.0);
   for (int i = 0; i < 3; i++) {
@@ -96,13 +99,13 @@ void main() {
   c.x *= asp;
   float mid = avg(8, 30);
   // Rastro: lo anterior se expande desde el centro, gira despacio y ondula.
-  float ang = 0.004 + 0.008 * sin(time * 0.21);
+  float ang = (0.004 + 0.008 * sin(time * 0.21)) * step;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
-  vec2 q = rot * c * (0.96 - bass * 0.025 - beat * 0.06);
-  q += 0.0035 * vec2(sin(c.y * 28.0 + time * 2.1), cos(c.x * 28.0 + time * 1.7));
+  vec2 q = rot * c * pow(0.96 - bass * 0.025 - beat * 0.06, step);
+  q += 0.0035 * step * vec2(sin(c.y * 28.0 + time * 2.1), cos(c.x * 28.0 + time * 1.7));
   q.x /= asp;
   // Se apaga restando además un poco: sin esto el fondo acaba en neblina gris.
-  vec3 trail = max(texture(prev, q + 0.5).rgb * (0.93 + mid * 0.03) - vec3(0.008, 0.005, 0.007), 0.0);
+  vec3 trail = max(texture(prev, q + 0.5).rgb * pow(0.93 + mid * 0.03, step) - vec3(0.008, 0.005, 0.007) * step, 0.0);
 
   float r = length(c);
   float a = atan(c.y, c.x);
@@ -136,8 +139,8 @@ void main() {
   float bands2 = 0.5 + 0.5 * sin(v * 18.0 - time * 2.0 - bass * 4.0 - beat * 3.0);
   vec3 col = hsv(fract(v * 0.7 + time * 0.035 + bass * 0.25), 0.85, 0.15 + 0.85 * bands2 * smoothstep(0.05, 0.9, v));
   // Algo de rastro girando para que "fluya".
-  float ang = 0.012 + level * 0.03;
-  vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * 0.99;
+  float ang = (0.012 + level * 0.03) * step;
+  vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * pow(0.99, step);
   q.x /= asp;
   vec3 trail = texture(prev, q + 0.5).rgb;
   o = vec4(clamp(mix(col, trail, 0.5 - beat * 0.3) * (0.85 + level * 0.4 + beat * 0.6), 0.0, 1.0), 1.0);
@@ -157,10 +160,10 @@ void main() {
   float glow = smoothstep(-0.1, 0.9, arms) * (0.25 + mid * 1.2 + beat * 0.9) * smoothstep(0.0, 0.12, r);
   vec3 col = hsv(fract(lr * 0.35 + time * 0.06 + a / 6.2831853), 0.9, 1.0) * glow;
   // Rastro hacia dentro: sensación de túnel.
-  float ang = -0.02 - level * 0.03;
-  vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * (1.025 + beat * 0.04);
+  float ang = (-0.02 - level * 0.03) * step;
+  vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * pow(1.025 + beat * 0.04, step);
   q.x /= asp;
-  vec3 trail = texture(prev, q + 0.5).rgb * 0.86;
+  vec3 trail = texture(prev, q + 0.5).rgb * pow(0.86, step);
   o = vec4(clamp(max(trail, col) + col * 0.3, 0.0, 1.0), 1.0);
 }`;
 
@@ -193,6 +196,7 @@ class Feedback implements VizRenderer {
   private w = 1;
   private h = 1;
   private buf: WebGLBuffer;
+  private lastT: number | null = null;
 
   constructor(canvas: HTMLCanvasElement, frag: string) {
     const gl = canvas.getContext("webgl2", { antialias: false, preserveDrawingBuffer: false });
@@ -248,6 +252,10 @@ class Feedback implements VizRenderer {
     gl.uniform1f(gl.getUniformLocation(this.draw_, "beat"), f.beat);
     gl.uniform1f(gl.getUniformLocation(this.draw_, "bass"), f.bass);
     gl.uniform1f(gl.getUniformLocation(this.draw_, "time"), t);
+    // Tiempo desde el fotograma anterior en "fotogramas de 60 fps" (acotado tras pausas).
+    const step = this.lastT === null ? 1 : Math.min(4, Math.max(0.5, (t - this.lastT) * 60));
+    this.lastT = t;
+    gl.uniform1f(gl.getUniformLocation(this.draw_, "step"), step);
     gl.uniform2f(gl.getUniformLocation(this.draw_, "res"), this.w, this.h);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     // 2) A pantalla.

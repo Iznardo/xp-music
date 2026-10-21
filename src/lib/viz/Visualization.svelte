@@ -45,10 +45,12 @@
     let raf = 0;
     const t0 = performance.now();
 
+    // Ahorro (008): los efectos WebGL se dibujan al 75 % de la resolución de
+    // pantalla (se estiran sin que se note: son difusos) y las barras a 1:1.
+    const scale = renderer.continuous ? 0.75 : Math.min(devicePixelRatio || 1, 1);
     const resize = () => {
-      const dpr = Math.min(devicePixelRatio || 1, 2);
-      canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
-      canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * scale));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * scale));
       renderer.resize(canvas.width, canvas.height);
       dirty = true;
     };
@@ -56,12 +58,18 @@
     ro.observe(canvas);
     resize();
 
-    const loop = () => {
+    // Como mucho 30 fps: es el ritmo al que llega el análisis del audio, así que
+    // dibujar más a menudo solo gasta CPU/GPU.
+    const MIN_FRAME_MS = 1000 / 30 - 2;
+    let last = 0;
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop);
+      if (now - last < MIN_FRAME_MS) return;
+      last = now;
       if (renderer.continuous || dirty) {
-        renderer.draw(frame, (performance.now() - t0) / 1000);
+        renderer.draw(frame, (now - t0) / 1000);
         dirty = false;
       }
-      raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
 
