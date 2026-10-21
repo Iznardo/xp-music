@@ -190,9 +190,12 @@
     box-shadow: inset 0 2px 1px rgb(255 255 255 / 0.9), inset 0 -3px 6px rgb(30 50 120 / 0.25), 0 2px 4px rgb(0 0 40 / 0.35);
     user-select: none;
   }
-  /* Unida a la lateral: su lado izquierdo es el contorno de la ventana. */
+  /* Unida a la lateral: sin borde ni fondo propios; la pinta la carcasa con el
+     mismo color que la lateral, así se leen como una sola pieza. */
   .pod.joined {
-    border-left: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
   }
   .play {
     position: absolute;

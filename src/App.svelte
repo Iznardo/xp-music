@@ -23,7 +23,7 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { SKIN, outlinePath, place, skinLayout } from "./lib/skin";
+  import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/strings";
   import type { SearchFilter } from "./lib/bindings";
@@ -44,6 +44,7 @@
   let winH = $state(0);
   const L = $derived(winW && winH ? skinLayout(winW, winH, !ui.sideCollapsed) : null);
   const outline = $derived(L ? outlinePath(L) : "");
+  const sidePod = $derived(L ? sidePodPath(L) : null);
   let outlineEl = $state<SVGPathElement>();
 
   // El contorno (con sus empalmes) es la región de la ventana (Windows): fuera no
@@ -113,13 +114,31 @@
           <stop offset="0.75" stop-color="#b4c3e8" />
           <stop offset="1" stop-color="#9eb0dc" />
         </linearGradient>
+        <!-- Lateral y píldora: el mismo color de punta a punta (son una pieza). -->
+        <linearGradient id="side-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={SKIN.sideW} y2="0">
+          <stop offset="0" class="sf-edge" />
+          <stop offset="0.55" class="sf-mid" />
+          <!-- Más allá de la lateral (la píldora) sigue el tono claro. -->
+          <stop offset="1" class="sf-mid" />
+        </linearGradient>
+        <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 1} x2="0" y2={winH}>
+          <!-- Sin efecto por encima de la píldora; dentro, brillo arriba y sombra abajo. -->
+          <stop offset="0" stop-color="#fff" stop-opacity="0" />
+          <stop offset="0.01" stop-color="#fff" stop-opacity="0.4" />
+          <stop offset="1" stop-color="#000" stop-opacity="0.15" />
+        </linearGradient>
       </defs>
       <path d={outline} bind:this={outlineEl} class="shell-fill" />
+      {#if sidePod}
+        <path d={sidePod} fill="url(#side-fill)" />
+        <!-- Brillo de arriba abajo en la zona de los controles, sin cortes. -->
+        <path d={sidePod} fill="url(#side-shade)" />
+      {/if}
     </svg>
     {#if L.side}
       <div
         class="piece side"
-        style="{place(L.side)};clip-path:path('{L.sideClip}');padding-top:{SKIN.sideTop - L.side.y + 4}px;padding-right:{L.side.w - SKIN.sideW}px;padding-bottom:{SKIN.taper - 10}px"
+        style="{place(L.side)};clip-path:path('{L.sideClip}');padding-top:{SKIN.sideTop - L.side.y + 4}px;padding-right:{L.side.w - SKIN.sideW}px;padding-bottom:{SKIN.taper + SKIN.podCorner - SKIN.pod.h}px"
       >
         <SideTasks />
       </div>
@@ -211,11 +230,16 @@
     border: 1px solid var(--skin-edge);
   }
   /* Lateral: azul, más oscura, por debajo del cuerpo. */
+  /* La lateral no pinta fondo: lo pinta la carcasa junto con la píldora. */
   .side {
     z-index: 1;
     border: 0;
-    background: linear-gradient(to right, var(--side-bottom), var(--side-top) 55%, var(--side-bottom));
-    box-shadow: inset 2px 2px 1px rgb(255 255 255 / 0.45), inset -2px -2px 2px rgb(0 0 50 / 0.3);
+  }
+  :global(.sf-edge) {
+    stop-color: var(--side-bottom);
+  }
+  :global(.sf-mid) {
+    stop-color: var(--side-top);
   }
   /* Cuerpo y pestaña no pintan nada propio: el plateado es el de la carcasa, así
      no hay costuras entre ellos. */
