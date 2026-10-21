@@ -143,6 +143,14 @@ fn allowed(url: &str) -> bool {
         return false;
     };
     let host = rest.split(['/', '?']).next().unwrap_or("");
+    let path = &rest[host.len()..];
+    // Portadas de las listas automáticas: mixes (`/image/radioart`, `/image/mixart`…)
+    // y las de "Liked Music" y similares (imágenes fijas de gstatic). Solo esas rutas.
+    if (host == "music.youtube.com" && path.starts_with("/image/"))
+        || (host == "www.gstatic.com" && path.starts_with("/youtube/"))
+    {
+        return true;
+    }
     ["googleusercontent.com", "ggpht.com", "ytimg.com"]
         .iter()
         .any(|d| host == *d || host.ends_with(&format!(".{d}")))
@@ -184,6 +192,13 @@ mod tests {
         assert!(!allowed("https://evil.com/lh3.googleusercontent.com"));
         assert!(!allowed("https://googleusercontent.com.evil.com/x"));
         assert!(!allowed("http://lh3.googleusercontent.com/x"));
+        // Listas automáticas: solo las rutas de imágenes.
+        assert!(allowed("https://music.youtube.com/image/radioart?r=CjMK"));
+        assert!(allowed(
+            "https://www.gstatic.com/youtube/media/ytm/images/pbg/liked-songs.png"
+        ));
+        assert!(!allowed("https://music.youtube.com/youtubei/v1/browse"));
+        assert!(!allowed("https://www.gstatic.com/other/x.png"));
     }
 
     #[test]
