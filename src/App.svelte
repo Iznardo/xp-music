@@ -108,12 +108,20 @@
     });
     const win = appWindow();
     if (!win) return () => clearTimeout(idle);
+    // "Volver al modo completo" del icono de la bandeja (salida de emergencia).
+    const offFull = import("@tauri-apps/api/event").then(({ listen }) =>
+      listen("ui://full-mode", () => {
+        if (skins.active) void skins.exit();
+        else void ui.setCompact(false);
+      }),
+    );
     const sync = async () => (maximized = await win.isMaximized());
     void sync();
     const unlisteners = [win.onResized(sync), win.onFocusChanged((e) => (active = e.payload))];
     return () => {
       clearTimeout(idle);
       unlisteners.forEach((p) => p.then((off) => off()));
+      void offFull.then((off) => off());
     };
   });
 

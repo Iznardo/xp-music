@@ -97,26 +97,12 @@
   }
 
   async function menu(x: number, y: number) {
-    const st = player.state;
     if (isTauri) {
-      const { Menu, MenuItem: Item, PredefinedMenuItem } = await import("@tauri-apps/api/menu");
-      const sep = () => PredefinedMenuItem.new({ item: "Separator" });
-      const m = await Menu.new({
-        items: [
-          await Item.new({ text: t.skins.backToFull, accelerator: "Ctrl+1", action: () => void skins.exit() }),
-          await Item.new({ text: t.skins.chooser, action: () => void openPicker() }),
-          await sep(),
-          await Item.new({ text: t.menuBar.playPause, action: () => void commands.playerToggle() }),
-          await Item.new({ text: t.menuBar.stop, action: () => void commands.playerStop() }),
-          await Item.new({ text: t.menuBar.previous, action: () => void commands.playerPrevious() }),
-          await Item.new({ text: t.menuBar.next, action: () => void commands.playerNext() }),
-          await Item.new({ text: t.menuBar.mute, action: () => void commands.playerSetMuted(!st?.muted) }),
-          await sep(),
-          await Item.new({ text: t.skins.exit, action: () => void appWindow()?.close() }),
-        ],
-      });
-      await m.popup();
-      return;
+      try {
+        return await nativeMenu();
+      } catch (e) {
+        void commands.uiLog("error", `máscara: el menú nativo falló: ${String(e)}`);
+      }
     }
     const items: MenuItem[] = [
       { kind: "item", label: t.skins.backToFull, bold: true, shortcut: "Ctrl+1", action: () => void skins.exit() },
@@ -126,6 +112,27 @@
       { kind: "item", label: t.menuBar.next, action: () => void commands.playerNext() },
     ];
     ui.openMenu({ x, y }, items);
+  }
+
+  async function nativeMenu() {
+    const st = player.state;
+    const { Menu, MenuItem: Item, PredefinedMenuItem } = await import("@tauri-apps/api/menu");
+    const sep = () => PredefinedMenuItem.new({ item: "Separator" });
+    const m = await Menu.new({
+      items: [
+        await Item.new({ text: t.skins.backToFull, accelerator: "Ctrl+1", action: () => void skins.exit() }),
+        await Item.new({ text: t.skins.chooser, action: () => void openPicker() }),
+        await sep(),
+        await Item.new({ text: t.menuBar.playPause, action: () => void commands.playerToggle() }),
+        await Item.new({ text: t.menuBar.stop, action: () => void commands.playerStop() }),
+        await Item.new({ text: t.menuBar.previous, action: () => void commands.playerPrevious() }),
+        await Item.new({ text: t.menuBar.next, action: () => void commands.playerNext() }),
+        await Item.new({ text: t.menuBar.mute, action: () => void commands.playerSetMuted(!st?.muted) }),
+        await sep(),
+        await Item.new({ text: t.skins.exit, action: () => void appWindow()?.close() }),
+      ],
+    });
+    await m.popup();
   }
 
   /// El selector no cabe en la ventana de una máscara: se vuelve al modo completo.

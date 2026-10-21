@@ -9,7 +9,7 @@ import { ui } from "./ui.svelte";
 export const SKIN_BASE = isTauri ? "http://skin.localhost" : "/skin";
 
 const KEY = "xpm.skin";
-const MODE = "xpm.skinMode";
+const MODE = "xpm.skinMode.v2";
 
 function read(key: string): string | null {
   try {

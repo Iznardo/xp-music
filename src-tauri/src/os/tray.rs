@@ -3,6 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use tauri::AppHandle;
+use tauri::Emitter;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
@@ -76,6 +77,7 @@ fn build_menu(app: &AppHandle, k: &MenuKey) -> tauri::Result<Menu<tauri::Wry>> {
             )?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "show", "Mostrar XP Music", true, None::<&str>)?,
+            &MenuItem::with_id(app, "full", "Volver al modo completo", true, None::<&str>)?,
             &MenuItem::with_id(app, "quit", "Salir", true, None::<&str>)?,
         ],
     )
@@ -109,6 +111,12 @@ pub fn create(
             "next" => p.next(),
             "previous" => p.previous(),
             "show" => super::show_main(app),
+            // Salida de emergencia si una máscara no deja volver.
+            "full" => {
+                tracing::info!("bandeja: volver al modo completo");
+                super::show_main(app);
+                let _ = app.emit("ui://full-mode", ());
+            }
             "quit" => super::quit(app),
             "like" => {
                 let Some(track) = p.state().track else { return };
