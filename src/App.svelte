@@ -50,9 +50,10 @@
   const sidePod = $derived(L ? sidePodPath(L) : null);
   let outlineEl = $state<SVGPathElement>();
 
-  // El contorno (con sus empalmes) es la región de la ventana (Windows): fuera no
-  // se pinta nada ni se reciben clics. Maximizada o compacta, rectangular.
+  // El contorno (con sus empalmes) es la forma para los clics: en lo transparente
+  // pasan a lo de detrás. Maximizada, rectangular; el modo compacto pone la suya.
   $effect(() => {
+    if (ui.compact) return;
     const path = outlineEl;
     const shaped = !ui.compact && !maximized && !!outline && path !== undefined;
     void outline;

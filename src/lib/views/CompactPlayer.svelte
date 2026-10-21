@@ -1,6 +1,9 @@
 <script lang="ts">
-  // Modo compacto (FR-004-13): un reproductor MP3 plateado de los 2000. Disco con la
-  // portada girando, pantalla LCD azul retroiluminada y botones "físicos".
+  // Modo compacto (FR-004-13): un reproductor MP3 plateado de los 2000 con la
+  // silueta asimétrica de la ventana principal: lóbulo redondo para el disco que
+  // sobresale arriba y abajo, empalmes curvos y una pestaña que sube en S arriba a
+  // la derecha. Disco con la portada girando, LCD azul y botones "físicos".
+  import { onMount } from "svelte";
   import { commands } from "../bindings";
   import { player } from "../stores/player.svelte";
   import { ui } from "../stores/ui.svelte";
@@ -36,12 +39,73 @@
     void commands.playerSeek(Math.round(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * duration));
   }
 
+  // --- Silueta ---
+  let w = $state(460);
+  let h = $state(150);
+  const R = 68; // lóbulo del disco
+  const CX = 72;
+  const TOP = 24; // banda del cuerpo
+  const F = 14; // empalmes
+  const TAB_Y = 6; // pestaña de arriba a la derecha
+  function fillet(line: number, below: boolean, cy: number) {
+    const fcY = line + (below ? F : -F);
+    const dy = fcY - cy;
+    const fx = CX + Math.sqrt((R + F) ** 2 - dy ** 2);
+    const k = R / (R + F);
+    return { fx, tx: CX + (fx - CX) * k, ty: cy + dy * k };
+  }
+  const outline = $derived.by(() => {
+    const cy = h / 2;
+    const bot = h - 20;
+    const t = fillet(TOP, false, cy);
+    const b = fillet(bot, true, cy);
+    const n = (v: number) => v.toFixed(1);
+    return [
+      `M ${n(t.tx)} ${n(t.ty)}`,
+      `A ${F} ${F} 0 0 0 ${n(t.fx)} ${TOP}`,
+      `L ${w - 170} ${TOP}`,
+      // Sube en S hasta la pestaña de los tornillos, como en la ventana grande.
+      `C ${w - 140} ${TOP} ${w - 130} ${TAB_Y} ${w - 100} ${TAB_Y}`,
+      `L ${w - 20} ${TAB_Y}`,
+      `A 16 16 0 0 1 ${w - 4} ${TAB_Y + 16}`,
+      `L ${w - 4} ${bot - 14}`,
+      `A 14 14 0 0 1 ${w - 18} ${bot}`,
+      `L ${n(b.fx)} ${bot}`,
+      `A ${F} ${F} 0 0 0 ${n(b.tx)} ${n(b.ty)}`,
+      `A ${R} ${R} 0 1 1 ${n(t.tx)} ${n(t.ty)}`,
+      "Z",
+    ].join(" ");
+  });
+
+  // La silueta es también la forma para los clics: en lo transparente pasan a lo
+  // de detrás (como en la ventana grande).
+  let pathEl = $state<SVGPathElement>();
+  $effect(() => {
+    void outline;
+    const path = pathEl;
+    if (!path) return;
+    const id = setTimeout(() => {
+      const dpr = devicePixelRatio || 1;
+      const len = path.getTotalLength();
+      const pts: [number, number][] = [];
+      const steps = Math.round(len / 3);
+      for (let i = 0; i < steps; i++) {
+        const q = path.getPointAtLength((i / steps) * len);
+        pts.push([Math.round(q.x * dpr), Math.round(q.y * dpr)]);
+      }
+      void commands.windowSetShape([pts]);
+    }, 60);
+    return () => clearTimeout(id);
+  });
+  onMount(() => () => void commands.windowSetShape(null));
+
   function vol(delta: number) {
     void commands.playerSetVolume(Math.min(1, Math.max(0, ((st?.volume ?? 0.8) * 100 + delta) / 100)));
   }
 </script>
 
-<div class="device" data-tauri-drag-region>
+<div class="frame" bind:clientWidth={w} bind:clientHeight={h}>
+<div class="device" style="clip-path: path('{outline}')" data-tauri-drag-region>
   <!-- Disco: la portada gira mientras suena. -->
   <div class="disc" class:spin={playing} data-tauri-drag-region>
     {#if cover}
@@ -110,26 +174,35 @@
     </button>
   </div>
 </div>
+<!-- Bisel: brillo por dentro del borde, sin delineado oscuro. -->
+<svg class="bevel" width={w} height={h} aria-hidden="true">
+  <defs><clipPath id="compact-clip"><path d={outline} /></clipPath></defs>
+  <path d={outline} bind:this={pathEl} clip-path="url(#compact-clip)" />
+</svg>
+</div>
 
 <style>
-  /* Cuerpo de aluminio cepillado. */
+  .frame {
+    position: absolute;
+    inset: 0;
+    /* La sombra sigue la silueta (se aplica después del recorte). */
+    filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45));
+  }
+  .bevel {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    fill: none;
+    stroke: rgb(255 255 255 / 0.85);
+    stroke-width: 3;
+  }
+  /* Cuerpo de aluminio cepillado, recortado con la silueta. */
   .device {
     position: absolute;
-    inset: 4px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 14px 0 12px;
-    border-radius: 24px;
+    inset: 0;
     background:
       repeating-linear-gradient(90deg, rgb(255 255 255 / 0.06) 0 1px, rgb(0 0 0 / 0.025) 1px 2px),
       linear-gradient(to bottom, #f7f8fa 0%, #dfe2e7 30%, #c9cdd4 70%, #b3b8c1 100%);
-    border: 1px solid #8a8f99;
-    box-shadow:
-      inset 0 1px 0 #fff,
-      inset 0 -2px 3px rgb(0 0 0 / 0.18),
-      0 3px 8px rgb(0 0 0 / 0.45);
-    overflow: hidden;
     user-select: none;
   }
   /* Reflejo diagonal del metal. */
@@ -141,9 +214,11 @@
   }
 
   /* --- Disco con la portada --- */
+  /* El disco ocupa el lóbulo de la izquierda. */
   .disc {
-    position: relative;
-    flex: none;
+    position: absolute;
+    left: 18px;
+    top: calc(50% - 54px);
     width: 108px;
     height: 108px;
     border-radius: 50%;
@@ -193,13 +268,16 @@
     pointer-events: none;
   }
 
+  /* Pantalla y botones en la banda del cuerpo. */
   .main {
-    position: relative;
-    flex: 1;
-    min-width: 0;
+    position: absolute;
+    left: 152px;
+    right: 16px;
+    top: 30px;
+    bottom: 22px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
   }
 
   /* --- Pantalla LCD azul retroiluminada --- */
@@ -366,10 +444,11 @@
   }
 
   /* --- Botoncitos de ventana, como tornillos --- */
+  /* En la pestaña que sube arriba a la derecha. */
   .screws {
     position: absolute;
-    top: 6px;
-    right: 14px;
+    top: 9px;
+    right: 22px;
     display: flex;
     gap: 4px;
   }
