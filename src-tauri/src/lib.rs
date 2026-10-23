@@ -222,6 +222,7 @@ pub fn run() {
             app.manage(Arc::clone(&yt));
             app.manage(Arc::clone(&player));
 
+            tools::spawn_warmup();
             tools::spawn_daily_check();
             updater::spawn_startup_check(handle.clone(), Arc::clone(&db));
 

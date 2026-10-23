@@ -266,7 +266,11 @@ impl PlayerService {
         // seguiría sonando la canción intermedia mientras se resuelve la nueva.
         self.engine.send(EngineCmd::Stop);
         self.emit_state();
-        self.prefetch_upcoming();
+        // Sin la pista actual en caché, las siguientes esperan a que termine su
+        // yt-dlp (`resolve_for_play`): varios a la vez en frío lo retrasan todo.
+        if self.resolver.cached(&track.id, FormatPreference::Aac128).is_some() {
+            self.prefetch_upcoming();
+        }
 
         let svc = Arc::clone(self);
         thread::spawn(move || {
@@ -303,12 +307,17 @@ impl PlayerService {
             return Ok(s);
         }
         let Some(fast) = self.fast_start.lock().unwrap().clone() else {
-            return self.resolver.resolve(id, pref);
+            let r = self.resolver.resolve(id, pref);
+            self.prefetch_upcoming();
+            return r;
         };
         let upgrade = Upgrade::default();
         {
-            let (resolver, id, up) = (Arc::clone(&self.resolver), id.clone(), upgrade.clone());
-            thread::spawn(move || up.fill(resolver.resolve(&id, pref)));
+            let (svc, id, up) = (Arc::clone(self), id.clone(), upgrade.clone());
+            thread::spawn(move || {
+                up.fill(svc.resolver.resolve(&id, pref));
+                svc.prefetch_upcoming();
+            });
         }
         let t0 = std::time::Instant::now();
         match fast(id) {

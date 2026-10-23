@@ -235,6 +235,24 @@ fn install(zip_bytes: &[u8]) -> AppResult<()> {
     Ok(())
 }
 
+/// Lanza yt-dlp y deno una vez al abrir la app: el primer arranque en frío
+/// (antivirus que los analiza, disco) es lo más lento y si no lo paga la primera
+/// canción, cuyo arranque rápido solo cubre ~1 min.
+pub fn spawn_warmup() {
+    std::thread::Builder::new()
+        .name("tools-warmup".into())
+        .spawn(|| {
+            let Some(tools) = ToolPaths::locate() else {
+                return;
+            };
+            let t0 = std::time::Instant::now();
+            let _ = version_of(&tools.yt_dlp);
+            let _ = version_of(&tools.deno);
+            tracing::debug!(ms = t0.elapsed().as_millis() as u64, "herramientas precalentadas");
+        })
+        .ok();
+}
+
 /// Comprobación diaria en segundo plano al arrancar.
 pub fn spawn_daily_check() {
     std::thread::Builder::new()

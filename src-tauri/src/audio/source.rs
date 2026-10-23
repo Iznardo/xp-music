@@ -22,8 +22,11 @@ pub const CHUNK: u64 = 1 << 18;
 const AHEAD: u64 = 32;
 const KEEP_BEHIND: u64 = 8;
 const RETRIES: u32 = 3;
-/// Lo más que se espera a la URL completa en un arranque rápido.
-const UPGRADE_TIMEOUT: Duration = Duration::from_secs(45);
+/// Lo más que se espera a la URL completa en un arranque rápido. yt-dlp ya tiene
+/// sus propios límites; esto solo evita esperar para siempre. Con un límite corto
+/// (antes 45 s) un yt-dlp lento en frío (primera canción, antivirus) cortaba la
+/// pista al acabarse el principio (~1:04) aunque la URL estuviera a punto de llegar.
+const UPGRADE_TIMEOUT: Duration = Duration::from_secs(180);
 const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
 
 /// Fallos que el motor distingue: un 403 significa URL caducada (re-resolver).
@@ -222,9 +225,10 @@ fn download_loop(
                     ua = full_ua;
                 }
                 None => {
-                    // Sin URL completa: el motor lo trata como caducada y re-resuelve.
+                    // Sin URL completa: fallo de red, el motor reintenta. No como caducada:
+                    // eso borraría de la caché la URL completa que yt-dlp sí haya dejado.
                     let mut st = sh.state.lock().unwrap();
-                    st.error = Some(SourceError::Expired);
+                    st.error = Some(SourceError::Network);
                     sh.cv.notify_all();
                     return;
                 }
@@ -498,7 +502,7 @@ mod tests {
     }
 
     #[test]
-    fn sin_url_completa_se_reporta_como_caducado() {
+    fn sin_url_completa_se_reporta_como_fallo_de_red() {
         let data = Arc::new(pattern(2 * HEAD_LIMIT as usize));
         let head = test_server::serve(Arc::clone(&data), Some((HEAD_LIMIT / CHUNK) as usize));
         let up = Upgrade::default();
@@ -510,6 +514,6 @@ mod tests {
         let mut buf = vec![0u8; HEAD_LIMIT as usize];
         src.read_exact(&mut buf).unwrap();
         let err = src.read(&mut buf).unwrap_err();
-        assert_eq!(SourceError::from_io(&err), SourceError::Expired);
+        assert_eq!(SourceError::from_io(&err), SourceError::Network);
     }
 }
