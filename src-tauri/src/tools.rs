@@ -248,7 +248,10 @@ pub fn spawn_warmup() {
             let t0 = std::time::Instant::now();
             let _ = version_of(&tools.yt_dlp);
             let _ = version_of(&tools.deno);
-            tracing::debug!(ms = t0.elapsed().as_millis() as u64, "herramientas precalentadas");
+            tracing::debug!(
+                ms = t0.elapsed().as_millis() as u64,
+                "herramientas precalentadas"
+            );
         })
         .ok();
 }

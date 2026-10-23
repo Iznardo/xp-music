@@ -268,7 +268,11 @@ impl PlayerService {
         self.emit_state();
         // Sin la pista actual en caché, las siguientes esperan a que termine su
         // yt-dlp (`resolve_for_play`): varios a la vez en frío lo retrasan todo.
-        if self.resolver.cached(&track.id, FormatPreference::Aac128).is_some() {
+        if self
+            .resolver
+            .cached(&track.id, FormatPreference::Aac128)
+            .is_some()
+        {
             self.prefetch_upcoming();
         }
 
