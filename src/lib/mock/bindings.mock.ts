@@ -71,7 +71,30 @@ export const events = {
 // ------------------------------------------------------------------ datos
 
 const palette = ["#3a6ea5", "#a54a3a", "#3aa56b", "#8a3aa5", "#a5893a", "#3a9aa5", "#a53a7c", "#5b5b5b"];
+/** Portada de verdad para "Ruta 2004" (la canción de las capturas y el vídeo de promoción). */
+const RUTA_2004 = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'>
+<defs>
+<linearGradient id='sky' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#1d1b5e'/><stop offset='.45' stop-color='#b2338f'/><stop offset='.62' stop-color='#ff7a3d'/></linearGradient>
+<linearGradient id='sun' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#ffe66b'/><stop offset='1' stop-color='#ff4f6d'/></linearGradient>
+<linearGradient id='chrome' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#ffffff'/><stop offset='.48' stop-color='#b8c4d6'/><stop offset='.52' stop-color='#4a5670'/><stop offset='1' stop-color='#e8eef8'/></linearGradient>
+<clipPath id='half'><rect x='0' y='0' width='600' height='372'/></clipPath>
+</defs>
+<rect width='600' height='372' fill='url(#sky)'/>
+<g clip-path='url(#half)'><circle cx='300' cy='372' r='150' fill='url(#sun)'/>
+<g fill='#c43a8c'><rect x='140' y='300' width='320' height='7'/><rect x='140' y='322' width='320' height='9'/><rect x='140' y='344' width='320' height='12'/><rect x='140' y='364' width='320' height='8'/></g></g>
+<rect y='372' width='600' height='228' fill='#14102e'/>
+<g stroke='#ff4fd8' stroke-width='3' opacity='.85'>
+<line x1='300' y1='372' x2='-300' y2='600'/><line x1='300' y1='372' x2='0' y2='600'/><line x1='300' y1='372' x2='150' y2='600'/><line x1='300' y1='372' x2='450' y2='600'/><line x1='300' y1='372' x2='600' y2='600'/><line x1='300' y1='372' x2='900' y2='600'/>
+<line x1='0' y1='392' x2='600' y2='392'/><line x1='0' y1='420' x2='600' y2='420'/><line x1='0' y1='462' x2='600' y2='462'/><line x1='0' y1='524' x2='600' y2='524'/></g>
+<polygon points='292,372 308,372 360,600 240,600' fill='#2a2350'/>
+<g fill='#ffe66b'><rect x='297' y='400' width='6' height='18'/><rect x='296' y='452' width='8' height='30'/><rect x='294' y='530' width='12' height='50'/></g>
+<text x='300' y='150' text-anchor='middle' font-family='Arial Black, Tahoma, sans-serif' font-weight='900' font-size='104' fill='url(#chrome)' stroke='#1d1b5e' stroke-width='4' letter-spacing='4'>RUTA</text>
+<text x='300' y='250' text-anchor='middle' font-family='Arial Black, Tahoma, sans-serif' font-weight='900' font-size='104' fill='url(#chrome)' stroke='#1d1b5e' stroke-width='4' letter-spacing='4'>2004</text>
+<text x='300' y='300' text-anchor='middle' font-family='Tahoma, sans-serif' font-weight='bold' font-size='26' fill='#ffffff' letter-spacing='10'>DUO SATÉLITE</text>
+</svg>`;
+
 function cover(seed: number, label: string): Thumbnail[] {
+  if (label === "Ruta") return [{ url: `data:image/svg+xml;utf8,${encodeURIComponent(RUTA_2004)}`, width: 600, height: 600 }];
   const c = palette[seed % palette.length];
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='226' height='226'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${c}'/><stop offset='1' stop-color='#111'/></linearGradient></defs><rect width='226' height='226' fill='url(#g)'/><text x='16' y='206' font-family='Tahoma' font-size='26' fill='#fff' opacity='.85'>${label}</text></svg>`;
   return [{ url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, width: 226, height: 226 }];
@@ -129,6 +152,19 @@ const artistSummaries: ArtistSummary[] = artists.map((n, i) => ({
   subtitle: `${(i + 1) * 1.3}M oyentes mensuales`,
   thumbnails: cover(i + 3, n.split(" ")[0]!),
 }));
+
+/** Datos de otra biblioteca para capturas (el vídeo de promoción): JSON en localStorage "xpm.mock.data". */
+try {
+  const raw = localStorage.getItem("xpm.mock.data");
+  if (raw) {
+    const d = JSON.parse(raw) as { tracks: Track[]; albums: AlbumSummary[]; artists: ArtistSummary[] };
+    allTracks.splice(0, allTracks.length, ...d.tracks);
+    albumSummaries.splice(0, albumSummaries.length, ...d.albums);
+    artistSummaries.splice(0, artistSummaries.length, ...d.artists);
+  }
+} catch {
+  // Sin datos alternativos: se quedan los de ejemplo.
+}
 
 // ------------------------------------------------------------------ reproductor simulado
 
