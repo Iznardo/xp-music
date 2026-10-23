@@ -33,3 +33,6 @@ src-tauri/gen/schemas/
 .claude/
 specs/
 spike/
+
+# Vídeos de promoción (proyectos de HyperFrames, capturas y renders): solo en local
+promo/
