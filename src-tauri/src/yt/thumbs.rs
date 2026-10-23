@@ -7,7 +7,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reqwest::blocking::Client;
+use reqwest::redirect::Policy;
 use tauri::http::{Request, Response, StatusCode};
+use url::Url;
 
 use crate::storage::Db;
 
@@ -15,6 +17,8 @@ use crate::storage::Db;
 const MAX_BYTES: i64 = 200 * 1024 * 1024;
 /// Tamaño máximo de una imagen.
 const MAX_IMAGE: usize = 4 * 1024 * 1024;
+/// Redirecciones que se siguen como mucho (cada salto se vuelve a validar).
+const MAX_REDIRECTS: usize = 5;
 
 pub struct ThumbCache {
     dir: PathBuf,
@@ -25,8 +29,17 @@ pub struct ThumbCache {
 impl ThumbCache {
     pub fn new(dir: PathBuf, db: Arc<Db>) -> Arc<Self> {
         let _ = std::fs::create_dir_all(&dir);
+        // Una redirección a un host fuera de la lista lo convertiría en proxy abierto.
+        let redirects = Policy::custom(|attempt| {
+            if attempt.previous().len() < MAX_REDIRECTS && permitted(attempt.url()) {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        });
         let http = Client::builder()
             .timeout(Duration::from_secs(15))
+            .redirect(redirects)
             .build()
             .expect("cliente HTTP");
         Arc::new(Self { dir, db, http })
@@ -35,10 +48,11 @@ impl ThumbCache {
     /// Atiende una petición del protocolo (bloqueante: llamar fuera del hilo de UI).
     pub fn handle(&self, req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
         let path = req.uri().path().trim_start_matches('/');
-        let Some(url) = percent_decode(path).filter(|u| allowed(u)) else {
+        let Some((url, parsed)) = percent_decode(path).and_then(|u| allowed(&u).map(|p| (u, p)))
+        else {
             return status(StatusCode::BAD_REQUEST);
         };
-        match self.get(&url) {
+        match self.get(&url, parsed) {
             Some((mime, bytes)) => Response::builder()
                 .header("Content-Type", mime)
                 .header("Cache-Control", "max-age=31536000, immutable")
@@ -49,7 +63,9 @@ impl ThumbCache {
         }
     }
 
-    fn get(&self, url: &str) -> Option<(String, Vec<u8>)> {
+    /// `url` es la clave de la caché; `parsed`, lo que se pide de verdad (el host
+    /// validado tiene que ser el mismo al que se conecta reqwest).
+    fn get(&self, url: &str, parsed: Url) -> Option<(String, Vec<u8>)> {
         let name = format!("{:016x}", fnv1a(url));
         let file = self.dir.join(&name);
         let hit: Option<String> = self
@@ -71,7 +87,7 @@ impl ThumbCache {
             return Some((mime, bytes));
         }
 
-        let resp = self.http.get(url).send().ok()?;
+        let resp = self.http.get(parsed).send().ok()?;
         if !resp.status().is_success() {
             return None;
         }
@@ -138,12 +154,27 @@ fn status(code: StatusCode) -> Response<Vec<u8>> {
 }
 
 /// Solo imágenes de Google/YouTube (evita usar el protocolo como proxy abierto).
-fn allowed(url: &str) -> bool {
-    let Some(rest) = url.strip_prefix("https://") else {
+/// Se parsea con el mismo parser que usa reqwest: partir el texto a mano dejaba
+/// pasar `https://evil.com#.ytimg.com` o `https://evil.com\x.ytimg.com`, que
+/// reqwest manda a `evil.com`.
+fn allowed(url: &str) -> Option<Url> {
+    let parsed = Url::parse(url).ok()?;
+    // Una portada nunca lleva fragmento; rechazarlo cierra la puerta a trucos con `#`.
+    (parsed.fragment().is_none() && permitted(&parsed)).then_some(parsed)
+}
+
+fn permitted(url: &Url) -> bool {
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+    {
+        return false;
+    }
+    let Some(host) = url.host_str() else {
         return false;
     };
-    let host = rest.split(['/', '?']).next().unwrap_or("");
-    let path = &rest[host.len()..];
+    let path = url.path();
     // Portadas de las listas automáticas: mixes (`/image/radioart`, `/image/mixart`…)
     // y las de "Liked Music" y similares (imágenes fijas de gstatic). Solo esas rutas.
     if (host == "music.youtube.com" && path.starts_with("/image/"))
@@ -184,21 +215,57 @@ fn fnv1a(s: &str) -> u64 {
 mod tests {
     use super::*;
 
+    fn ok(url: &str) -> bool {
+        allowed(url).is_some()
+    }
+
     #[test]
     fn solo_hosts_de_google() {
-        assert!(allowed("https://lh3.googleusercontent.com/abc=w120-h120"));
-        assert!(allowed("https://i.ytimg.com/vi/x/hqdefault.jpg"));
-        assert!(allowed("https://yt3.ggpht.com/x"));
-        assert!(!allowed("https://evil.com/lh3.googleusercontent.com"));
-        assert!(!allowed("https://googleusercontent.com.evil.com/x"));
-        assert!(!allowed("http://lh3.googleusercontent.com/x"));
+        assert!(ok("https://lh3.googleusercontent.com/abc=w120-h120"));
+        assert!(ok("https://i.ytimg.com/vi/x/hqdefault.jpg"));
+        assert!(ok("https://yt3.ggpht.com/x"));
+        assert!(!ok("https://evil.com/lh3.googleusercontent.com"));
+        assert!(!ok("https://googleusercontent.com.evil.com/x"));
+        assert!(!ok("http://lh3.googleusercontent.com/x"));
         // Listas automáticas: solo las rutas de imágenes.
-        assert!(allowed("https://music.youtube.com/image/radioart?r=CjMK"));
-        assert!(allowed(
+        assert!(ok("https://music.youtube.com/image/radioart?r=CjMK"));
+        assert!(ok(
             "https://www.gstatic.com/youtube/media/ytm/images/pbg/liked-songs.png"
         ));
-        assert!(!allowed("https://music.youtube.com/youtubei/v1/browse"));
-        assert!(!allowed("https://www.gstatic.com/other/x.png"));
+        assert!(!ok("https://music.youtube.com/youtubei/v1/browse"));
+        assert!(!ok("https://www.gstatic.com/other/x.png"));
+    }
+
+    #[test]
+    fn el_host_validado_es_el_que_se_pide() {
+        // Con el corte a mano, estas pasaban el filtro y reqwest iba a evil.com.
+        for url in [
+            "https://evil.com#.ytimg.com",
+            "https://evil.com#/i.ytimg.com/x",
+            "https://evil.com\\x.ytimg.com",
+            "https://evil.com\\p\\i.ytimg.com/vi/x",
+            "https://i.ytimg.com@evil.com/x",
+            "https://evil.com:443\\.ytimg.com",
+            "https://music.youtube.com\\image/x#.ytimg.com",
+        ] {
+            assert!(!ok(url), "{url}");
+        }
+        // Userinfo, puerto y fragmento no hacen falta para una portada.
+        assert!(!ok("https://evil.com@i.ytimg.com/x"));
+        assert!(!ok("https://i.ytimg.com:8443/x"));
+        assert!(!ok("https://i.ytimg.com/vi/x/hqdefault.jpg#a"));
+        // Lo que se pide es el host que se validó.
+        let u = allowed("https://i.ytimg.com/vi/x/hqdefault.jpg").unwrap();
+        assert_eq!(u.host_str(), Some("i.ytimg.com"));
+    }
+
+    #[test]
+    fn redirecciones_solo_a_hosts_permitidos() {
+        let ok = |u: &str| permitted(&Url::parse(u).unwrap());
+        assert!(ok("https://lh3.googleusercontent.com/a"));
+        assert!(!ok("https://evil.com/a"));
+        assert!(!ok("http://i.ytimg.com/a"));
+        assert!(!ok("https://127.0.0.1/a"));
     }
 
     #[test]
