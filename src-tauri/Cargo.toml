@@ -1,6 +1,6 @@
 [package]
 name = "xp-music"
-version = "1.0.1"
+version = "1.0.2"
 description = "Reproductor de YouTube Music con estética Windows Media Player / XP"
 authors = ["iznardo"]
 license = "MIT"
