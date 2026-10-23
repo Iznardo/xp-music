@@ -3,6 +3,7 @@
   // mientras este componente está montado y la página es visible (AC-005-02).
   import { onMount } from "svelte";
   import { vizVisible } from "./active";
+  import { appWindow } from "../platform";
   import { commands, events, type VizPreset } from "../bindings";
   import { EMPTY_FRAME, toData, type VizData, type VizRenderer } from "./types";
   import { Bars, Waves } from "./canvas2d";
@@ -50,7 +51,7 @@
     const MIN_FRAME_MS = 1000 / 30 - 2;
     let last = 0;
     const loop = (now: number) => {
-      raf = requestAnimationFrame(loop);
+      raf = counted ? requestAnimationFrame(loop) : 0;
       if (now - last < MIN_FRAME_MS) return;
       last = now;
       if (renderer.continuous || dirty) {
@@ -58,29 +59,42 @@
         dirty = false;
       }
     };
-    raf = requestAnimationFrame(loop);
-
     const unlisten = events.vizFrame.listen((e) => {
       frame = toData(e.payload);
       dirty = true;
     });
 
-    // Cuenta como visible mientras la página lo está.
+    // Cuenta como visible mientras la página lo está. WebView2 no la da por oculta
+    // al minimizar la ventana: eso se pregunta aparte (si no, se sigue dibujando
+    // y analizando el audio con la ventana en la barra de tareas).
+    const win = appWindow();
     let counted = false;
+    let minimized = false;
+    let disposed = false;
     const sync = () => {
-      const now = document.visibilityState === "visible";
+      if (disposed) return;
+      const now = document.visibilityState === "visible" && !minimized;
       if (now !== counted) {
         counted = now;
         vizVisible(now ? 1 : -1);
+        if (now && !raf) raf = requestAnimationFrame(loop);
       }
     };
+    const syncMinimized = async () => {
+      minimized = (await win?.isMinimized()) ?? false;
+      sync();
+    };
     sync();
+    void syncMinimized();
     document.addEventListener("visibilitychange", sync);
+    const offResized = win?.onResized(() => void syncMinimized());
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       document.removeEventListener("visibilitychange", sync);
+      void offResized?.then((off) => off());
       void unlisten.then((off) => off());
       if (counted) vizVisible(-1);
       renderer.dispose();
