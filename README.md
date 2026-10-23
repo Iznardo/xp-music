@@ -2,6 +2,10 @@
 
 Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media Player 9 en Windows XP. Solo para Windows 10 y 11.
 
+![Biblioteca de XP Music](docs/biblioteca.jpg)
+
+![Reproduciendo con visualización](docs/reproduciendo.jpg)
+
 - Inicio, búsqueda, biblioteca, «Me gusta», historial y radio de tu cuenta de YouTube Music.
 - Listas de reproducción: crear, añadir canciones y reproducirlas.
 - Visualizaciones que siguen el ritmo de la música.
