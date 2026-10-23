@@ -24,6 +24,7 @@ $signingPath = Join-Path $root 'src-tauri\signing.local.json'
 $confPath = Join-Path $root 'src-tauri\tauri.conf.json'
 
 function Fail($msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
+# Get-Content sin -Encoding lee como ANSI en PowerShell 5.1 y estropea las tildes.
 function Write-Utf8($path, $text) { [IO.File]::WriteAllText($path, $text, (New-Object Text.UTF8Encoding $false)) }
 
 # --- 1. Comprobaciones --------------------------------------------------------
@@ -40,7 +41,7 @@ if (-not (Test-Path (Join-Path $root 'tools\yt-dlp\yt-dlp.exe')) -or -not (Test-
 }
 
 # --- 2. Versión ---------------------------------------------------------------
-$pkg = Get-Content package.json -Raw | ConvertFrom-Json
+$pkg = Get-Content package.json -Raw -Encoding UTF8 | ConvertFrom-Json
 $version = [version]$pkg.version
 $new = switch ($Bump) {
     'major' { [version]::new($version.Major + 1, 0, 0) }
@@ -53,9 +54,9 @@ if ($Bump -ne 'none') {
     $from = '"version": "' + $pkg.version + '"'
     $to = '"version": "' + $v + '"'
     foreach ($f in 'package.json', 'src-tauri\tauri.conf.json') {
-        Write-Utf8 (Join-Path $root $f) ((Get-Content $f -Raw).Replace($from, $to))
+        Write-Utf8 (Join-Path $root $f) ((Get-Content $f -Raw -Encoding UTF8).Replace($from, $to))
     }
-    $cargo = Get-Content src-tauri\Cargo.toml -Raw
+    $cargo = Get-Content src-tauri\Cargo.toml -Raw -Encoding UTF8
     $cargo = ([regex]'(?m)^version = "[^"]+"').Replace($cargo, "version = `"$v`"", 1)
     Write-Utf8 (Join-Path $root 'src-tauri\Cargo.toml') $cargo
     Write-Host "Versión $($pkg.version) → $v"

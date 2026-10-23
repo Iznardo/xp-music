@@ -50,7 +50,7 @@
       "../THIRD-PARTY-NOTICES.txt": "THIRD-PARTY-NOTICES.txt"
     },
     "publisher": "iznardo",
-    "copyright": "Â© 2026 iznardo",
+    "copyright": "© 2026 iznardo",
     "shortDescription": "Reproductor de YouTube Music con aspecto de Windows XP",
     "windows": {
       "nsis": {
