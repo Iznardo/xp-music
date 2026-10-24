@@ -261,9 +261,10 @@ el workflow único:
 3. Verifica criptográficamente con `minisign` **todas** las firmas del updater, sube los
    archivos al draft (salvo el EXE x64, que ya estaba) y calcula el SHA-256 de cada uno.
 4. Escribe en las notas de la release, **encima** de las notas del mantenedor, una tabla
-   *Sistema · Arquitectura · Formato · SHA-256 · Descarga* con los instaladores, y los
-   archivos del actualizador en un desplegable. La tabla va entre marcadores HTML, así
-   que reintentar el workflow la sustituye en vez de duplicarla.
+   *Sistema (SO y arquitectura) · SHA-256 · Descarga* con los instaladores; el texto del
+   enlace es el nombre del archivo, que ya indica el formato. Los archivos del actualizador
+   (`.app.tar.gz`, `.sig`, `latest.json`) siguen en la release pero no se listan. La tabla va
+   entre marcadores HTML, así que reintentar el workflow la sustituye en vez de duplicarla.
 5. Crea un único `latest.json` (con solo las notas del mantenedor) con una entrada por
    target y formato: `windows-x86_64`, `windows-aarch64`, `linux-{x86_64,aarch64}-{deb,appimage,rpm}`
    y `darwin-{x86_64,aarch64}-app`; las de Windows y macOS conservan también la clave

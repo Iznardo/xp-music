@@ -11,7 +11,7 @@ const { version } = JSON.parse(await readFile(new URL("../package.json", import.
 const sha = (text) => createHash("sha256").update(text).digest("hex");
 
 test("composeNotes is idempotent and keeps only the maintainer notes under the table", () => {
-  const rows = ARTIFACTS.map((artifact) => ({ artifact, url: `https://example.test/${artifact.format}`, sha256: "a".repeat(64) }));
+  const rows = ARTIFACTS.map((artifact, index) => ({ artifact, url: `https://example.test/XP.Music_${index}.bin`, sha256: "a".repeat(64) }));
   const once = composeNotes("Arreglos varios", rows);
   assert.equal(composeNotes(once, rows), once);
   assert.ok(once.startsWith(`${START}\n## Descargas\n`));
@@ -20,13 +20,12 @@ test("composeNotes is idempotent and keeps only the maintainer notes under the t
   assert.equal(stripDownloads(null), "");
   assert.equal(composeNotes("", rows).endsWith(`${END}\n`), true);
   const [header, separator, first] = once.split("\n").slice(3, 6);
-  assert.equal(header, "| Sistema | Arquitectura | Formato | SHA-256 | Descarga |");
-  assert.equal(separator, "| --- | --- | --- | --- | --- |");
-  assert.equal(first, `| Windows | x64 | Instalador (.exe) | \`${"a".repeat(64)}\` | [Descargar](https://example.test/Instalador (.exe)) |`);
-  // Los archivos que solo usa el updater van en el desplegable, no en la tabla principal.
-  const [table, details] = once.split("<details>");
-  assert.ok(!table.includes("app.tar.gz"));
-  assert.match(details, /Archivos del actualizador[\s\S]*app\.tar\.gz/);
+  assert.equal(header, "| Sistema | SHA-256 | Descarga |");
+  assert.equal(separator, "| --- | --- | --- |");
+  assert.equal(first, `| Windows x64 | \`${"a".repeat(64)}\` | [XP.Music_0.bin](https://example.test/XP.Music_0.bin) |`);
+  // Los archivos que solo usa el updater no se listan.
+  assert.ok(!once.includes("app.tar.gz") && !once.includes("<details>") && !once.includes("Actualizador"));
+  assert.equal(once.split("\n").filter((line) => /^\| (Windows|Linux|macOS) /.test(line)).length, ARTIFACTS.filter((a) => a.installer).length);
   assert.throws(() => stripDownloads(`${START}\nsin cierre`), /incompleto/);
   assert.throws(() => stripDownloads(`${END}${START}`), /incompleto/);
 });
@@ -52,8 +51,9 @@ test("generateNotes hashes local files, uses uploaded URLs and fails closed", as
     await writeFile(metadata, JSON.stringify(release));
     const notes = await generateNotes(metadata, packages, output);
     assert.equal(await readFile(output, "utf8"), notes);
-    assert.ok(notes.includes(`| Linux | ARM64 | AppImage | \`${sha("payload-6")}\` | [Descargar](${release.assets[6].browser_download_url}) |`));
-    assert.ok(notes.includes(`| macOS | Apple Silicon (ARM64) | Imagen de disco (.dmg) | \`${sha("payload-10")}\``));
+    assert.ok(notes.includes(`| Linux ARM64 | \`${sha("payload-6")}\` | [${release.assets[6].name}](${release.assets[6].browser_download_url}) |`));
+    assert.ok(notes.includes(`| macOS Apple Silicon | \`${sha("payload-10")}\` | [${release.assets[10].name}](${release.assets[10].browser_download_url}) |`));
+    assert.ok(!notes.includes("app.tar.gz"));
     assert.ok(notes.endsWith("\nMis notas\n"));
     // Regenerar sobre unas notas ya publicadas da el mismo resultado.
     release.body = notes;

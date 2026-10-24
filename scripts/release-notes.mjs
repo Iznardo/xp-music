@@ -20,25 +20,18 @@ export function stripDownloads(body) {
   return `${text.slice(0, start)}${text.slice(end + END.length)}`.trim();
 }
 
-/** @param rows {{artifact, url, sha256}}[] */
+/**
+ * Tabla: «Sistema» (SO y arquitectura), SHA-256 y enlace con el nombre del archivo, que ya
+ * indica el formato. Los archivos que solo usa el actualizador (`.app.tar.gz`, `.sig`,
+ * `latest.json`) no se listan: la app los descarga sola.
+ * @param rows {{artifact, url, sha256}}[]
+ */
 export function renderDownloads(rows) {
-  const link = (row) => `[Descargar](${row.url})`;
-  const table = (items, headers, cells) => [
-    `| ${headers.join(" | ")} |`,
-    `| ${headers.map(() => "---").join(" | ")} |`,
-    ...items.map((row) => `| ${cells(row).join(" | ")} |`),
-  ];
-  const installers = rows.filter((row) => row.artifact.installer);
-  const updaterOnly = rows.filter((row) => !row.artifact.installer);
-  const lines = [START, "## Descargas", "",
-    ...table(installers, ["Sistema", "Arquitectura", "Formato", "SHA-256", "Descarga"],
-      (row) => [row.artifact.system, row.artifact.arch, row.artifact.format, `\`${row.sha256}\``, link(row)])];
-  if (updaterOnly.length) {
-    lines.push("", "<details>", "<summary>Archivos del actualizador</summary>", "",
-      "Los usa la actualización automática de la app (junto a sus `.sig` y `latest.json`); no hace falta descargarlos.", "",
-      ...table(updaterOnly, ["Sistema", "Arquitectura", "Formato", "SHA-256", "Descarga"],
-        (row) => [row.artifact.system, row.artifact.arch, row.artifact.format, `\`${row.sha256}\``, link(row)]),
-      "", "</details>");
+  const lines = [START, "## Descargas", "", "| Sistema | SHA-256 | Descarga |", "| --- | --- | --- |"];
+  for (const row of rows.filter((r) => r.artifact.installer)) {
+    const { system, arch } = row.artifact;
+    const file = decodeURIComponent(new URL(row.url).pathname.split("/").pop());
+    lines.push(`| ${system} ${arch} | \`${row.sha256}\` | [${file}](${row.url}) |`);
   }
   lines.push(END);
   return lines.join("\n");
@@ -59,7 +52,7 @@ export async function generateNotes(metadataPath, packagesDirectory, outputPath)
   }
   const files = await listFiles(packagesDirectory);
   const rows = [];
-  for (const artifact of ARTIFACTS.filter((a) => a.installer || a.updater)) {
+  for (const artifact of ARTIFACTS.filter((a) => a.installer)) {
     const suffix = artifact.suffix(version);
     const local = unique(files, suffix, "local");
     const remote = unique(release.assets, suffix, "remote");
