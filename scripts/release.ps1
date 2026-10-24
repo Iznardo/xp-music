@@ -188,4 +188,4 @@ gh release create $tag @assets --repo $repo --draft --title "XP Music $v" --note
 if ($LASTEXITCODE -ne 0) { Fail 'No se pudo preparar el draft.' }
 gh workflow run release.yml --repo $repo --ref main -f "tag=$tag"
 if ($LASTEXITCODE -ne 0) { Fail 'El draft sigue sin publicar: lanza release.yml con su tag desde Actions.' }
-Write-Host "Draft $tag preparado. El workflow probará los instaladores de Windows, compilará y probará Linux y macOS, y publicará la release con la tabla de descargas y latest.json si todo pasa." -ForegroundColor Green
+Write-Host "Draft $tag preparado. El workflow probará los instaladores de Windows, compilará y probará Linux y macOS, y publicará la release con la tabla de descargas y latest.json si todo pasa. Antes de compilar Linux y macOS esperará a que apruebes el environment release (Actions → Review deployments)." -ForegroundColor Green
