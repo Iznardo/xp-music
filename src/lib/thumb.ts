@@ -1,12 +1,13 @@
 // Portadas servidas por el protocolo `thumb` (caché en disco del backend).
 
+import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Thumbnail } from "./bindings";
 import { isTauri } from "./platform";
 
 /// URL local para una imagen de Google/YouTube (en la vista previa, la original).
 export function thumbUrl(url: string): string {
   if (!isTauri || url.startsWith("data:")) return url;
-  return `http://thumb.localhost/${encodeURIComponent(url)}`;
+  return convertFileSrc(url, "thumb");
 }
 
 /// La menor miniatura de al menos `px` de ancho. En las de googleusercontent se

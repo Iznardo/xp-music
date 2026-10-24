@@ -4,9 +4,10 @@
 //!   LibreWolf…) copiando `cookies.sqlite` **y su WAL** (las cookies rotadas hace
 //!   poco solo están ahí) y quedándose con **un único contenedor**: mezclar
 //!   contenedores produce una sesión inválida.
-//! - La sesión se guarda cifrada con DPAPI (ligada al usuario de Windows) en
-//!   `%APPDATA%\xp-music\session.bin`; nunca en claro (principio VI). No se usa el
-//!   Administrador de credenciales porque la cookie supera su límite de 2,5 KB.
+//! - En Windows la sesión se guarda cifrada con DPAPI (ligada al usuario) en
+//!   `%APPDATA%\xp-music\session.bin`. En Linux se guarda en Secret Service,
+//!   aislada por la ruta de SessionStore; nunca en claro en disco (principio VI).
+//!   No se usa el Administrador de credenciales de Windows por su límite de 2,5 KB.
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -75,19 +76,59 @@ pub struct BrowserProfile {
 
 /// Perfiles de navegadores basados en Firefox con base de cookies.
 pub fn detect_profiles() -> Vec<BrowserProfile> {
-    let Some(appdata) = dirs::config_dir() else {
-        return Vec::new();
+    #[cfg(target_os = "linux")]
+    let browsers = {
+        let Some(home) = dirs::home_dir() else {
+            return Vec::new();
+        };
+        linux_profile_dirs(&home)
     };
-    let browsers = [
-        ("Zen", appdata.join("zen").join("Profiles")),
+    #[cfg(not(target_os = "linux"))]
+    let browsers = {
+        let Some(appdata) = dirs::config_dir() else {
+            return Vec::new();
+        };
+        [
+            ("Zen", appdata.join("zen").join("Profiles")),
+            (
+                "Firefox",
+                appdata.join("Mozilla").join("Firefox").join("Profiles"),
+            ),
+            ("LibreWolf", appdata.join("librewolf").join("Profiles")),
+            ("Floorp", appdata.join("Floorp").join("Profiles")),
+            ("Waterfox", appdata.join("Waterfox").join("Profiles")),
+        ]
+    };
+    detect_profiles_in(browsers)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_profile_dirs(home: &Path) -> Vec<(&'static str, PathBuf)> {
+    [
+        ("Zen", ".zen"),
+        ("Firefox", ".mozilla/firefox"),
+        ("Firefox", ".config/mozilla/firefox"),
+        ("LibreWolf", ".librewolf"),
+        ("Floorp", ".floorp"),
+        ("Waterfox", ".waterfox"),
+        ("Zen", ".var/app/app.zen_browser.zen/.zen"),
+        ("Firefox", ".var/app/org.mozilla.firefox/.mozilla/firefox"),
         (
-            "Firefox",
-            appdata.join("Mozilla").join("Firefox").join("Profiles"),
+            "LibreWolf",
+            ".var/app/io.gitlab.librewolf-community/.librewolf",
         ),
-        ("LibreWolf", appdata.join("librewolf").join("Profiles")),
-        ("Floorp", appdata.join("Floorp").join("Profiles")),
-        ("Waterfox", appdata.join("Waterfox").join("Profiles")),
-    ];
+        ("Floorp", ".var/app/one.ablaze.floorp/.floorp"),
+        ("Waterfox", ".var/app/net.waterfox.waterfox/.waterfox"),
+        ("Firefox", "snap/firefox/common/.mozilla/firefox"),
+    ]
+    .into_iter()
+    .map(|(browser, dir)| (browser, home.join(dir)))
+    .collect()
+}
+
+fn detect_profiles_in(
+    browsers: impl IntoIterator<Item = (&'static str, PathBuf)>,
+) -> Vec<BrowserProfile> {
     let mut out = Vec::new();
     for (browser, dir) in browsers {
         let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -144,6 +185,16 @@ impl CookieDb {
             std::process::id(),
             rand::random::<u32>()
         ));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            // No reutilizar un directorio ajeno ni exponer las cookies a otros usuarios.
+            std::fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&dir)
+                .map_err(|e| AppError::internal(e.to_string()))?;
+        }
+        #[cfg(not(unix))]
         std::fs::create_dir_all(&dir).map_err(|e| AppError::internal(e.to_string()))?;
         let copy = |name: &str| -> std::io::Result<()> {
             let from = profile.join(name);
@@ -344,16 +395,32 @@ pub fn netscape_from_header(header: &str) -> String {
 // ------------------------------------------------------------------ almacenamiento cifrado
 
 pub struct SessionStore {
+    #[cfg(windows)]
     path: PathBuf,
+    #[cfg(target_os = "linux")]
+    entry: keyring::Result<keyring::Entry>,
 }
 
 impl SessionStore {
     pub fn new(data_dir: &Path) -> Self {
         Self {
+            #[cfg(windows)]
             path: data_dir.join("session.bin"),
+            #[cfg(target_os = "linux")]
+            entry: {
+                use sha2::{Digest, Sha256};
+                let path = data_dir.join("session.bin");
+                // Identidad estable, sin colisiones por rutas con bytes no UTF-8.
+                let hash: String = Sha256::digest(path.as_os_str().as_encoded_bytes())
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect();
+                keyring::Entry::new("com.iznardo.xpmusic", &format!("session-{hash}"))
+            },
         }
     }
 
+    #[cfg(windows)]
     pub fn load(&self) -> Option<Session> {
         let enc = std::fs::read(&self.path).ok()?;
         let plain = dpapi::unprotect(&enc)
@@ -364,6 +431,7 @@ impl SessionStore {
             .ok()
     }
 
+    #[cfg(windows)]
     pub fn save(&self, s: &Session) -> AppResult<()> {
         let plain = serde_json::to_vec(s)?;
         let enc =
@@ -377,11 +445,70 @@ impl SessionStore {
             })
     }
 
-    pub fn clear(&self) {
-        let _ = std::fs::remove_file(&self.path);
+    #[cfg(windows)]
+    pub fn clear(&self) -> AppResult<()> {
+        match std::fs::remove_file(&self.path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(_) => Err(AppError::new(
+                ErrorCode::Storage,
+                "No se pudo borrar la sesión.",
+            )),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn entry(&self) -> AppResult<&keyring::Entry> {
+        self.entry.as_ref().map_err(|_| {
+            tracing::error!("no se pudo inicializar la entrada de Secret Service");
+            AppError::new(ErrorCode::Storage, "No se pudo acceder a Secret Service.")
+        })
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn load(&self) -> Option<Session> {
+        let plain = match self.entry().ok()?.get_secret() {
+            Ok(plain) => plain,
+            Err(keyring::Error::NoEntry) => return None,
+            Err(_) => {
+                tracing::warn!("no se pudo leer la sesión de Secret Service");
+                return None;
+            }
+        };
+        serde_json::from_slice(&plain)
+            // No registrar el error de JSON: puede incluir valores de las cookies.
+            .map_err(|_| tracing::warn!("sesión de Secret Service no válida"))
+            .ok()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn save(&self, s: &Session) -> AppResult<()> {
+        let plain = serde_json::to_vec(s)?;
+        self.entry()?.set_secret(&plain).map_err(|_| {
+            tracing::error!("no se pudo guardar la sesión en Secret Service");
+            AppError::new(
+                ErrorCode::Storage,
+                "No se pudo guardar la sesión en Secret Service.",
+            )
+        })
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn clear(&self) -> AppResult<()> {
+        match self.entry()?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => {
+                tracing::error!("no se pudo borrar la sesión de Secret Service");
+                Err(AppError::new(
+                    ErrorCode::Storage,
+                    "No se pudo borrar la sesión de Secret Service.",
+                ))
+            }
+        }
     }
 }
 
+#[cfg(windows)]
 mod dpapi {
     //! Cifrado ligado al usuario de Windows (CryptProtectData).
     use std::ptr;
@@ -484,22 +611,13 @@ mod tests {
         assert!(clean_pasted_cookie("hola").is_err());
     }
 
+    #[cfg(windows)]
     #[test]
     fn sesion_cifrada_en_disco() {
         let dir = std::env::temp_dir().join(format!("xp-music-test-{}", rand::random::<u32>()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = SessionStore::new(&dir);
-        let s = Session {
-            cookie_header: "SAPISID=secreto123".into(),
-            netscape: String::new(),
-            auth_user: 1,
-            source: None,
-            account_name: Some("alex".into()),
-            account_handle: None,
-            account_photo: None,
-            imported_at: 1,
-            app_login: false,
-        };
+        let s = test_session();
         store.save(&s).unwrap();
         let raw = std::fs::read(dir.join("session.bin")).unwrap();
         assert!(!String::from_utf8_lossy(&raw).contains("secreto123"));
@@ -510,9 +628,184 @@ mod tests {
             !format!("{back:?}").contains("secreto"),
             "Debug no debe mostrar cookies"
         );
-        store.clear();
+        store.clear().unwrap();
         assert!(store.load().is_none());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    fn test_session() -> Session {
+        Session {
+            cookie_header: "SAPISID=secreto123".into(),
+            netscape: String::new(),
+            auth_user: 1,
+            source: None,
+            account_name: Some("alex".into()),
+            account_handle: None,
+            account_photo: None,
+            imported_at: 1,
+            app_login: false,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn sesion_linux_en_secret_service_mock() {
+        let dir = std::env::temp_dir().join(format!("xp-music-test-{}", rand::random::<u64>()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Inyección por instancia: no cambiar el builder global de keyring.
+        let mut store = SessionStore::new(&dir);
+        store.entry = Ok(keyring::Entry::new_with_credential(Box::new(
+            keyring::mock::MockCredential::default(),
+        )));
+        let entry = store.entry().unwrap();
+        let mock = entry
+            .get_credential()
+            .downcast_ref::<keyring::mock::MockCredential>()
+            .unwrap();
+        assert!(store.load().is_none());
+        let mut s = test_session();
+        s.netscape = "cookie-larga".repeat(1024);
+        store.save(&s).unwrap();
+        assert_eq!(entry.get_secret().unwrap(), serde_json::to_vec(&s).unwrap());
+        let back = store.load().unwrap();
+        assert_eq!(back.cookie_header, s.cookie_header);
+        assert_eq!(back.netscape, s.netscape);
+        assert_eq!(back.auth_user, s.auth_user);
+        assert!(!format!("{back:?}").contains("secreto"));
+
+        mock.set_error(keyring::Error::NoStorageAccess(Box::new(
+            std::io::Error::other("almacén bloqueado: secreto123"),
+        )));
+        let err = store.save(&s).unwrap_err();
+        assert_eq!(err.code, ErrorCode::Storage);
+        assert!(!err.message.contains("secreto123"));
+        mock.set_error(keyring::Error::PlatformFailure(Box::new(
+            std::io::Error::other("sin D-Bus"),
+        )));
+        assert!(store.load().is_none());
+        mock.set_error(keyring::Error::NoStorageAccess(Box::new(
+            std::io::Error::other("almacén bloqueado"),
+        )));
+        assert_eq!(store.clear().unwrap_err().code, ErrorCode::Storage);
+        assert!(
+            store.load().is_some(),
+            "no fingir que se borró la credencial"
+        );
+        entry.set_secret(br#"{"auth_user":"secreto123"}"#).unwrap();
+        assert!(store.load().is_none(), "rechazar JSON de sesión inválido");
+        store.clear().unwrap();
+        store.clear().unwrap(); // Borrar una entrada ausente es inocuo.
+        assert!(matches!(entry.get_secret(), Err(keyring::Error::NoEntry)));
+        assert!(store.load().is_none());
+
+        let unavailable = SessionStore {
+            entry: Err(keyring::Error::Invalid(
+                "username".into(),
+                "secreto123".into(),
+            )),
+        };
+        assert_eq!(unavailable.save(&s).unwrap_err().code, ErrorCode::Storage);
+        assert!(unavailable.load().is_none());
+        assert_eq!(unavailable.clear().unwrap_err().code, ErrorCode::Storage);
+        assert!(std::fs::read_dir(&dir).unwrap().next().is_none());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Requiere D-Bus y Secret Service desbloqueado (p. ej. gnome-keyring).
+    /// `cargo test --lib sesion_linux_secret_service_real -- --ignored --nocapture`
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "requiere un Secret Service real y desbloqueado"]
+    fn sesion_linux_secret_service_real() {
+        let dir = std::env::temp_dir().join(format!("xp-music-keyring-{}", rand::random::<u64>()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = SessionStore::new(&dir);
+        let other = SessionStore::new(&dir.join("otro-perfil"));
+        let s = test_session();
+        assert!(store.load().is_none());
+        store.save(&s).unwrap();
+        let reopened = SessionStore::new(&dir);
+        let back = reopened.load();
+        let isolated = other.load().is_none();
+        store.clear().unwrap(); // Limpiar antes de las aserciones del roundtrip.
+        assert!(matches!(
+            reopened.entry().unwrap().get_secret(),
+            Err(keyring::Error::NoEntry)
+        ));
+        let back = back.expect("sesión persistida en Secret Service");
+        assert_eq!(back.cookie_header, s.cookie_header);
+        assert_eq!(back.auth_user, s.auth_user);
+        assert!(isolated, "las rutas no deben compartir credenciales");
+        assert!(
+            std::fs::read_dir(&dir).unwrap().next().is_none(),
+            "no debe existir session.bin ni archivos temporales"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn usuarios_secret_service_aislados_por_ruta() {
+        let attrs = |store: &SessionStore| {
+            store
+                .entry()
+                .unwrap()
+                .get_credential()
+                .downcast_ref::<keyring::secret_service::SsCredential>()
+                .unwrap()
+                .attributes
+                .clone()
+        };
+        let a = attrs(&SessionStore::new(Path::new("/tmp/perfil-a")));
+        let b = attrs(&SessionStore::new(Path::new("/tmp/perfil-b")));
+        assert_eq!(a["service"], "com.iznardo.xpmusic");
+        assert_ne!(a["username"], b["username"]);
+        assert_eq!(a, attrs(&SessionStore::new(Path::new("/tmp/perfil-a"))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copia_cookies_en_directorio_privado() {
+        use std::os::unix::fs::PermissionsExt;
+        let profile =
+            std::env::temp_dir().join(format!("xp-music-profile-{}", rand::random::<u64>()));
+        std::fs::create_dir_all(&profile).unwrap();
+        Connection::open(profile.join("cookies.sqlite"))
+            .unwrap()
+            .execute("CREATE TABLE prueba (id INTEGER)", [])
+            .unwrap();
+        let db = CookieDb::open(&profile).unwrap();
+        assert_eq!(
+            std::fs::metadata(&db.dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        drop(db);
+        std::fs::remove_dir_all(profile).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn detecta_perfiles_linux() {
+        let home =
+            std::env::temp_dir().join(format!("xp-music-profiles-{}", rand::random::<u64>()));
+        let roots = linux_profile_dirs(&home);
+        for (_, root) in &roots {
+            std::fs::create_dir_all(root.join("abc.personal")).unwrap();
+            std::fs::write(root.join("abc.personal/cookies.sqlite"), []).unwrap();
+            std::fs::create_dir_all(root.join("sin-cookies")).unwrap();
+        }
+        let profiles = detect_profiles_in(roots.clone());
+        assert_eq!(profiles.len(), roots.len());
+        for ((browser, root), profile) in roots.iter().zip(&profiles) {
+            assert_eq!(&profile.browser, browser);
+            assert_eq!(profile.name, "personal");
+            assert_eq!(
+                profile.path,
+                root.join("abc.personal").display().to_string()
+            );
+        }
+        std::fs::remove_dir_all(&home).unwrap();
+        assert!(detect_profiles_in(linux_profile_dirs(&home)).is_empty());
     }
 
     /// Con el perfil real de Zen: `cargo test --lib -- --ignored --nocapture contenedores_reales`.

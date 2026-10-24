@@ -54,7 +54,8 @@ try {
     # La versión de un solo archivo ya no hace falta: la app usa la "onedir".
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $tools 'yt-dlp.exe')
     if ($Update) {
-        $newLock | ConvertTo-Json | Set-Content -Encoding utf8 $lockPath
+        if ($lock.linux) { $newLock['linux'] = $lock.linux }
+        $newLock | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $lockPath
         Write-Host "tools.lock.json actualizado."
     }
     & (Join-Path $tools 'yt-dlp\yt-dlp.exe') --version
