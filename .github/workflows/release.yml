@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-      # TEMPORAL: quitar antes de fusionar
-      - feat/linux-releases
   workflow_dispatch:
     inputs:
       tag:
@@ -140,6 +138,12 @@ jobs:
             os: macos-15
             bundles: app,dmg
     runs-on: ${{ matrix.os }}
+    # La clave del updater y los certificados de Apple solo existen en el
+    # environment `release`, que exige la aprobación del mantenedor. Solo lo
+    # usan los jobs de Linux y macOS al publicar; Windows llega ya firmado.
+    environment: >-
+      ${{ inputs.tag && !startsWith(matrix.target, 'windows-') && 'release' ||
+      '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

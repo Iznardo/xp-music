@@ -225,22 +225,30 @@ aarch64-pc-windows-msvc` y el componente «MSVC ARM64 build tools» de Visual St
 Tools. `npm run release` descarga el yt-dlp y el deno de ARM64 (`tools.lock.json`) y los
 pone en `tools/` solo mientras compila ese instalador.
 
-Configura una vez en **Iznardo/xp-music → Settings → Secrets and variables → Actions**:
+Configura una vez, en **Iznardo/xp-music → Settings**:
 
-| Tipo | Nombre | Valor |
-| --- | --- | --- |
-| Variable | `XP_MUSIC_UPDATER_PUBKEY` | Contenido de la clave pública existente `~/.xp-music/updater.key.pub` |
-| Variable | `WINDOWS_SIGNING_THUMBPRINT` | Huella de `src-tauri/signing.local.json` |
-| Secret | `TAURI_SIGNING_PRIVATE_KEY` | Contenido de la clave privada **existente** `~/.xp-music/updater.key` (no una ruta) |
-| Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Su contraseña; vacío si no tiene |
-| Secret (opcional) | `APPLE_CERTIFICATE` | Certificado «Developer ID Application» exportado como `.p12`, en base64 |
-| Secret (opcional) | `APPLE_CERTIFICATE_PASSWORD` | Contraseña del `.p12` |
-| Secret (opcional) | `APPLE_SIGNING_IDENTITY` | Nombre de la identidad, p. ej. `Developer ID Application: Nombre (TEAMID)` |
-| Secret (opcional) | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Para notarizar: Apple ID, contraseña específica de app y Team ID |
+1. **Environments → New environment → `release`**, con **Required reviewers** (tú) y
+   **Deployment branches and tags** limitado a la rama `main` (el workflow de release se
+   lanza desde `main`). Los secretos van **solo** aquí, no en los secretos del
+   repositorio: así ningún job los recibe sin tu aprobación.
+2. **Secrets and variables → Actions → Variables** (del repositorio) para las dos variables.
+
+| Dónde | Tipo | Nombre | Valor |
+| --- | --- | --- | --- |
+| Repositorio | Variable | `XP_MUSIC_UPDATER_PUBKEY` | Contenido de la clave pública existente `~/.xp-music/updater.key.pub` |
+| Repositorio | Variable | `WINDOWS_SIGNING_THUMBPRINT` | Huella de `src-tauri/signing.local.json` |
+| Environment `release` | Secret | `TAURI_SIGNING_PRIVATE_KEY` | Contenido de la clave privada **existente** `~/.xp-music/updater.key` (no una ruta) |
+| Environment `release` | Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Su contraseña; vacío si no tiene |
+| Environment `release` | Secret (opcional) | `APPLE_CERTIFICATE` | Certificado «Developer ID Application» exportado como `.p12`, en base64 |
+| Environment `release` | Secret (opcional) | `APPLE_CERTIFICATE_PASSWORD` | Contraseña del `.p12` |
+| Environment `release` | Secret (opcional) | `APPLE_SIGNING_IDENTITY` | Nombre de la identidad, p. ej. `Developer ID Application: Nombre (TEAMID)` |
+| Environment `release` | Secret (opcional) | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Para notarizar: Apple ID, contraseña específica de app y Team ID |
 
 No generes otra clave del updater: las versiones ya instaladas confían en la actual.
 Los secretos solo se pasan al compilar releases, nunca en los checks de PR, ni en push
-ni en el dry run. Sin `APPLE_CERTIFICATE` y `APPLE_SIGNING_IDENTITY`, macOS se firma
+ni en el dry run, y solo a los jobs de Linux (clave del updater) y macOS (certificados
+de Apple); cada release se detiene hasta que apruebes el environment `release` en
+Actions → Review deployments. Windows no necesita ninguno: llega firmado desde tu equipo. Sin `APPLE_CERTIFICATE` y `APPLE_SIGNING_IDENTITY`, macOS se firma
 *ad hoc* (los usuarios deben saltarse Gatekeeper, ver arriba); con ellos se firma con
 Developer ID, y se notariza si además están `APPLE_ID`, `APPLE_PASSWORD` y `APPLE_TEAM_ID`.
 
