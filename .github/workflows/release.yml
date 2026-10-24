@@ -80,7 +80,7 @@ jobs:
             assert.equal(release.draft, true, "La release debe estar en draft");
             assert.equal(release.prerelease, false);
           '
-      - name: Reunir el instalador Windows x64 firmado en local
+      - name: Reunir los instaladores Windows firmados en local
         if: inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -88,17 +88,27 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           version=$(node -p 'require("./package.json").version')
-          mkdir draft-windows
-          gh release download "$TAG" --dir draft-windows \
-            --pattern "*_${version}_x64-setup.exe" \
-            --pattern "*_${version}_x64-setup.exe.sig"
-          test "$(find draft-windows -type f | wc -l)" -eq 2
+          for arch in x64 arm64; do
+            mkdir "draft-$arch"
+            gh release download "$TAG" --dir "draft-$arch" \
+              --pattern "*_${version}_${arch}-setup.exe" \
+              --pattern "*_${version}_${arch}-setup.exe.sig"
+            test "$(find "draft-$arch" -type f | wc -l)" -eq 2
+          done
       # actions/upload-artifact v7.0.2
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: inputs.tag != ''
         with:
           name: draft-windows-x86_64
-          path: draft-windows/*
+          path: draft-x64/*
+          if-no-files-found: error
+          retention-days: 1
+      # actions/upload-artifact v7.0.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: inputs.tag != ''
+        with:
+          name: draft-windows-aarch64
+          path: draft-arm64/*
           if-no-files-found: error
           retention-days: 1
 
@@ -145,12 +155,13 @@ jobs:
           bundles: ${{ matrix.bundles }}
           tag: ${{ inputs.tag }}
           updater-pubkey: ${{ inputs.tag && vars.XP_MUSIC_UPDATER_PUBKEY }}
-          # macOS no tiene updater (experimental): no recibe la clave.
+          # Solo Linux firma en CI: Windows se firma en local y macOS no tiene
+          # updater (experimental).
           signing-key: >-
-            ${{ inputs.tag && !startsWith(matrix.target, 'darwin-') &&
+            ${{ inputs.tag && startsWith(matrix.target, 'linux-') &&
             secrets.TAURI_SIGNING_PRIVATE_KEY }}
           signing-key-password: >-
-            ${{ inputs.tag && !startsWith(matrix.target, 'darwin-') &&
+            ${{ inputs.tag && startsWith(matrix.target, 'linux-') &&
             secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           windows-thumbprint: >-
             ${{ inputs.tag && vars.WINDOWS_SIGNING_THUMBPRINT }}
@@ -238,11 +249,11 @@ jobs:
             const release = require(process.env.RUNNER_TEMP + "/release.json");
             if (!release.draft) process.exit(1);
           '
-          # El instalador Windows x64 ya está en el draft, firmado en local:
-          # no se vuelve a subir.
+          # Los instaladores Windows (x64 y ARM64) ya están en el draft,
+          # firmados en local: no se vuelven a subir.
           mapfile -d '' uploads < <(
-            find packages -type f ! -name '*_x64-setup.exe' \
-              ! -name '*_x64-setup.exe.sig' -print0
+            find packages -type f ! -name '*-setup.exe' \
+              ! -name '*-setup.exe.sig' -print0
           )
           gh release upload "$TAG" "${uploads[@]}" --clobber
           find_release > "$RUNNER_TEMP/release.json"

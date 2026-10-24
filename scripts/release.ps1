@@ -1,18 +1,20 @@
 ﻿# Publica una versión de XP Music (specs/007, FR-007-07): sube la versión, compila
-# el instalador Windows x64 firmado (el único que se hace aquí: el certificado es
-# no exportable), prepara un draft y lanza el workflow multiplataforma.
-# El workflow compila el resto (Windows ARM64, Linux x64/ARM64, macOS Intel/Apple
-# Silicon), y solo él publica la release, la tabla de descargas y latest.json
-# cuando pasan todos los targets. -Notes son las notas del mantenedor: el workflow
-# les añade encima la tabla de descargas.
+# los instaladores Windows x64 y ARM64 firmados (los únicos que se hacen aquí: el
+# certificado es no exportable), prepara un draft y lanza el workflow multiplataforma.
+# El workflow compila el resto (Linux x64/ARM64, macOS Intel/Apple Silicon), prueba
+# también los de Windows, y solo él publica la release, la tabla de descargas y
+# latest.json cuando pasan todos los targets. -Notes son las notas del mantenedor: el
+# workflow les añade encima la tabla de descargas.
 #
 #   npm run release                 # patch: 0.1.0 → 0.1.1
 #   npm run release -- -Bump minor
 #   npm run release -- -Bump none -NoPublish   # solo compilar (prueba local)
 #
-# Requisitos (una vez): scripts\setup-signing.ps1 (certificado) y la clave del
+# Requisitos (una vez): scripts\setup-signing.ps1 (certificado), la clave del
 # updater en %USERPROFILE%\.xp-music\updater.key (+ .pub), creada con
 #   npm run tauri signer generate -- -w "$env:USERPROFILE\.xp-music\updater.key"
+# y, para ARM64, `rustup target add aarch64-pc-windows-msvc` más el componente
+# «MSVC ARM64 build tools» de Visual Studio Build Tools.
 # La contraseña de la clave se pide al compilar (o TAURI_SIGNING_PRIVATE_KEY_PASSWORD).
 param(
     [ValidateSet('patch', 'minor', 'major', 'none')][string]$Bump = 'patch',
@@ -24,6 +26,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 $repo = 'Iznardo/xp-music'
+$armTarget = 'aarch64-pc-windows-msvc'
 $keyPath = Join-Path $env:USERPROFILE '.xp-music\updater.key'
 $signingPath = Join-Path $root 'src-tauri\signing.local.json'
 $confPath = Join-Path $root 'src-tauri\tauri.conf.json'
@@ -45,6 +48,10 @@ if (-not $NoPublish) {
     if (-not (Test-Path $signingPath)) { Fail 'Falta la firma: ejecuta scripts\setup-signing.ps1.' }
     if (-not (Test-Path $keyPath)) { Fail "Falta la clave del updater en $keyPath." }
 }
+if (-not (@(rustup target list --installed) -contains $armTarget)) {
+    Fail "Falta el target de ARM64: rustup target add $armTarget (y «MSVC ARM64 build tools» de Visual Studio)."
+}
+if (Test-Path (Join-Path $root 'tools.x64')) { Fail 'Existe tools.x64 de una ejecución anterior: devuélvelo a tools\ o bórralo.' }
 if (-not (Test-Path (Join-Path $root 'tools\yt-dlp\yt-dlp.exe')) -or -not (Test-Path (Join-Path $root 'tools\deno.exe'))) {
     & (Join-Path $PSScriptRoot 'fetch-tools.ps1')
 }
@@ -107,24 +114,45 @@ if (Test-Path $keyPath) {
 $tmpConf = Join-Path ([IO.Path]::GetTempPath()) "xp-music-release-$v.json"
 Write-Utf8 $tmpConf ($extra | ConvertTo-Json -Depth 5)
 
-# --- 4. Compilar --------------------------------------------------------------
+# --- 4. Compilar (x64 y ARM64) ------------------------------------------------
+$tools = Join-Path $root 'tools'
+$toolsX64 = Join-Path $root 'tools.x64'
 try {
     npm run tauri build -- --config $tmpConf
-    if ($LASTEXITCODE -ne 0) { Fail 'La compilación falló.' }
+    if ($LASTEXITCODE -ne 0) { Fail 'La compilación x64 falló.' }
+    # El instalador empaqueta tools\ tal cual: mientras se compila ARM64 se ponen ahí
+    # el yt-dlp y el deno de ARM64 (fetch-tools solo comprueba su SHA-256, no los ejecuta).
+    Move-Item $tools $toolsX64
+    try {
+        $env:XP_MUSIC_TOOLS_TARGET = 'windows-arm64'
+        node scripts/fetch-tools.mjs
+        if ($LASTEXITCODE -ne 0) { Fail 'No se pudieron descargar yt-dlp y deno de ARM64.' }
+        npm run tauri build -- --config $tmpConf --target $armTarget
+        if ($LASTEXITCODE -ne 0) { Fail 'La compilación ARM64 falló.' }
+    } finally {
+        Remove-Item Env:XP_MUSIC_TOOLS_TARGET -ErrorAction SilentlyContinue
+        if (Test-Path $tools) { Remove-Item -Recurse -Force $tools }
+        Move-Item $toolsX64 $tools
+    }
 } finally {
     Remove-Item -Force $tmpConf
     Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY, Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
 }
-$nsis = Join-Path $root 'src-tauri\target\release\bundle\nsis'
-$installer = Get-ChildItem $nsis -Filter "*_${v}_x64-setup.exe" | Select-Object -First 1
-if (-not $installer) { Fail "No se encuentra el instalador de $v en $nsis." }
-Write-Host "Instalador: $($installer.FullName) ($([math]::Round($installer.Length / 1MB, 1)) MB)"
+$installers = foreach ($build in @(
+        @{ dir = 'src-tauri\target\release\bundle\nsis'; arch = 'x64' },
+        @{ dir = "src-tauri\target\$armTarget\release\bundle\nsis"; arch = 'arm64' })) {
+    $nsis = Join-Path $root $build.dir
+    $found = Get-ChildItem $nsis -Filter "*_${v}_$($build.arch)-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $found) { Fail "No se encuentra el instalador $($build.arch) de $v en $nsis." }
+    Write-Host "Instalador: $($found.FullName) ($([math]::Round($found.Length / 1MB, 1)) MB)"
+    $found
+}
 
 # --- 5. Verificar firma -------------------------------------------------------
 if (Test-Path $signingPath) {
-    # Solo el instalador: Tauri firma el ejecutable al empaquetarlo y luego deja en
-    # target\release la copia sin firmar (la de dentro del instalador sí lo está).
-    foreach ($f in @($installer.FullName)) {
+    # Solo los instaladores: Tauri firma el ejecutable al empaquetarlo y luego deja en
+    # target\...\release la copia sin firmar (la de dentro del instalador sí lo está).
+    foreach ($f in @($installers.FullName)) {
         $a = Get-AuthenticodeSignature $f
         if ($a.Status -ne 'Valid' -or $a.SignerCertificate.Subject -ne 'CN=iznardo') {
             Fail "Firma no válida en $f ($($a.Status))."
@@ -136,8 +164,12 @@ if (Test-Path $signingPath) {
 if ($NoPublish) { Write-Host 'Compilado sin publicar.'; exit 0 }
 
 # --- 6. Preparar draft; el workflow compila el resto, lo verifica y publica -----
-$sigFile = "$($installer.FullName).sig"
-if (-not (Test-Path $sigFile)) { Fail 'Falta la firma del updater del instalador.' }
+$assets = foreach ($installer in $installers) {
+    $sigFile = "$($installer.FullName).sig"
+    if (-not (Test-Path $sigFile)) { Fail "Falta la firma del updater de $($installer.Name)." }
+    $installer.FullName
+    $sigFile
+}
 $tag = "v$v"
 if ($Bump -ne 'none') {
     git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
@@ -152,8 +184,8 @@ if ($LASTEXITCODE -ne 0) { Fail 'No se pudo subir el tag.' }
 
 # Notas del mantenedor; el workflow antepone la tabla de descargas (SHA-256 y enlaces).
 if (-not $Notes) { $Notes = "XP Music $v" }
-gh release create $tag $installer.FullName $sigFile --repo $repo --draft --title "XP Music $v" --notes $Notes
+gh release create $tag @assets --repo $repo --draft --title "XP Music $v" --notes $Notes
 if ($LASTEXITCODE -ne 0) { Fail 'No se pudo preparar el draft.' }
 gh workflow run release.yml --repo $repo --ref main -f "tag=$tag"
 if ($LASTEXITCODE -ne 0) { Fail 'El draft sigue sin publicar: lanza release.yml con su tag desde Actions.' }
-Write-Host "Draft $tag preparado. El workflow compilará y probará Windows ARM64, Linux y macOS, y publicará la release con la tabla de descargas y latest.json si todo pasa." -ForegroundColor Green
+Write-Host "Draft $tag preparado. El workflow probará los instaladores de Windows, compilará y probará Linux y macOS, y publicará la release con la tabla de descargas y latest.json si todo pasa." -ForegroundColor Green

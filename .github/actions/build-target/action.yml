@@ -31,7 +31,7 @@ inputs:
     required: false
     default: ""
   windows-thumbprint:
-    description: "Huella del certificado Authenticode local (Windows x64)"
+    description: "Huella del certificado Authenticode local (Windows)"
     required: false
     default: ""
   apple-certificate:
@@ -87,18 +87,18 @@ runs:
         npm run fetch-tools
         npm run check
 
-    # Windows x64: el instalador lo firma el mantenedor en local y aquí
-    # solo se reutiliza byte a byte.
+    # Windows (x64 y ARM64): el instalador lo firma el mantenedor en local y
+    # aquí solo se reutiliza byte a byte.
     - name: Recuperar el instalador Windows con su firma local
-      if: inputs.tag != '' && inputs.target == 'windows-x86_64'
+      if: inputs.tag != '' && startsWith(inputs.target, 'windows-')
       # actions/download-artifact v8.0.2. Lo sube `validate`, el único job
       # con permiso para ver el draft.
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
       with:
-        name: draft-windows-x86_64
+        name: draft-${{ inputs.target }}
         path: src-tauri/target/release/bundle/nsis
     - name: Verificar Authenticode sin cambiar el certificado de Windows
-      if: inputs.tag != '' && inputs.target == 'windows-x86_64'
+      if: inputs.tag != '' && startsWith(inputs.target, 'windows-')
       shell: pwsh
       env:
         WINDOWS_SIGNING_THUMBPRINT: ${{ inputs.windows-thumbprint }}
@@ -126,7 +126,7 @@ runs:
 
     # Todo lo demás se compila aquí.
     - name: Empaquetar
-      if: inputs.tag == '' || inputs.target != 'windows-x86_64'
+      if: inputs.tag == '' || !startsWith(inputs.target, 'windows-')
       shell: bash
       env:
         BUNDLES: ${{ inputs.bundles }}
