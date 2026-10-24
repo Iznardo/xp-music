@@ -181,7 +181,10 @@ impl CookieDb {
         if !src.is_file() {
             return Err(AppError::new(
                 ErrorCode::NotFound,
-                "Ese perfil no tiene base de cookies.",
+                tr!(
+                    "That profile has no cookie database.",
+                    "Ese perfil no tiene base de cookies."
+                ),
             ));
         }
         let dir = std::env::temp_dir().join(format!(
@@ -211,9 +214,10 @@ impl CookieDb {
         if let Err(e) = res {
             let _ = std::fs::remove_dir_all(&dir);
             tracing::warn!(error = %e, "no se pudo copiar la base de cookies");
-            return Err(AppError::internal(
-                "No se pudo leer la base de cookies del navegador.",
-            ));
+            return Err(AppError::internal(tr!(
+                "Could not read the browser's cookie database.",
+                "No se pudo leer la base de cookies del navegador."
+            )));
         }
         // Lectura/escritura para que SQLite incorpore el WAL de la copia.
         let conn = Connection::open_with_flags(
@@ -333,7 +337,10 @@ pub fn read_cookies(source: &CookieSource) -> AppResult<(String, String)> {
     {
         return Err(AppError::new(
             ErrorCode::NotAuthenticated,
-            "No hay sesión de YouTube iniciada en ese navegador.",
+            tr!(
+                "There is no signed-in YouTube session in that browser.",
+                "No hay sesión de YouTube iniciada en ese navegador."
+            ),
         ));
     }
     let header = rows
@@ -376,7 +383,10 @@ pub fn clean_pasted_cookie(raw: &str) -> AppResult<String> {
     if !s.contains("SAPISID=") {
         return Err(AppError::new(
             ErrorCode::InvalidInput,
-            "Eso no parece la cabecera Cookie de music.youtube.com (falta SAPISID).",
+            tr!(
+                "That does not look like the Cookie header of music.youtube.com (SAPISID is missing).",
+                "Eso no parece la cabecera Cookie de music.youtube.com (falta SAPISID)."
+            ),
         ));
     }
     Ok(s)
@@ -398,10 +408,10 @@ pub fn netscape_from_header(header: &str) -> String {
 
 // ------------------------------------------------------------------ almacenamiento cifrado
 
-/// Almacén del sistema, para los mensajes.
+/// Almacén del sistema, para los logs.
 #[cfg(not(windows))]
 const KEYRING: &str = if cfg!(target_os = "macos") {
-    "el Llavero"
+    "Keychain"
 } else {
     "Secret Service"
 };
@@ -453,7 +463,13 @@ impl SessionStore {
             .and_then(|_| std::fs::rename(&tmp, &self.path))
             .map_err(|e| {
                 tracing::error!(error = %e, "no se pudo guardar la sesión");
-                AppError::new(ErrorCode::Storage, "No se pudo guardar la sesión.")
+                AppError::new(
+                    ErrorCode::Storage,
+                    tr!(
+                        "Could not save the session.",
+                        "No se pudo guardar la sesión."
+                    ),
+                )
             })
     }
 
@@ -464,7 +480,10 @@ impl SessionStore {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(_) => Err(AppError::new(
                 ErrorCode::Storage,
-                "No se pudo borrar la sesión.",
+                tr!(
+                    "Could not delete the session.",
+                    "No se pudo borrar la sesión."
+                ),
             )),
         }
     }
@@ -475,7 +494,17 @@ impl SessionStore {
             tracing::error!("no se pudo inicializar la entrada de {KEYRING}");
             AppError::new(
                 ErrorCode::Storage,
-                format!("No se pudo acceder a {KEYRING}."),
+                if cfg!(target_os = "macos") {
+                    tr!(
+                        "Could not access the Keychain.",
+                        "No se pudo acceder al Llavero."
+                    )
+                } else {
+                    tr!(
+                        "Could not access Secret Service.",
+                        "No se pudo acceder a Secret Service."
+                    )
+                },
             )
         })
     }
@@ -503,7 +532,17 @@ impl SessionStore {
             tracing::error!("no se pudo guardar la sesión en {KEYRING}");
             AppError::new(
                 ErrorCode::Storage,
-                format!("No se pudo guardar la sesión en {KEYRING}."),
+                if cfg!(target_os = "macos") {
+                    tr!(
+                        "Could not save the session in the Keychain.",
+                        "No se pudo guardar la sesión en el Llavero."
+                    )
+                } else {
+                    tr!(
+                        "Could not save the session in Secret Service.",
+                        "No se pudo guardar la sesión en Secret Service."
+                    )
+                },
             )
         })
     }
@@ -516,7 +555,17 @@ impl SessionStore {
                 tracing::error!("no se pudo borrar la sesión de {KEYRING}");
                 Err(AppError::new(
                     ErrorCode::Storage,
-                    format!("No se pudo borrar la sesión de {KEYRING}."),
+                    if cfg!(target_os = "macos") {
+                        tr!(
+                            "Could not delete the session from the Keychain.",
+                            "No se pudo borrar la sesión del Llavero."
+                        )
+                    } else {
+                        tr!(
+                            "Could not delete the session from Secret Service.",
+                            "No se pudo borrar la sesión de Secret Service."
+                        )
+                    },
                 ))
             }
         }

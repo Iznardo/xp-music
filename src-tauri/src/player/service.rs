@@ -591,7 +591,7 @@ impl PlayerService {
         if tracks.is_empty() {
             return Err(AppError::new(
                 ErrorCode::InvalidInput,
-                "La lista está vacía.",
+                tr!("The queue is empty.", "La lista está vacía."),
             ));
         }
         self.lock().queue.set(tracks, start as usize, source);
@@ -604,7 +604,10 @@ impl PlayerService {
         if !self.lock().queue.play_index(index as usize) {
             return Err(AppError::new(
                 ErrorCode::InvalidInput,
-                "Esa canción no está en la cola.",
+                tr!(
+                    "That song is not in the queue.",
+                    "Esa canción no está en la cola."
+                ),
             ));
         }
         self.emit_queue();
@@ -844,7 +847,10 @@ impl PlayerService {
                 } else {
                     self.fail(AppError::new(
                         ErrorCode::Network,
-                        "No se pudo seguir reproduciendo esta canción.",
+                        tr!(
+                            "Could not keep playing this song.",
+                            "No se pudo seguir reproduciendo esta canción."
+                        ),
                     ));
                 }
             }

@@ -9,6 +9,7 @@ use specta::Type;
 use tauri_specta::Event;
 
 use crate::error::AppResult;
+use crate::i18n::Language;
 use crate::storage::Db;
 
 const KEY: &str = "app";
@@ -49,6 +50,8 @@ pub enum VizPreset {
 #[tauri_specta(event_name = "settings://changed")]
 pub struct Settings {
     pub theme: Theme,
+    /// `None` = follow the system language.
+    pub language: Option<Language>,
     /// 0.0..=1.0
     pub volume: f32,
     pub normalize_volume: bool,
@@ -82,6 +85,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: Theme::Blue,
+            language: None,
             volume: 0.8,
             normalize_volume: true,
             audio_quality: AudioQuality::Aac128,

@@ -57,7 +57,10 @@ impl From<rusqlite::Error> for AppError {
         tracing::error!(error = %e, "error de base de datos");
         Self::new(
             ErrorCode::Storage,
-            "No se pudo acceder a la base de datos local.",
+            tr!(
+                "Could not access the local database.",
+                "No se pudo acceder a la base de datos local."
+            ),
         )
     }
 }
@@ -65,7 +68,10 @@ impl From<rusqlite::Error> for AppError {
 impl From<serde_json::Error> for AppError {
     fn from(e: serde_json::Error) -> Self {
         tracing::error!(error = %e, "error de serialización");
-        Self::internal("Datos locales con formato no válido.")
+        Self::internal(tr!(
+            "Local data has an invalid format.",
+            "Datos locales con formato no válido."
+        ))
     }
 }
 

@@ -2,10 +2,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use tauri::AppHandle;
-use tauri::Emitter;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::domain::LikeStatus;
 use crate::player::service::PlayerService;
@@ -52,7 +51,7 @@ fn build_menu(app: &AppHandle, k: &MenuKey) -> tauri::Result<Menu<tauri::Wry>> {
         .track
         .as_ref()
         .map(|(_, t)| truncate(t, 60))
-        .unwrap_or_else(|| "No se está reproduciendo nada".into());
+        .unwrap_or_else(|| tr!("Nothing is playing", "No se está reproduciendo nada"));
     Menu::with_items(
         app,
         &[
@@ -61,24 +60,46 @@ fn build_menu(app: &AppHandle, k: &MenuKey) -> tauri::Result<Menu<tauri::Wry>> {
             &MenuItem::with_id(
                 app,
                 "toggle",
-                if k.playing { "Pausa" } else { "Reproducir" },
+                if k.playing {
+                    tr!("Pause", "Pausa")
+                } else {
+                    tr!("Play", "Reproducir")
+                },
                 true,
                 None::<&str>,
             )?,
-            &MenuItem::with_id(app, "previous", "Anterior", true, None::<&str>)?,
-            &MenuItem::with_id(app, "next", "Siguiente", true, None::<&str>)?,
+            &MenuItem::with_id(
+                app,
+                "previous",
+                tr!("Previous", "Anterior"),
+                true,
+                None::<&str>,
+            )?,
+            &MenuItem::with_id(app, "next", tr!("Next", "Siguiente"), true, None::<&str>)?,
             &CheckMenuItem::with_id(
                 app,
                 "like",
-                "Me gusta",
+                tr!("Like", "Me gusta"),
                 k.track.is_some(),
                 k.liked,
                 None::<&str>,
             )?,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "show", "Mostrar XP Music", true, None::<&str>)?,
-            &MenuItem::with_id(app, "full", "Volver al modo completo", true, None::<&str>)?,
-            &MenuItem::with_id(app, "quit", "Salir", true, None::<&str>)?,
+            &MenuItem::with_id(
+                app,
+                "show",
+                tr!("Show XP Music", "Mostrar XP Music"),
+                true,
+                None::<&str>,
+            )?,
+            &MenuItem::with_id(
+                app,
+                "full",
+                tr!("Back to full mode", "Volver al modo completo"),
+                true,
+                None::<&str>,
+            )?,
+            &MenuItem::with_id(app, "quit", tr!("Exit", "Salir"), true, None::<&str>)?,
         ],
     )
 }
@@ -163,18 +184,34 @@ pub fn create(
         }
         *last = k.clone();
         drop(last);
-        let tip = k
-            .track
-            .as_ref()
-            .map(|(_, t)| truncate(&format!("{t} - XP Music"), 120))
-            .unwrap_or_else(|| "XP Music".into());
-        let _ = tray.set_tooltip(Some(tip));
-        match build_menu(&app2, &k) {
-            Ok(m) => {
-                let _ = tray.set_menu(Some(m));
-            }
-            Err(e) => tracing::warn!(error = %e, "no se pudo actualizar el menú de la bandeja"),
-        }
+        refresh(&tray, &app2, &k);
     }));
     Ok(())
+}
+
+/// Updates the tooltip and menu from the player state.
+fn refresh(tray: &TrayIcon, app: &AppHandle, k: &MenuKey) {
+    let tip = k
+        .track
+        .as_ref()
+        .map(|(_, t)| truncate(&format!("{t} - XP Music"), 120))
+        .unwrap_or_else(|| "XP Music".into());
+    let _ = tray.set_tooltip(Some(tip));
+    match build_menu(app, k) {
+        Ok(m) => {
+            let _ = tray.set_menu(Some(m));
+        }
+        Err(e) => tracing::warn!(error = %e, "no se pudo actualizar el menú de la bandeja"),
+    }
+}
+
+/// Rebuilds the menu in the current language (after a language change).
+pub fn relocalize(app: &AppHandle) {
+    let (Some(tray), Some(player)) = (
+        app.tray_by_id("main"),
+        app.try_state::<Arc<PlayerService>>(),
+    ) else {
+        return;
+    };
+    refresh(&tray, app, &key(&player.state()));
 }

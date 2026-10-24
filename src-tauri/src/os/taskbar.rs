@@ -55,6 +55,14 @@ pub fn attach(hwnd_raw: isize) {
     add_buttons(hwnd);
 }
 
+/// Re-labels the buttons after a language change. UI thread.
+pub fn relocalize() {
+    let raw = *CURRENT.lock().unwrap();
+    if raw != 0 {
+        add_buttons(HWND(raw as *mut _));
+    }
+}
+
 /// Refleja reproducir/pausa en el botón central. Hilo de UI.
 pub fn set_playing(playing: bool) {
     if PLAYING.swap(playing, Ordering::AcqRel) == playing {
@@ -69,7 +77,11 @@ pub fn set_playing(playing: bool) {
     let b = button(
         BTN_TOGGLE,
         if playing { icons.pause } else { icons.play },
-        if playing { "Pausa" } else { "Reproducir" },
+        if playing {
+            tr!("Pause", "Pausa")
+        } else {
+            tr!("Play", "Reproducir")
+        },
     );
     // SAFETY: COM ya está inicializado en el hilo de UI (lo usa WebView2).
     unsafe {
@@ -110,13 +122,17 @@ fn add_buttons(hwnd: HWND) {
     let Some(icons) = icons() else { return };
     let playing = PLAYING.load(Ordering::Acquire);
     let buttons = [
-        button(BTN_PREV, icons.prev, "Anterior"),
+        button(BTN_PREV, icons.prev, &tr!("Previous", "Anterior")),
         button(
             BTN_TOGGLE,
             if playing { icons.pause } else { icons.play },
-            if playing { "Pausa" } else { "Reproducir" },
+            if playing {
+                tr!("Pause", "Pausa")
+            } else {
+                tr!("Play", "Reproducir")
+            },
         ),
-        button(BTN_NEXT, icons.next, "Siguiente"),
+        button(BTN_NEXT, icons.next, &tr!("Next", "Siguiente")),
     ];
     // SAFETY: COM inicializado en el hilo de UI; si la barra aún no está lista, falla sin más
     // y se reintenta al llegar "TaskbarButtonCreated".

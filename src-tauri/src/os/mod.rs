@@ -93,8 +93,20 @@ pub fn quit(app: &AppHandle) {
     app.exit(0);
 }
 
+/// Rebuilds the OS-level texts (tray menu, taskbar buttons) after a language change.
+pub fn relocalize(app: &AppHandle) {
+    tray::relocalize(app);
+    #[cfg(windows)]
+    {
+        let _ = app.run_on_main_thread(taskbar::relocalize);
+    }
+}
+
 /// Aplica los ajustes que tocan el sistema: autoarranque y atajos globales.
 pub fn apply_settings(app: &AppHandle, s: &Settings) {
+    if crate::i18n::set(s.language) {
+        relocalize(app);
+    }
     let auto = app.autolaunch();
     let enabled = auto.is_enabled().unwrap_or(false);
     let res = match (s.launch_at_login, enabled) {

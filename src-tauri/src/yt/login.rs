@@ -29,7 +29,9 @@ pub type Cookies = (String, String);
 fn data_dir() -> AppResult<PathBuf> {
     dirs::data_local_dir()
         .map(|d| d.join("xp-music").join("login"))
-        .ok_or_else(|| AppError::internal("Sin carpeta de datos local."))
+        .ok_or_else(|| {
+            AppError::internal(tr!("No local data folder.", "Sin carpeta de datos local."))
+        })
 }
 
 /// Abre la ventana de inicio de sesión y espera a que termine (o se cierre).
@@ -38,7 +40,10 @@ pub async fn sign_in(app: &AppHandle) -> AppResult<Cookies> {
         let _ = w.set_focus();
         return Err(AppError::new(
             ErrorCode::InvalidInput,
-            "Ya hay una ventana de inicio de sesión abierta.",
+            tr!(
+                "A sign-in window is already open.",
+                "Ya hay una ventana de inicio de sesión abierta."
+            ),
         ));
     }
     run(app, SIGN_IN, true, None).await
@@ -50,7 +55,7 @@ pub async fn refresh(app: &AppHandle) -> AppResult<Cookies> {
     if app.get_webview_window(LABEL).is_some() {
         return Err(AppError::new(
             ErrorCode::AuthExpired,
-            "Inicio de sesión en curso.",
+            tr!("Sign-in in progress.", "Inicio de sesión en curso."),
         ));
     }
     run(app, MUSIC, false, Some(REFRESH_TIMEOUT)).await
@@ -87,7 +92,10 @@ async fn run(
         LABEL,
         WebviewUrl::External(start.parse().expect("URL fija")),
     )
-    .title("Iniciar sesión en YouTube Music - XP Music")
+    .title(tr!(
+        "Sign in to YouTube Music - XP Music",
+        "Iniciar sesión en YouTube Music - XP Music"
+    ))
     .inner_size(480.0, 640.0)
     .center()
     .visible(visible)
@@ -121,8 +129,10 @@ async fn run(
     });
     let win = builder.build().map_err(|e| {
         tracing::error!(error = %e, "no se pudo abrir la ventana de inicio de sesión");
-        AppError::internal(format!(
-            "No se pudo abrir la ventana de inicio de sesión: {e}"
+        AppError::internal(tr!(
+            "Could not open the sign-in window: {e}",
+            "No se pudo abrir la ventana de inicio de sesión: {e}",
+            e = e
         ))
     })?;
 
@@ -136,7 +146,10 @@ async fn run(
         {
             let _ = tx.send(Err(AppError::new(
                 ErrorCode::InvalidInput,
-                "Se cerró la ventana sin iniciar sesión.",
+                tr!(
+                    "The window was closed without signing in.",
+                    "Se cerró la ventana sin iniciar sesión."
+                ),
             )));
         }
     });
@@ -149,13 +162,21 @@ async fn run(
                 let _ = win.close();
                 return Err(AppError::new(
                     ErrorCode::AuthExpired,
-                    "YouTube Music no respondió al renovar la sesión.",
+                    tr!(
+                        "YouTube Music did not respond while renewing the session.",
+                        "YouTube Music no respondió al renovar la sesión."
+                    ),
                 ));
             }
         },
         None => rx.await,
     };
-    result.unwrap_or_else(|_| Err(AppError::internal("Inicio de sesión interrumpido.")))
+    result.unwrap_or_else(|_| {
+        Err(AppError::internal(tr!(
+            "Sign-in interrupted.",
+            "Inicio de sesión interrumpido."
+        )))
+    })
 }
 
 fn read(win: &WebviewWindow) -> AppResult<Cookies> {
@@ -175,7 +196,10 @@ fn read(win: &WebviewWindow) -> AppResult<Cookies> {
     {
         return Err(AppError::new(
             ErrorCode::NotAuthenticated,
-            "No hay sesión de YouTube iniciada.",
+            tr!(
+                "You are not signed in to YouTube.",
+                "No hay sesión de YouTube iniciada."
+            ),
         ));
     }
     Ok(to_cookies(&wanted))

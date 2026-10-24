@@ -30,7 +30,13 @@ fn client() -> &'static reqwest::blocking::Client {
 
 fn fail(why: &str) -> AppError {
     tracing::debug!(why, "arranque rápido no disponible");
-    AppError::new(ErrorCode::ResolveFailed, "Arranque rápido no disponible.")
+    AppError::new(
+        ErrorCode::ResolveFailed,
+        tr!(
+            "Fast start is not available.",
+            "Arranque rápido no disponible."
+        ),
+    )
 }
 
 /// URL del principio del audio. Cualquier fallo = usar solo yt-dlp.

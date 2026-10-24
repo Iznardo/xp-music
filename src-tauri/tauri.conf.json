@@ -50,11 +50,12 @@
     },
     "publisher": "iznardo",
     "copyright": "© 2026 iznardo",
-    "shortDescription": "Reproductor de YouTube Music con aspecto de Windows XP",
+    "shortDescription": "A YouTube Music player that looks like Windows XP",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
         "languages": [
+          "English",
           "Spanish"
         ],
         "displayLanguageSelector": false

@@ -115,23 +115,44 @@ pub fn map_error(what: &str, e: &ytmapi_rs::Error) -> AppError {
     if code("401") || code("403") {
         AppError::new(
             ErrorCode::AuthExpired,
-            "La sesión de YouTube Music ha caducado. Vuelve a importarla.",
+            tr!(
+                "The YouTube Music session has expired. Import it again.",
+                "La sesión de YouTube Music ha caducado. Vuelve a importarla."
+            ),
         )
     } else if code("429") {
         AppError::new(
             ErrorCode::RateLimited,
-            "YouTube Music pide esperar un poco antes de seguir.",
+            tr!(
+                "YouTube Music asks you to wait a moment before continuing.",
+                "YouTube Music pide esperar un poco antes de seguir."
+            ),
         )
     } else if code("404") {
-        AppError::new(ErrorCode::NotFound, "No se encontró en YouTube Music.")
+        AppError::new(
+            ErrorCode::NotFound,
+            tr!(
+                "Not found on YouTube Music.",
+                "No se encontró en YouTube Music."
+            ),
+        )
     } else if text.to_ascii_lowercase().contains("error sending request")
         || text.contains("timed out")
     {
-        AppError::new(ErrorCode::Network, "No hay conexión con YouTube Music.")
+        AppError::new(
+            ErrorCode::Network,
+            tr!(
+                "Cannot reach YouTube Music.",
+                "No hay conexión con YouTube Music."
+            ),
+        )
     } else {
         AppError::new(
             ErrorCode::Internal,
-            "YouTube Music respondió algo inesperado.",
+            tr!(
+                "YouTube Music returned an unexpected response.",
+                "YouTube Music respondió algo inesperado."
+            ),
         )
     }
 }
