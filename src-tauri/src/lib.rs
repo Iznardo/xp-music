@@ -341,6 +341,12 @@ pub fn run() {
                 tracing::info!("ventana cerrada: sigue en la bandeja");
             }
         }
+        // Clic en el Dock sin ventana (con «cerrar a la bandeja» se destruye al cerrarla).
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen {
+            has_visible_windows: false,
+            ..
+        } => os::show_main(app),
         tauri::RunEvent::Exit => {
             if let Some(player) = app.try_state::<Arc<PlayerService>>() {
                 player.shutdown();

@@ -1,6 +1,6 @@
 # XP Music
 
-Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media Player 9 en Windows XP. Para Windows 10/11 y Linux x86_64 (soporte experimental).
+Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media Player 9 en Windows XP. Para Windows 10/11 (x64 y ARM64), con soporte experimental para Linux (x64 y ARM64) y macOS (Intel y Apple Silicon).
 
 ![Biblioteca de XP Music](docs/biblioteca.jpg)
 
@@ -16,21 +16,45 @@ Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media
 
 ## Instalar
 
+Descarga el archivo de tu sistema desde [Releases](https://github.com/Iznardo/xp-music/releases).
+Arriba de las notas de cada release hay una tabla con todos los archivos, su
+SHA-256 y el enlace directo de descarga (`sha256sum archivo` para comprobarlo).
+
+| Sistema | Arquitectura | Archivo (`x.y.z` = versión) | Estado |
+| --- | --- | --- | --- |
+| Windows 10/11 | x64 | `XP Music_x.y.z_x64-setup.exe` | Soportado; firmado con el certificado propio del autor |
+| Windows 10/11 | ARM64 | `XP Music_x.y.z_arm64-setup.exe` | Experimental; sin firma Authenticode |
+| Linux | x64 | `…_amd64.deb`, `…_amd64.AppImage`, `…-1.x86_64.rpm` | Experimental |
+| Linux | ARM64 | `…_arm64.deb`, `…_aarch64.AppImage`, `…-1.aarch64.rpm` | Experimental |
+| macOS | Intel (x64) | `…_x64.dmg` | Experimental |
+| macOS | Apple Silicon (ARM64) | `…_aarch64.dmg` | Experimental |
+| Arch Linux | x86_64, aarch64 | `packaging/arch/PKGBUILD` (se compila desde el código) | Experimental |
+| NixOS / Nix | x86_64, aarch64 | flake del repositorio | Experimental |
+
+«Experimental» significa que el CI compila y prueba el arranque, pero no hay
+pruebas manuales en cada sistema.
+
 ### Windows
 
-1. Descarga el instalador (`XP Music_x.y.z_x64-setup.exe`) de la página de *releases*.
+1. Descarga el instalador (`XP Music_x.y.z_x64-setup.exe`, o `_arm64-setup.exe` en equipos ARM).
 2. Ábrelo. Como no lleva una firma comercial, Windows SmartScreen puede avisar la primera vez: «Más información» → «Ejecutar de todas formas».
 3. Inicia sesión con tu cuenta de Google desde la propia app.
 
+El instalador x64 se firma con un certificado propio del autor (autofirmado: SmartScreen
+no lo reconoce). El de ARM64 lo genera el CI y **no** lleva firma Authenticode, porque
+ese certificado es no exportable y solo existe en el equipo del mantenedor; sí lleva la
+firma del updater, que es lo que comprueba la app antes de actualizarse.
 En Windows la app se actualiza sola: cuando hay una versión nueva, te lo ofrece al arrancar.
 
 ### Linux (experimental)
 
-Descarga el `.deb` o la `.AppImage` desde [Releases](https://github.com/Iznardo/xp-music/releases).
-Los paquetes se compilan en Ubuntu 24.04 para x86_64; no son binarios universales para cualquier distribución.
+Descarga el paquete de tu arquitectura (x64 o ARM64) desde [Releases](https://github.com/Iznardo/xp-music/releases).
+Se compilan en Ubuntu 24.04 (glibc 2.39, WebKitGTK 4.1), y el CI los prueba en Ubuntu
+y, el `.rpm`, en Fedora; no son binarios universales para cualquier distribución.
 
 ```bash
-sudo apt install ./XP*.deb
+sudo apt install ./XP*.deb          # Debian, Ubuntu y derivadas
+sudo dnf install ./XP*.rpm          # Fedora (openSUSE: sudo zypper install ./XP*.rpm)
 # O, sin instalar (requiere FUSE 2):
 chmod +x ./*.AppImage
 ./XP*.AppImage
@@ -59,9 +83,39 @@ for_window [app_id="xp-music"] floating enable
 
 Linux usa MPRIS para los controles multimedia; no incluye los botones de miniatura,
 la pausa al bloquear la sesión ni el clic a través de las zonas transparentes de las máscaras.
+
+### Arch Linux
+
+`packaging/arch/PKGBUILD` compila la versión publicada desde el código fuente
+(x86_64 y aarch64). Usa el `yt-dlp` y el `deno` de los repositorios oficiales, y deja las
+actualizaciones a pacman (la app no se autoactualiza). No está publicado en el AUR.
+
+```bash
+git clone https://github.com/Iznardo/xp-music
+cd xp-music/packaging/arch
+makepkg -si
+```
+
+### macOS (experimental)
+
+Requiere macOS 11 o posterior.
+
+1. Descarga el `.dmg` de tu Mac (`_x64.dmg` para Intel, `_aarch64.dmg` para Apple Silicon), ábrelo y arrastra **XP Music** a *Aplicaciones*.
+2. La primera vez, macOS lo bloqueará: la app lleva una firma *ad hoc*, sin certificado de desarrollador de Apple ni notarización (salvo que el mantenedor configure la firma de Apple en el CI, ver «Publicar»). Para abrirla:
+   - macOS 15 (Sequoia) y posteriores: intenta abrirla, y luego **Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente»**.
+   - macOS 14 y anteriores: clic derecho sobre la app → **Abrir** → **Abrir**.
+   - O desde la terminal: `xattr -dr com.apple.quarantine "/Applications/XP Music.app"`.
+3. Inicia sesión con tu cuenta de Google desde la propia app.
+
+El CI abre el `.dmg`, comprueba la firma del bundle y arranca la app en macOS 15
+(Intel y Apple Silicon). Faltan las funciones propias de Windows (botones de miniatura,
+pausa al bloquear la sesión, clic a través de las máscaras). La app se actualiza sola
+descargando el `.app.tar.gz` firmado de la release.
+
 ### NixOS / Nix
 
-El repositorio incluye un flake (solo `x86_64-linux`):
+El repositorio incluye un flake (`x86_64-linux` y `aarch64-linux`; este último solo se
+comprueba en el CI, sin pruebas en hardware):
 
 ```bash
 nix run github:Iznardo/xp-music          # probar
@@ -77,18 +131,21 @@ sustituyen: se actualizan con tu `flake.lock`. Al estar en `/nix/store`, tampoco
 autoactualiza; usa `nix flake update`.
 Si un yt-dlp antiguo falla con YouTube, actualiza `nixpkgs` y reconstruye.
 
+### Actualizaciones automáticas
+
 Las releases firmadas ofrecen actualizaciones desde la propia app:
 - **AppImage:** reemplaza el archivo original; debe estar en una carpeta donde puedas escribir.
-- **`.deb`:** instala la nueva versión solicitando autorización de administrador.
+- **`.deb` y `.rpm`:** instalan la nueva versión solicitando autorización de administrador.
+- **macOS:** reemplaza la `.app` con el `.app.tar.gz` de la release.
 
 No se activa en binarios de desarrollo, Nix (`/nix/store`), Flatpak ni Snap.
-Para paquetes mantenidos por un repositorio, el empaquetador puede desactivarlo
-con `XP_MUSIC_DISABLE_UPDATER=1` y dejar las actualizaciones al gestor de paquetes.
+Para paquetes mantenidos por un repositorio (como el de Arch), el empaquetador puede
+desactivarlo con `XP_MUSIC_DISABLE_UPDATER=1` y dejar las actualizaciones al gestor de paquetes.
 Las compilaciones locales sin clave pública tampoco se autoactualizan.
 
 ## Máscaras de Windows Media Player
 
-XP Music lee las máscaras originales de WMP (`.wmz`). No incluye ninguna: copia las que tengas en la carpeta de máscaras (menú **Ver → Selector de máscaras… → Abrir carpeta**, que es `%APPDATA%\xp-music\skins` en Windows y `~/.config/xp-music/skins` en Linux (o `$XDG_CONFIG_HOME/xp-music/skins`)) y pulsa **Actualizar**.
+XP Music lee las máscaras originales de WMP (`.wmz`). No incluye ninguna: copia las que tengas en la carpeta de máscaras (menú **Ver → Selector de máscaras… → Abrir carpeta**, que es `%APPDATA%\xp-music\skins` en Windows y `~/.config/xp-music/skins` en Linux (o `$XDG_CONFIG_HOME/xp-music/skins`) y `~/Library/Application Support/xp-music/skins` en macOS) y pulsa **Actualizar**.
 
 Para volver al aspecto normal: **Ctrl+1**, clic derecho sobre la máscara → «Volver al modo completo», o desde el icono de la bandeja.
 
@@ -97,7 +154,8 @@ Los scripts de cada máscara se ejecutan aislados, sin acceso a tu cuenta ni a t
 ## Compilar
 
 Requisitos: [Rust](https://rustup.rs) estable y Node.js 24. En Windows hace falta
-WebView2 (viene con Windows 11). En Ubuntu 24.04 instala además:
+WebView2 (viene con Windows 11); en macOS, las herramientas de línea de comandos de Xcode.
+En Ubuntu 24.04 instala además:
 
 ```bash
 sudo apt install build-essential curl pkg-config unzip libwebkit2gtk-4.1-dev \
@@ -107,31 +165,58 @@ sudo apt install build-essential curl pkg-config unzip libwebkit2gtk-4.1-dev \
 
 ```bash
 npm install
-npm run fetch-tools    # descarga yt-dlp y deno en tools/ (versiones fijadas en tools.lock.json)
+npm run fetch-tools    # descarga yt-dlp y deno de tu sistema en tools/ (versiones fijadas en tools.lock.json)
 npm run tauri dev      # la app en modo desarrollo
 ```
 
 Otras órdenes útiles:
 
 - `npm run dev:mock`: la interfaz en el navegador con datos simulados, sin backend.
-- `npm run check`: comprobaciones de TypeScript, formato, Clippy y tests de Rust.
-- `npm run release`: prepara el instalador Windows firmado y lanza la publicación **Windows/Linux** (ver más abajo).
-- `npm run tauri build`: en Linux genera `.deb` y AppImage en `src-tauri/target/release/bundle/`.
+- `npm run check`: tests de los scripts de release, TypeScript, formato, Clippy y tests de Rust.
+- `npm run release`: prepara el instalador Windows x64 firmado y lanza la publicación multiplataforma (ver más abajo).
+- `npm run tauri build`: genera los paquetes de tu sistema en `src-tauri/target/release/bundle/`
+  (Windows: NSIS; Linux: `.deb`, AppImage y `.rpm`; macOS: `.app` y `.dmg`).
 
-El workflow único `.github/workflows/release.yml` comprueba y empaqueta **Windows
-y Linux** en cada PR. En Linux prueba además el arranque, modo compacto y cierre
-de ambos paquetes. Para repetir el smoke test
-localmente (requiere Xvfb, D-Bus, Openbox, xdotool, GNOME Keyring y PulseAudio):
+El workflow único `.github/workflows/release.yml` compila, comprueba y empaqueta
+**los seis targets** (Windows x64/ARM64, Linux x64/ARM64, macOS Intel/Apple Silicon) en
+cada PR y en cada push a `main`, y comprueba el flake de Nix en x86_64 y aarch64. Cada
+target ejecuta la acción local `.github/actions/build-target` (dependencias, `npm run check`,
+empaquetado, smoke test y subida de artefactos). Los smoke tests arrancan el paquete real:
+
+- Linux (`.deb`, AppImage): arranque, recursos, modo compacto y cierre, con
+  `scripts/smoke-linux.sh`. El `.rpm` se instala en un contenedor `fedora:latest`
+  (`scripts/smoke-linux-rpm.sh`, necesita Docker).
+- Windows y macOS: `scripts/smoke-desktop.mjs` lanza la app instalada (Windows) o la del
+  `.dmg` (macOS) y espera hasta 60 s a las líneas «UI montada» y «herramientas encontradas»
+  del log.
+
+Para repetir el de Linux localmente (requiere Xvfb, D-Bus, Openbox, xdotool,
+GNOME Keyring y PulseAudio):
 
 ```bash
 xvfb-run -a dbus-run-session -- bash scripts/smoke-linux.sh /usr/bin/xp-music
+bash scripts/smoke-linux-rpm.sh "src-tauri/target/release/bundle/rpm/XP Music-x.y.z-1.x86_64.rpm"
 ```
+
+Los nombres y formatos de cada archivo de una release se definen una sola vez en
+`scripts/release-targets.mjs`; de ahí salen `latest.json`, la tabla de descargas y la
+recogida de artefactos del CI. Al añadir un target, actualiza esa tabla y la matriz del workflow.
 
 ## Publicar una versión (mantenedor)
 
+### Quién compila qué
+
+| Target | Quién lo compila | Firmas |
+| --- | --- | --- |
+| Windows x64 | **El equipo Windows del mantenedor** (`npm run release`) | Authenticode con el certificado local + updater |
+| Windows ARM64 | CI (`windows-11-arm`) | Solo updater (sin Authenticode) |
+| Linux x64 / ARM64 | CI (`ubuntu-24.04`, `ubuntu-24.04-arm`): `.deb`, AppImage, `.rpm` | Updater |
+| macOS Intel / Apple Silicon | CI (`macos-15-intel`, `macos-15`): `.dmg` y `.app.tar.gz` | Updater; *ad hoc* o Developer ID + notarización si hay secretos `APPLE_*` |
+
 Se conserva el certificado Authenticode de Windows: `setup-signing.ps1` lo crea
-**no exportable**, así que el instalador sigue firmándose en el equipo Windows del
-mantenedor. No se sustituye por un EXE sin firmar generado en CI.
+**no exportable**, así que el instalador x64 sigue firmándose en el equipo Windows del
+mantenedor y el CI lo reutiliza byte a byte desde el draft. No se sustituye por un EXE
+sin firmar generado en CI; por eso el de ARM64 queda sin firma Authenticode.
 
 Configura una vez en **Iznardo/xp-music → Settings → Secrets and variables → Actions**:
 
@@ -141,9 +226,18 @@ Configura una vez en **Iznardo/xp-music → Settings → Secrets and variables �
 | Variable | `WINDOWS_SIGNING_THUMBPRINT` | Huella de `src-tauri/signing.local.json` |
 | Secret | `TAURI_SIGNING_PRIVATE_KEY` | Contenido de la clave privada **existente** `~/.xp-music/updater.key` (no una ruta) |
 | Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Su contraseña; vacío si no tiene |
+| Secret (opcional) | `APPLE_CERTIFICATE` | Certificado «Developer ID Application» exportado como `.p12`, en base64 |
+| Secret (opcional) | `APPLE_CERTIFICATE_PASSWORD` | Contraseña del `.p12` |
+| Secret (opcional) | `APPLE_SIGNING_IDENTITY` | Nombre de la identidad, p. ej. `Developer ID Application: Nombre (TEAMID)` |
+| Secret (opcional) | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Para notarizar: Apple ID, contraseña específica de app y Team ID |
 
 No generes otra clave del updater: las versiones ya instaladas confían en la actual.
-Los secretos solo se usan al compilar releases, nunca en los checks de PR.
+Los secretos solo se pasan al compilar releases, nunca en los checks de PR, ni en push
+ni en el dry run. Sin `APPLE_CERTIFICATE` y `APPLE_SIGNING_IDENTITY`, macOS se firma
+*ad hoc* (los usuarios deben saltarse Gatekeeper, ver arriba); con ellos se firma con
+Developer ID, y se notariza si además están `APPLE_ID`, `APPLE_PASSWORD` y `APPLE_TEAM_ID`.
+
+### Lanzar la release
 
 Desde `main` en el equipo Windows del mantenedor, con `origin` apuntando al upstream:
 
@@ -151,19 +245,30 @@ Desde `main` en el equipo Windows del mantenedor, con `origin` apuntando al upst
 npm run release                     # incrementa patch
 npm run release -- -Bump minor
 npm run release -- -Bump none -NoPublish  # prueba local, no publica ni lanza CI
+npm run release -- -Notes "Qué cambia en esta versión"
 ```
 
-El script compila y verifica el instalador Windows, sube el tag y prepara una
-**release draft** con su EXE y firma del updater. Después lanza el workflow único:
+El script compila y verifica el instalador Windows x64, sube el tag y prepara una
+**release draft** con su EXE, la firma del updater y las notas (`-Notes`). Después lanza
+el workflow único:
 
-1. Comprueba el código en Windows y Linux. Verifica la firma Authenticode del EXE
-   original contra la huella configurada, sin recompilarlo ni cambiarlo.
-2. Compila `.deb` y AppImage con la misma clave pública y genera sus firmas.
-   Prueba ambos paquetes fuera del repositorio.
-3. Verifica criptográficamente las tres firmas del updater, adjunta Linux y crea
-   un único `latest.json` con Windows y entradas Linux separadas por formato.
-4. Publica el draft solo cuando todo ha pasado. La entrada `windows-x86_64` se
-   conserva para los clientes Windows existentes.
+1. Valida el tag, la versión, que sea un draft y que el commit esté en `main`, antes de
+   usar ninguna clave. Solo se publica desde `Iznardo/xp-music`.
+2. Compila, comprueba y prueba el arranque de los seis targets. En Windows x64 no
+   recompila: verifica la firma Authenticode del EXE del draft contra la huella
+   configurada y lo prueba tal cual. El resto se compila con la misma clave pública y
+   genera sus firmas del updater.
+3. Verifica criptográficamente con `minisign` **todas** las firmas del updater, sube los
+   archivos al draft (salvo el EXE x64, que ya estaba) y calcula el SHA-256 de cada uno.
+4. Escribe en las notas de la release, **encima** de las notas del mantenedor, una tabla
+   *Sistema · Arquitectura · Formato · SHA-256 · Descarga* con los instaladores, y los
+   archivos del actualizador en un desplegable. La tabla va entre marcadores HTML, así
+   que reintentar el workflow la sustituye en vez de duplicarla.
+5. Crea un único `latest.json` (con solo las notas del mantenedor) con una entrada por
+   target y formato: `windows-x86_64`, `windows-aarch64`, `linux-{x86_64,aarch64}-{deb,appimage,rpm}`
+   y `darwin-{x86_64,aarch64}-app`; las de Windows y macOS conservan también la clave
+   sin formato (`windows-x86_64`, `darwin-aarch64`…) que usan las instalaciones existentes.
+6. Publica el draft solo cuando todo ha pasado.
 
 Si falla, el draft no se publica. Corrige el problema y reintenta **el mismo tag**
 desde Actions → Desktop → Run workflow, o:
@@ -172,15 +277,24 @@ desde Actions → Desktop → Run workflow, o:
 gh workflow run release.yml --repo Iznardo/xp-music --ref main -f tag=v1.0.3
 ```
 
+**Dry run:** lanzar el workflow *sin* tag (Actions → Run workflow con el campo vacío, o
+`gh workflow run release.yml --ref mi-rama`) compila y prueba los seis targets sin
+claves ni publicación; sirve para probar cambios de CI en cualquier rama.
+
 No publiques el draft manualmente ni ejecutes otro proceso que escriba
 `latest.json`: el workflow es el único publicador. Rechaza tags ajenos a `main`,
 versiones inconsistentes, releases ya publicadas y la publicación desde forks.
 Para activar el updater en una compilación Linux anterior sin clave pública,
 instala primero uno de los nuevos paquetes firmados.
 
+### Arch Linux
+
+El `PKGBUILD` de `packaging/arch/` no forma parte de la publicación. Tras cada release,
+sube `pkgver` (con `pkgrel=1`), ejecuta `updpkgsums` en esa carpeta y confirma el cambio.
+
 ## Terceros
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) y [Deno](https://deno.com) (MIT) van incluidos en el instalador para obtener el audio.
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) y [Deno](https://deno.com) (MIT) van incluidos en los instaladores y paquetes de las releases para obtener el audio.
 - [ytmapi-rs](https://github.com/nick42d/youtui) (MIT), con un parche, en `vendor/` (ver `vendor/README.md`).
 - [Tauri](https://tauri.app), [Svelte](https://svelte.dev) y el resto de dependencias de `Cargo.toml` y `package.json`, cada una con su licencia.
 

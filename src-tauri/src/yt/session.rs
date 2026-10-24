@@ -6,7 +6,8 @@
 //!   contenedores produce una sesión inválida.
 //! - En Windows la sesión se guarda cifrada con DPAPI (ligada al usuario) en
 //!   `%APPDATA%\xp-music\session.bin`. En Linux se guarda en Secret Service,
-//!   aislada por la ruta de SessionStore; nunca en claro en disco (principio VI).
+//!   aislada por la ruta de SessionStore; en macOS, en el Llavero con la misma clave;
+//!   nunca en claro en disco (principio VI).
 //!   No se usa el Administrador de credenciales de Windows por su límite de 2,5 KB.
 
 use std::path::{Path, PathBuf};
@@ -88,12 +89,15 @@ pub fn detect_profiles() -> Vec<BrowserProfile> {
         let Some(appdata) = dirs::config_dir() else {
             return Vec::new();
         };
+        // macOS: ~/Library/Application Support/Firefox; Windows: %APPDATA%\Mozilla\Firefox.
+        let firefox = if cfg!(target_os = "macos") {
+            appdata.join("Firefox")
+        } else {
+            appdata.join("Mozilla").join("Firefox")
+        };
         [
             ("Zen", appdata.join("zen").join("Profiles")),
-            (
-                "Firefox",
-                appdata.join("Mozilla").join("Firefox").join("Profiles"),
-            ),
+            ("Firefox", firefox.join("Profiles")),
             ("LibreWolf", appdata.join("librewolf").join("Profiles")),
             ("Floorp", appdata.join("Floorp").join("Profiles")),
             ("Waterfox", appdata.join("Waterfox").join("Profiles")),
@@ -394,10 +398,18 @@ pub fn netscape_from_header(header: &str) -> String {
 
 // ------------------------------------------------------------------ almacenamiento cifrado
 
+/// Almacén del sistema, para los mensajes.
+#[cfg(not(windows))]
+const KEYRING: &str = if cfg!(target_os = "macos") {
+    "el Llavero"
+} else {
+    "Secret Service"
+};
+
 pub struct SessionStore {
     #[cfg(windows)]
     path: PathBuf,
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     entry: keyring::Result<keyring::Entry>,
 }
 
@@ -406,7 +418,7 @@ impl SessionStore {
         Self {
             #[cfg(windows)]
             path: data_dir.join("session.bin"),
-            #[cfg(target_os = "linux")]
+            #[cfg(not(windows))]
             entry: {
                 use sha2::{Digest, Sha256};
                 let path = data_dir.join("session.bin");
@@ -457,51 +469,54 @@ impl SessionStore {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     fn entry(&self) -> AppResult<&keyring::Entry> {
         self.entry.as_ref().map_err(|_| {
-            tracing::error!("no se pudo inicializar la entrada de Secret Service");
-            AppError::new(ErrorCode::Storage, "No se pudo acceder a Secret Service.")
+            tracing::error!("no se pudo inicializar la entrada de {KEYRING}");
+            AppError::new(
+                ErrorCode::Storage,
+                format!("No se pudo acceder a {KEYRING}."),
+            )
         })
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     pub fn load(&self) -> Option<Session> {
         let plain = match self.entry().ok()?.get_secret() {
             Ok(plain) => plain,
             Err(keyring::Error::NoEntry) => return None,
             Err(_) => {
-                tracing::warn!("no se pudo leer la sesión de Secret Service");
+                tracing::warn!("no se pudo leer la sesión de {KEYRING}");
                 return None;
             }
         };
         serde_json::from_slice(&plain)
             // No registrar el error de JSON: puede incluir valores de las cookies.
-            .map_err(|_| tracing::warn!("sesión de Secret Service no válida"))
+            .map_err(|_| tracing::warn!("sesión de {KEYRING} no válida"))
             .ok()
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     pub fn save(&self, s: &Session) -> AppResult<()> {
         let plain = serde_json::to_vec(s)?;
         self.entry()?.set_secret(&plain).map_err(|_| {
-            tracing::error!("no se pudo guardar la sesión en Secret Service");
+            tracing::error!("no se pudo guardar la sesión en {KEYRING}");
             AppError::new(
                 ErrorCode::Storage,
-                "No se pudo guardar la sesión en Secret Service.",
+                format!("No se pudo guardar la sesión en {KEYRING}."),
             )
         })
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     pub fn clear(&self) -> AppResult<()> {
         match self.entry()?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(_) => {
-                tracing::error!("no se pudo borrar la sesión de Secret Service");
+                tracing::error!("no se pudo borrar la sesión de {KEYRING}");
                 Err(AppError::new(
                     ErrorCode::Storage,
-                    "No se pudo borrar la sesión de Secret Service.",
+                    format!("No se pudo borrar la sesión de {KEYRING}."),
                 ))
             }
         }
@@ -647,9 +662,9 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     #[test]
-    fn sesion_linux_en_secret_service_mock() {
+    fn sesion_en_keyring_mock() {
         let dir = std::env::temp_dir().join(format!("xp-music-test-{}", rand::random::<u64>()));
         std::fs::create_dir_all(&dir).unwrap();
         // Inyección por instancia: no cambiar el builder global de keyring.
@@ -711,12 +726,13 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
-    /// Requiere D-Bus y Secret Service desbloqueado (p. ej. gnome-keyring).
-    /// `cargo test --lib sesion_linux_secret_service_real -- --ignored --nocapture`
-    #[cfg(target_os = "linux")]
+    /// Linux: requiere D-Bus y Secret Service desbloqueado (p. ej. gnome-keyring);
+    /// macOS: el Llavero de inicio de sesión desbloqueado.
+    /// `cargo test --lib sesion_keyring_real -- --ignored --nocapture`
+    #[cfg(not(windows))]
     #[test]
-    #[ignore = "requiere un Secret Service real y desbloqueado"]
-    fn sesion_linux_secret_service_real() {
+    #[ignore = "requiere un almacén de credenciales real y desbloqueado"]
+    fn sesion_keyring_real() {
         let dir = std::env::temp_dir().join(format!("xp-music-keyring-{}", rand::random::<u64>()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = SessionStore::new(&dir);
@@ -743,24 +759,33 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(windows))]
     #[test]
-    fn usuarios_secret_service_aislados_por_ruta() {
-        let attrs = |store: &SessionStore| {
-            store
-                .entry()
-                .unwrap()
-                .get_credential()
-                .downcast_ref::<keyring::secret_service::SsCredential>()
-                .unwrap()
-                .attributes
-                .clone()
+    fn usuarios_keyring_aislados_por_ruta() {
+        // (servicio, usuario) de la credencial nativa.
+        let ids = |store: &SessionStore| {
+            let cred = store.entry().unwrap().get_credential();
+            #[cfg(target_os = "linux")]
+            {
+                let a = &cred
+                    .downcast_ref::<keyring::secret_service::SsCredential>()
+                    .unwrap()
+                    .attributes;
+                (a["service"].clone(), a["username"].clone())
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let m = cred
+                    .downcast_ref::<keyring::macos::MacCredential>()
+                    .unwrap();
+                (m.service.clone(), m.account.clone())
+            }
         };
-        let a = attrs(&SessionStore::new(Path::new("/tmp/perfil-a")));
-        let b = attrs(&SessionStore::new(Path::new("/tmp/perfil-b")));
-        assert_eq!(a["service"], "com.iznardo.xpmusic");
-        assert_ne!(a["username"], b["username"]);
-        assert_eq!(a, attrs(&SessionStore::new(Path::new("/tmp/perfil-a"))));
+        let a = ids(&SessionStore::new(Path::new("/tmp/perfil-a")));
+        let b = ids(&SessionStore::new(Path::new("/tmp/perfil-b")));
+        assert_eq!(a.0, "com.iznardo.xpmusic");
+        assert_ne!(a.1, b.1);
+        assert_eq!(a, ids(&SessionStore::new(Path::new("/tmp/perfil-a"))));
     }
 
     #[cfg(unix)]

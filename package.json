@@ -14,7 +14,7 @@
     "gen:bindings": "cargo test --manifest-path src-tauri/Cargo.toml --lib export_bindings",
     "check:front": "svelte-check --tsconfig ./tsconfig.json",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml",
-    "check:scripts": "node --test scripts/update-manifest.test.mjs",
+    "check:scripts": "node --test \"scripts/*.test.mjs\"",
     "check": "npm run check:scripts && npm run check:front && npm run check:rust",
     "fetch-tools": "node scripts/fetch-tools.mjs",
     "release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1"

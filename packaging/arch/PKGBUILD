@@ -1,0 +1,82 @@
+# Maintainer: iznardo
+# XP Music para Arch Linux (x86_64 y aarch64): se compila desde el código fuente.
+# yt-dlp y Deno son los del sistema (los actualiza pacman); la app no se
+# autoactualiza ni descarga su propio yt-dlp.
+#
+# Probar en local:       cd packaging/arch && makepkg -si
+# Cada versión nueva:    subir pkgver, pkgrel=1 y `updpkgsums`; para el AUR,
+#                        `makepkg --printsrcinfo > .SRCINFO`.
+pkgname=xp-music
+pkgver=1.0.2
+pkgrel=1
+pkgdesc='Reproductor de YouTube Music con aspecto de Windows Media Player / XP'
+arch=(x86_64 aarch64)
+url='https://github.com/Iznardo/xp-music'
+license=(MIT)
+depends=(webkit2gtk-4.1 gtk3 glib2 libayatana-appindicator alsa-lib dbus openssl
+         hicolor-icon-theme xdg-utils yt-dlp deno)
+makedepends=(rust nodejs npm pkgconf)
+optdepends=('gnome-keyring: Secret Service donde se guarda la sesión de YouTube (sirve cualquier otro, p. ej. KeePassXC)')
+options=(!lto !debug)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# Actualizar con `updpkgsums` al fijar el tag de cada versión.
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --manifest-path src-tauri/Cargo.toml \
+    --target "$(rustc -vV | sed -n 's/^host: //p')"
+  npm ci
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  # tauri.linux.conf.json empaqueta tools/ como recurso; aquí lo aportan yt-dlp
+  # y deno del sistema, así que bastan marcadores vacíos para que compile.
+  mkdir -p tools/yt-dlp
+  touch tools/deno
+  # Sin paquetes de Tauri (.deb/AppImage/rpm): solo el binario con el frontend dentro.
+  npm run tauri build -- --no-bundle
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 src-tauri/target/release/xp-music "$pkgdir/usr/lib/$pkgname/xp-music"
+
+  # La app busca `deno` y `yt-dlp_linux` en XP_MUSIC_TOOLS (mismo esquema que nix/package.nix).
+  install -d "$pkgdir/usr/lib/$pkgname/tools"
+  ln -s /usr/bin/deno "$pkgdir/usr/lib/$pkgname/tools/deno"
+  ln -s /usr/bin/yt-dlp "$pkgdir/usr/lib/$pkgname/tools/yt-dlp_linux"
+
+  # XP_MUSIC_TOOLS también desactiva la actualización de yt-dlp; el updater de la app
+  # se apaga a mano: las versiones las gestiona pacman.
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/$pkgname" <<'EOF'
+#!/bin/sh
+export XP_MUSIC_TOOLS=/usr/lib/xp-music/tools
+export XP_MUSIC_DISABLE_UPDATER=1
+exec /usr/lib/xp-music/xp-music "$@"
+EOF
+
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/$pkgname.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=XP Music
+Comment=Reproductor de YouTube Music con aspecto de Windows Media Player / XP
+Exec=xp-music
+Icon=xp-music
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=xp-music
+EOF
+
+  local icons=src-tauri/icons
+  install -Dm644 "$icons/32x32.png" "$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+  install -Dm644 "$icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+  install -Dm644 "$icons/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+  install -Dm644 "$icons/icon.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 THIRD-PARTY-NOTICES.txt "$pkgdir/usr/share/licenses/$pkgname/THIRD-PARTY-NOTICES.txt"
+}

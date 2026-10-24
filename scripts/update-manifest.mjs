@@ -1,28 +1,10 @@
-import { readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-
-function unique(items, suffix, source) {
-  const matches = items.filter((item) => item.name.endsWith(suffix));
-  if (matches.length !== 1) {
-    throw new Error(`Expected one ${source} artifact ending in ${suffix}; found ${matches.length}`);
-  }
-  return matches[0];
-}
-
-function downloadUrl(asset, tag) {
-  const url = new URL(asset.browser_download_url);
-  const parts = url.pathname.split("/");
-  if (url.protocol !== "https:" || url.host !== "github.com" || url.username || url.password ||
-      url.search || url.hash || parts.length !== 7 || !parts[1] || !parts[2] ||
-      parts[3] !== "releases" || parts[4] !== "download" ||
-      decodeURIComponent(parts[5]) !== tag || decodeURIComponent(parts[6]) !== asset.name) {
-    throw new Error(`Unsafe GitHub download URL for ${asset.name}`);
-  }
-  return asset.browser_download_url;
-}
+import { ARTIFACTS, downloadUrl, listFiles, readVersion, unique } from "./release-targets.mjs";
+import { stripDownloads } from "./release-notes.mjs";
 
 export async function generateManifest(metadataPath, packagesDirectory, outputPath) {
-  const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const version = await readVersion();
   const release = JSON.parse(await readFile(metadataPath, "utf8"));
   if (release.tag_name !== `v${version}`) throw new Error(`Expected release tag v${version}`);
   if (release.draft !== true || release.prerelease !== false) {
@@ -36,14 +18,10 @@ export async function generateManifest(metadataPath, packagesDirectory, outputPa
     throw new Error("Release notes or creation date are invalid");
   }
 
-  const files = (await readdir(packagesDirectory, { recursive: true, withFileTypes: true }))
-    .filter((entry) => entry.isFile());
+  const files = await listFiles(packagesDirectory);
   const platforms = {};
-  for (const [platform, suffix] of [
-    ["windows-x86_64-nsis", `_${version}_x64-setup.exe`],
-    ["linux-x86_64-deb", `_${version}_amd64.deb`],
-    ["linux-x86_64-appimage", `_${version}_amd64.AppImage`],
-  ]) {
+  for (const artifact of ARTIFACTS.filter((a) => a.updater)) {
+    const suffix = artifact.suffix(version);
     const local = unique(files, suffix, "local");
     const localSignature = unique(files, `${suffix}.sig`, "local");
     if (join(localSignature.parentPath, localSignature.name) !== join(local.parentPath, `${local.name}.sig`)) {
@@ -59,12 +37,14 @@ export async function generateManifest(metadataPath, packagesDirectory, outputPa
     const signature = (await readFile(join(localSignature.parentPath, localSignature.name), "utf8")).trim();
     if (!signature) throw new Error(`Empty signature for ${local.name}`);
     downloadUrl(remoteSignature, release.tag_name);
-    platforms[platform] = { signature, url: downloadUrl(remote, release.tag_name) };
+    const entry = { signature, url: downloadUrl(remote, release.tag_name) };
+    // Clave específica del formato y, si existe, el alias heredado (mismo objeto).
+    for (const key of artifact.updater) platforms[key] = entry;
   }
-  platforms["windows-x86_64"] = platforms["windows-x86_64-nsis"];
   const manifest = {
     version,
-    notes: release.body ?? "",
+    // Solo las notas del mantenedor: la tabla de descargas se genera aparte.
+    notes: stripDownloads(release.body),
     pub_date: release.created_at,
     platforms,
   };

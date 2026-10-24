@@ -16,12 +16,24 @@ use crate::audio::resolver::ToolPaths;
 use crate::error::{AppError, AppResult, ErrorCode};
 
 const RELEASES: &str = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
-#[cfg(windows)]
-const ASSET: &str = "yt-dlp_win.zip";
-#[cfg(not(windows))]
-const ASSET: &str = "yt-dlp_linux";
+/// Archivo de la release de yt-dlp para un sistema y arquitectura (`std::env::consts`).
+fn asset_name(os: &str, arch: &str) -> Option<&'static str> {
+    Some(match (os, arch) {
+        ("windows", "x86_64") => "yt-dlp_win.zip",
+        ("windows", "aarch64") => "yt-dlp_win_arm64.zip",
+        ("linux", "x86_64") => "yt-dlp_linux",
+        ("linux", "aarch64") => "yt-dlp_linux_aarch64",
+        // Un único Mach-O universal para Intel y Apple Silicon.
+        ("macos", _) => "yt-dlp_macos",
+        _ => return None,
+    })
+}
+
+/// Nombre con el que se instala (y se empaqueta), igual en todas las arquitecturas.
 pub const YT_DLP_EXE: &str = if cfg!(windows) {
     "yt-dlp.exe"
+} else if cfg!(target_os = "macos") {
+    "yt-dlp_macos"
 } else {
     "yt-dlp_linux"
 };
@@ -167,13 +179,18 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
         tracing::info!(version = %rel.tag_name, "yt-dlp ya está al día");
         return Ok(None);
     }
+    let Some(asset) = asset_name(std::env::consts::OS, std::env::consts::ARCH) else {
+        return Err(AppError::internal(
+            "No hay yt-dlp actualizable para esta plataforma.",
+        ));
+    };
     let url = |name: &str| {
         rel.assets
             .iter()
             .find(|a| a.name == name)
             .map(|a| a.browser_download_url.clone())
     };
-    let (Some(zip_url), Some(sums_url)) = (url(ASSET), url(SUMS)) else {
+    let (Some(zip_url), Some(sums_url)) = (url(asset), url(SUMS)) else {
         return Err(AppError::internal(
             "La versión nueva de yt-dlp no trae el paquete esperado.",
         ));
@@ -187,7 +204,7 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
         .lines()
         .find_map(|l| {
             l.split_once(char::is_whitespace)
-                .filter(|(_, n)| n.trim() == ASSET)
+                .filter(|(_, n)| n.trim() == asset)
                 .map(|(h, _)| h.to_ascii_lowercase())
         })
         .ok_or_else(|| AppError::internal("Falta la suma SHA-256 del paquete de yt-dlp."))?;
@@ -255,6 +272,11 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
             }
             let mut w = std::fs::File::create(&out).map_err(io)?;
             std::io::copy(&mut f, &mut w).map_err(io)?;
+        }
+        // El zip de ARM64 trae `yt-dlp_arm64.exe`; la app y fetch-tools lo llaman `yt-dlp.exe`.
+        let arm64 = staging.join("yt-dlp_arm64.exe");
+        if arm64.is_file() && !staging.join(YT_DLP_EXE).exists() {
+            std::fs::rename(&arm64, staging.join(YT_DLP_EXE)).map_err(io)?;
         }
     }
     let exe = staging.join(YT_DLP_EXE);
@@ -347,16 +369,7 @@ pub async fn tools_update_now() -> AppResult<Option<String>> {
 #[specta::specta]
 pub fn tools_open_logs_dir() -> AppResult<()> {
     let dirs = crate::state::AppDirs::resolve().map_err(|e| AppError::internal(e.to_string()))?;
-    let opener = if cfg!(windows) {
-        "explorer.exe"
-    } else {
-        "xdg-open"
-    };
-    Command::new(opener)
-        .arg(&dirs.logs)
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| AppError::internal(e.to_string()))
+    crate::os::open_dir(&dirs.logs)
 }
 
 #[cfg(test)]
@@ -371,6 +384,21 @@ mod tests {
             .strip_prefix("deno ")
             .map_or(first, |r| r.split_whitespace().next().unwrap_or(r));
         assert_eq!(v, "2.9.7");
+    }
+
+    #[test]
+    fn asset_por_plataforma() {
+        for (os, arch, asset) in [
+            ("windows", "x86_64", "yt-dlp_win.zip"),
+            ("windows", "aarch64", "yt-dlp_win_arm64.zip"),
+            ("linux", "x86_64", "yt-dlp_linux"),
+            ("linux", "aarch64", "yt-dlp_linux_aarch64"),
+            ("macos", "x86_64", "yt-dlp_macos"),
+            ("macos", "aarch64", "yt-dlp_macos"),
+        ] {
+            assert_eq!(asset_name(os, arch), Some(asset), "{os} {arch}");
+        }
+        assert_eq!(asset_name("linux", "riscv64"), None);
     }
 
     #[test]

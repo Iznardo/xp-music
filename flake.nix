@@ -6,7 +6,11 @@
   outputs =
     { self, nixpkgs }:
     let
-      systems = [ "x86_64-linux" ];
+      # aarch64-linux: evaluado, pero sin probar en hardware (solo lo compila el CI).
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {

@@ -148,15 +148,7 @@ pub fn skins_list() -> AppResult<Vec<SkinInfo>> {
 #[tauri::command]
 #[specta::specta]
 pub fn skins_open_dir() -> AppResult<()> {
-    #[cfg(target_os = "windows")]
-    let opener = "explorer.exe";
-    #[cfg(target_os = "linux")]
-    let opener = "xdg-open";
-    std::process::Command::new(opener)
-        .arg(dir()?)
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| AppError::internal(e.to_string()))
+    crate::os::open_dir(&dir()?)
 }
 
 /// Atiende el protocolo `skin` (bloqueante: llamar fuera del hilo de la UI).

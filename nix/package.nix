@@ -112,6 +112,9 @@ rustPlatform.buildRustPackage (finalAttrs: {
     homepage = "https://github.com/Iznardo/xp-music";
     license = lib.licenses.mit;
     mainProgram = "xp-music";
-    platforms = [ "x86_64-linux" ];
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
   };
 })
