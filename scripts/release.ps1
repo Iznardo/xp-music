@@ -1,5 +1,6 @@
 ﻿# Publica una versión de XP Music (specs/007, FR-007-07): sube la versión, compila
-# el instalador firmado, crea la release en GitHub y sube latest.json para el updater.
+# el instalador firmado, prepara un draft y lanza el workflow Windows/Linux.
+# Solo el workflow publica la release y latest.json cuando pasan ambos sistemas.
 #
 #   npm run release                 # patch: 0.1.0 → 0.1.1
 #   npm run release -- -Bump minor
@@ -31,6 +32,10 @@ function Write-Utf8($path, $text) { [IO.File]::WriteAllText($path, $text, (New-O
 if (-not $NoPublish) {
     if (git status --porcelain) { Fail 'Hay cambios sin confirmar.' }
     if ((git rev-parse --abbrev-ref HEAD) -ne 'main') { Fail 'Las releases se hacen desde main.' }
+    $origin = git remote get-url origin
+    if ($LASTEXITCODE -ne 0 -or $origin -notmatch '^(git@github\.com:|https://github\.com/)Iznardo/xp-music(\.git)?/?$') {
+        Fail 'origin debe apuntar a Iznardo/xp-music; no se publica desde un fork.'
+    }
     gh auth status 2>$null | Out-Null
     if ($LASTEXITCODE -ne 0) { Fail 'gh no tiene sesión iniciada (gh auth login).' }
     if (-not (Test-Path $signingPath)) { Fail 'Falta la firma: ejecuta scripts\setup-signing.ps1.' }
@@ -53,9 +58,9 @@ $v = $new.ToString()
 if ($Bump -ne 'none') {
     $from = '"version": "' + $pkg.version + '"'
     $to = '"version": "' + $v + '"'
-    foreach ($f in 'package.json', 'src-tauri\tauri.conf.json') {
-        Write-Utf8 (Join-Path $root $f) ((Get-Content $f -Raw -Encoding UTF8).Replace($from, $to))
-    }
+    npm version $v --no-git-tag-version --ignore-scripts
+    if ($LASTEXITCODE -ne 0) { Fail 'No se pudo actualizar package.json/package-lock.json.' }
+    Write-Utf8 $confPath ((Get-Content $confPath -Raw -Encoding UTF8).Replace($from, $to))
     $cargo = Get-Content src-tauri\Cargo.toml -Raw -Encoding UTF8
     $cargo = ([regex]'(?m)^version = "[^"]+"').Replace($cargo, "version = `"$v`"", 1)
     Write-Utf8 (Join-Path $root 'src-tauri\Cargo.toml') $cargo
@@ -126,38 +131,24 @@ if (Test-Path $signingPath) {
 }
 if ($NoPublish) { Write-Host 'Compilado sin publicar.'; exit 0 }
 
-# --- 6. Commit, tag y release -------------------------------------------------
+# --- 6. Preparar draft; el workflow verifica ambos sistemas y publica ----------
+$sigFile = "$($installer.FullName).sig"
+if (-not (Test-Path $sigFile)) { Fail 'Falta la firma del updater del instalador.' }
 $tag = "v$v"
 if ($Bump -ne 'none') {
-    git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+    git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+    if ($LASTEXITCODE -ne 0) { Fail 'No se pudieron preparar los archivos de versión.' }
     git commit -m "release: $tag"
+    if ($LASTEXITCODE -ne 0) { Fail 'No se pudo confirmar la versión.' }
 }
 git tag $tag
+if ($LASTEXITCODE -ne 0) { Fail 'No se pudo crear el tag (si ya existe el draft, reintenta el workflow).' }
 git push origin main $tag
 if ($LASTEXITCODE -ne 0) { Fail 'No se pudo subir el tag.' }
 
-$sigFile = "$($installer.FullName).sig"
 if (-not $Notes) { $Notes = "XP Music $v" }
-gh release create $tag $installer.FullName $sigFile --repo $repo --title "XP Music $v" --notes $Notes
-if ($LASTEXITCODE -ne 0) { Fail 'No se pudo crear la release.' }
-
-# Repo público: el updater descarga el instalador por su enlace normal.
-$rel = gh api "repos/$repo/releases/tags/$tag" | ConvertFrom-Json
-$asset = $rel.assets | Where-Object { $_.name -like "*_${v}_x64-setup.exe" } | Select-Object -First 1
-if (-not $asset) { Fail 'No se encuentra el instalador en la release.' }
-$latest = [ordered]@{
-    version = $v
-    notes = $Notes
-    pub_date = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-    platforms = [ordered]@{
-        'windows-x86_64' = [ordered]@{
-            signature = (Get-Content $sigFile -Raw).Trim()
-            url = $asset.browser_download_url
-        }
-    }
-}
-$latestPath = Join-Path ([IO.Path]::GetTempPath()) 'latest.json'
-Write-Utf8 $latestPath ($latest | ConvertTo-Json -Depth 5)
-gh release upload $tag $latestPath --repo $repo --clobber
-Remove-Item -Force $latestPath
-Write-Host "Publicada $tag." -ForegroundColor Green
+gh release create $tag $installer.FullName $sigFile --repo $repo --draft --title "XP Music $v" --notes $Notes
+if ($LASTEXITCODE -ne 0) { Fail 'No se pudo preparar el draft.' }
+gh workflow run release.yml --repo $repo --ref main -f "tag=$tag"
+if ($LASTEXITCODE -ne 0) { Fail 'El draft sigue sin publicar: lanza release.yml con su tag desde Actions.' }
+Write-Host "Draft $tag preparado. El workflow publicará Windows, Linux y latest.json si pasan las pruebas." -ForegroundColor Green

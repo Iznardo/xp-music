@@ -405,7 +405,7 @@ export type UpdateInfo = {
 };
 
 export type UpdaterStatus = {
-	/**  Esta compilación trae la clave pública del updater. */
+	/**  Las actualizaciones automáticas están disponibles en esta instalación. */
 	enabled: boolean,
 	pending: UpdateInfo | null,
 };

@@ -45,7 +45,14 @@ Por eso, en Linux cerrar la ventana sale de la app por defecto; activa «Cerrar 
 la bandeja» solo si tu escritorio muestra ese icono.
 Linux usa MPRIS para los controles multimedia; no incluye los botones de miniatura,
 la pausa al bloquear la sesión ni el clic a través de las zonas transparentes de las máscaras.
-Los paquetes Linux se actualizan descargando la nueva release, sin autoactualizador.
+Las releases firmadas ofrecen actualizaciones desde la propia app:
+- **AppImage:** reemplaza el archivo original; debe estar en una carpeta donde puedas escribir.
+- **`.deb`:** instala la nueva versión solicitando autorización de administrador.
+
+No se activa en binarios de desarrollo, Nix (`/nix/store`), Flatpak ni Snap.
+Para paquetes mantenidos por un repositorio, el empaquetador puede desactivarlo
+con `XP_MUSIC_DISABLE_UPDATER=1` y dejar las actualizaciones al gestor de paquetes.
+Las compilaciones locales sin clave pública tampoco se autoactualizan.
 
 ## Máscaras de Windows Media Player
 
@@ -76,21 +83,68 @@ Otras órdenes útiles:
 
 - `npm run dev:mock`: la interfaz en el navegador con datos simulados, sin backend.
 - `npm run check`: comprobaciones de TypeScript, formato, Clippy y tests de Rust.
-- `npm run release`: compila, firma y publica una versión **Windows** (ver `scripts/release.ps1`).
+- `npm run release`: prepara el instalador Windows firmado y lanza la publicación **Windows/Linux** (ver más abajo).
 - `npm run tauri build`: en Linux genera `.deb` y AppImage en `src-tauri/target/release/bundle/`.
 
-El workflow `.github/workflows/linux.yml` comprueba, empaqueta y prueba el arranque,
-modo compacto y cierre de ambos paquetes en cada PR. Para repetir el smoke test
+El workflow único `.github/workflows/release.yml` comprueba y empaqueta **Windows
+y Linux** en cada PR. En Linux prueba además el arranque, modo compacto y cierre
+de ambos paquetes. Para repetir el smoke test
 localmente (requiere Xvfb, D-Bus, Openbox, xdotool, GNOME Keyring y PulseAudio):
 
 ```bash
 xvfb-run -a dbus-run-session -- bash scripts/smoke-linux.sh /usr/bin/xp-music
 ```
 
-Al publicarse una release adjunta ambos paquetes a **esa misma release**, sin
-alterar el instalador Windows ni `latest.json`. También se puede ejecutar manualmente
-indicando un tag existente que ya incluya el soporte Linux. No necesita secretos
-adicionales: solo el `GITHUB_TOKEN` con permiso de escritura en la fase de publicación.
+## Publicar una versión (mantenedor)
+
+Se conserva el certificado Authenticode de Windows: `setup-signing.ps1` lo crea
+**no exportable**, así que el instalador sigue firmándose en el equipo Windows del
+mantenedor. No se sustituye por un EXE sin firmar generado en CI.
+
+Configura una vez en **Iznardo/xp-music → Settings → Secrets and variables → Actions**:
+
+| Tipo | Nombre | Valor |
+| --- | --- | --- |
+| Variable | `XP_MUSIC_UPDATER_PUBKEY` | Contenido de la clave pública existente `~/.xp-music/updater.key.pub` |
+| Variable | `WINDOWS_SIGNING_THUMBPRINT` | Huella de `src-tauri/signing.local.json` |
+| Secret | `TAURI_SIGNING_PRIVATE_KEY` | Contenido de la clave privada **existente** `~/.xp-music/updater.key` (no una ruta) |
+| Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Su contraseña; vacío si no tiene |
+
+No generes otra clave del updater: las versiones ya instaladas confían en la actual.
+Los secretos solo se usan al compilar releases, nunca en los checks de PR.
+
+Desde `main` en el equipo Windows del mantenedor, con `origin` apuntando al upstream:
+
+```powershell
+npm run release                     # incrementa patch
+npm run release -- -Bump minor
+npm run release -- -Bump none -NoPublish  # prueba local, no publica ni lanza CI
+```
+
+El script compila y verifica el instalador Windows, sube el tag y prepara una
+**release draft** con su EXE y firma del updater. Después lanza el workflow único:
+
+1. Comprueba el código en Windows y Linux. Verifica la firma Authenticode del EXE
+   original contra la huella configurada, sin recompilarlo ni cambiarlo.
+2. Compila `.deb` y AppImage con la misma clave pública y genera sus firmas.
+   Prueba ambos paquetes fuera del repositorio.
+3. Verifica criptográficamente las tres firmas del updater, adjunta Linux y crea
+   un único `latest.json` con Windows y entradas Linux separadas por formato.
+4. Publica el draft solo cuando todo ha pasado. La entrada `windows-x86_64` se
+   conserva para los clientes Windows existentes.
+
+Si falla, el draft no se publica. Corrige el problema y reintenta **el mismo tag**
+desde Actions → Desktop → Run workflow, o:
+
+```bash
+gh workflow run release.yml --repo Iznardo/xp-music --ref main -f tag=v1.0.3
+```
+
+No publiques el draft manualmente ni ejecutes otro proceso que escriba
+`latest.json`: el workflow es el único publicador. Rechaza tags ajenos a `main`,
+versiones inconsistentes, releases ya publicadas y la publicación desde forks.
+Para activar el updater en una compilación Linux anterior sin clave pública,
+instala primero uno de los nuevos paquetes firmados.
 
 ## Terceros
 
