@@ -33,7 +33,9 @@ export type Release = { tag: string; date: string; url: string; assets: Asset[] 
 /** Última versión publicada (API de GitHub, sin autenticar: 60 peticiones/hora por IP). */
 export const release = $state<{ data: Release | null; failed: boolean }>({ data: null, failed: false });
 
-fetch(`${REPO.replace("github.com", "api.github.com/repos")}/releases/latest`)
+// VITE_RELEASE_API: otra URL con el mismo formato, para probar la página con una
+// release de ejemplo (`VITE_RELEASE_API=/ejemplo.json npm run site:dev`).
+fetch(import.meta.env.VITE_RELEASE_API || `${REPO.replace("github.com", "api.github.com/repos")}/releases/latest`)
   .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
   .then((j) => {
     release.data = {
