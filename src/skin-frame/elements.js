@@ -4,6 +4,7 @@
 
 import { wmpObject, cssColor, parseColor, bool, num, timeString } from "./util.js";
 import { opaqueAt, colorAt } from "./images.js";
+import { queueName } from "./objects.js";
 
 /** @typedef {import("./wms.js").WmsNode} WmsNode */
 /** @typedef {import("./images.js").SkinImage} SkinImage */
@@ -1348,7 +1349,7 @@ export class Playlist extends El {
     const playing = cssColor(this._playing) || fg;
     this._list.style.color = fg;
     if (this._dropdown) {
-      this._list.textContent = q.name || "Cola de reproducción";
+      this._list.textContent = q.name || queueName();
       return;
     }
     this._list.replaceChildren(

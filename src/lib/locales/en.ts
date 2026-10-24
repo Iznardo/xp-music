@@ -85,6 +85,8 @@ Do you want to install it now? The application will restart.`,
     albums: "Albums",
     artists: "Artists",
     history: "History",
+    expand: "Expand",
+    collapse: "Collapse",
   },
   columns: {
     index: "#",

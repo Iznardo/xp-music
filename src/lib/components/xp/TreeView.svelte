@@ -2,6 +2,7 @@
   // XP Explorer-style tree (FR-004-04): nodes with icon, expand/collapse and keyboard.
   import Icon from "./Icon.svelte";
   import type { TreeNode } from "./types";
+  import { t } from "../../i18n.svelte";
 
   let { nodes, selected }: { nodes: TreeNode[]; selected: string | null } = $props();
   let expanded = $state<Set<string>>(new Set(["library", "playlists"]));
@@ -46,7 +47,7 @@
   {#each visible as { node, depth } (node.id)}
     <div class="node" style:padding-left="{depth * 16 + 2}px" role="treeitem" aria-selected={selected === node.id} aria-expanded={node.children?.length ? expanded.has(node.id) : undefined}>
       {#if node.children?.length}
-        <button class="exp" aria-label={expanded.has(node.id) ? "Contraer" : "Expandir"} onclick={() => toggle(node.id)}>{expanded.has(node.id) ? "−" : "+"}</button>
+        <button class="exp" aria-label={expanded.has(node.id) ? t.tree.collapse : t.tree.expand} onclick={() => toggle(node.id)}>{expanded.has(node.id) ? "−" : "+"}</button>
       {:else}
         <span class="exp-pad"></span>
       {/if}

@@ -146,7 +146,7 @@ impl YtService {
                 name: s
                     .account_name
                     .clone()
-                    .unwrap_or_else(|| "Cuenta de YouTube".into()),
+                    .unwrap_or_else(|| tr!("YouTube account", "Cuenta de YouTube")),
                 handle: s.account_handle.clone(),
                 photo: s.account_photo.clone(),
             }),

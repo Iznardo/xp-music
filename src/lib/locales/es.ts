@@ -86,6 +86,8 @@ ${notes}` : ""}
     albums: "Álbumes",
     artists: "Artistas",
     history: "Historial",
+    expand: "Expandir",
+    collapse: "Contraer",
   },
   columns: {
     index: "#",
