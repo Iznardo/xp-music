@@ -52,8 +52,17 @@ pub fn bin_dir() -> Option<PathBuf> {
     Some(dirs::data_local_dir()?.join("xp-music").join("bin"))
 }
 
+/// `XP_MUSIC_TOOLS` (p. ej. el paquete de Nix) aporta yt-dlp y deno: los gestiona quien
+/// los instala, no la app.
+fn managed_externally() -> bool {
+    std::env::var_os("XP_MUSIC_TOOLS").is_some()
+}
+
 /// yt-dlp actualizado por la app (puede no existir).
 pub fn updated_yt_dlp() -> Option<PathBuf> {
+    if managed_externally() {
+        return None;
+    }
     Some(bin_dir()?.join("yt-dlp").join(YT_DLP_EXE))
 }
 
@@ -132,6 +141,12 @@ pub fn update_yt_dlp(force: bool) -> AppResult<Option<String>> {
 }
 
 fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
+    if managed_externally() {
+        return Err(AppError::new(
+            ErrorCode::InvalidInput,
+            "yt-dlp lo gestiona el paquete del sistema: actualízalo con él.",
+        ));
+    }
     {
         let mut last = LAST.lock().unwrap();
         let limit = if force { FORCED_EVERY } else { CHECK_EVERY };

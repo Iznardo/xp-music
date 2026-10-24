@@ -1,5 +1,7 @@
 # Build
 target/
+result
+result-*
 node_modules/
 dist/
 
