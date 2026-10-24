@@ -23,7 +23,7 @@ SHA-256 y el enlace directo de descarga (`sha256sum archivo` para comprobarlo).
 | Sistema | Arquitectura | Archivo (`x.y.z` = versión) | Estado |
 | --- | --- | --- | --- |
 | Windows 10/11 | x64 | `XP Music_x.y.z_x64-setup.exe` | Soportado; firmado con el certificado propio del autor |
-| Windows 10/11 | ARM64 | `XP Music_x.y.z_arm64-setup.exe` | Experimental; sin firma Authenticode |
+| Windows 10/11 | ARM64 | `XP Music_x.y.z_arm64-setup.exe` | Experimental; firmado con el certificado propio del autor |
 | Linux | x64 | `…_amd64.deb`, `…_amd64.AppImage`, `…-1.x86_64.rpm` | Experimental |
 | Linux | ARM64 | `…_arm64.deb`, `…_aarch64.AppImage`, `…-1.aarch64.rpm` | Experimental |
 | macOS | Intel (x64) | `…_x64.dmg` | Experimental; sin actualizaciones automáticas |
@@ -40,10 +40,9 @@ pruebas manuales en cada sistema.
 2. Ábrelo. Como no lleva una firma comercial, Windows SmartScreen puede avisar la primera vez: «Más información» → «Ejecutar de todas formas».
 3. Inicia sesión con tu cuenta de Google desde la propia app.
 
-El instalador x64 se firma con un certificado propio del autor (autofirmado: SmartScreen
-no lo reconoce). El de ARM64 lo genera el CI y **no** lleva firma Authenticode, porque
-ese certificado es no exportable y solo existe en el equipo del mantenedor; sí lleva la
-firma del updater, que es lo que comprueba la app antes de actualizarse.
+Los dos instaladores se firman con un certificado propio del autor (autofirmado: SmartScreen
+no lo reconoce) y llevan la firma del updater, que es lo que comprueba la app antes de
+actualizarse.
 En Windows la app se actualiza sola: cuando hay una versión nueva, te lo ofrece al arrancar.
 
 ### Linux (experimental)
@@ -176,7 +175,7 @@ Otras órdenes útiles:
 
 - `npm run dev:mock`: la interfaz en el navegador con datos simulados, sin backend.
 - `npm run check`: tests de los scripts de release, TypeScript, formato, Clippy y tests de Rust.
-- `npm run release`: prepara el instalador Windows x64 firmado y lanza la publicación multiplataforma (ver más abajo).
+- `npm run release`: prepara los instaladores Windows x64 y ARM64 firmados y lanza la publicación multiplataforma (ver más abajo).
 - `npm run tauri build`: genera los paquetes de tu sistema en `src-tauri/target/release/bundle/`
   (Windows: NSIS; Linux: `.deb`, AppImage y `.rpm`; macOS: `.app` y `.dmg`).
 
@@ -211,15 +210,20 @@ recogida de artefactos del CI. Al añadir un target, actualiza esa tabla y la ma
 
 | Target | Quién lo compila | Firmas |
 | --- | --- | --- |
-| Windows x64 | **El equipo Windows del mantenedor** (`npm run release`) | Authenticode con el certificado local + updater |
-| Windows ARM64 | CI (`windows-11-arm`) | Solo updater (sin Authenticode) |
+| Windows x64 y ARM64 | **El equipo Windows del mantenedor** (`npm run release`; ARM64 con compilación cruzada) | Authenticode con el certificado local + updater |
 | Linux x64 / ARM64 | CI (`ubuntu-24.04`, `ubuntu-24.04-arm`): `.deb`, AppImage, `.rpm` | Updater |
 | macOS Intel / Apple Silicon | CI (`macos-15-intel`, `macos-15`): `.dmg` | Sin updater; *ad hoc* o Developer ID + notarización si hay secretos `APPLE_*` |
 
 Se conserva el certificado Authenticode de Windows: `setup-signing.ps1` lo crea
-**no exportable**, así que el instalador x64 sigue firmándose en el equipo Windows del
-mantenedor y el CI lo reutiliza byte a byte desde el draft. No se sustituye por un EXE
-sin firmar generado en CI; por eso el de ARM64 queda sin firma Authenticode.
+**no exportable**, así que los instaladores de Windows (x64 y ARM64) se firman en el equipo
+Windows del mantenedor y el CI los reutiliza byte a byte desde el draft (en el runner
+`windows-11-arm` solo se instala y se prueba el de ARM64). Así la clave del updater tampoco
+sale de ese equipo para Windows.
+
+Para compilar ARM64 en un equipo x64 hacen falta, una vez, `rustup target add
+aarch64-pc-windows-msvc` y el componente «MSVC ARM64 build tools» de Visual Studio Build
+Tools. `npm run release` descarga el yt-dlp y el deno de ARM64 (`tools.lock.json`) y los
+pone en `tools/` solo mientras compila ese instalador.
 
 Configura una vez en **Iznardo/xp-music → Settings → Secrets and variables → Actions**:
 
@@ -251,18 +255,18 @@ npm run release -- -Bump none -NoPublish  # prueba local, no publica ni lanza CI
 npm run release -- -Notes "Qué cambia en esta versión"
 ```
 
-El script compila y verifica el instalador Windows x64, sube el tag y prepara una
-**release draft** con su EXE, la firma del updater y las notas (`-Notes`). Después lanza
+El script compila y verifica los instaladores Windows x64 y ARM64, sube el tag y prepara una
+**release draft** con los EXE, sus firmas del updater y las notas (`-Notes`). Después lanza
 el workflow único:
 
 1. Valida el tag, la versión, que sea un draft y que el commit esté en `main`, antes de
    usar ninguna clave. Solo se publica desde `Iznardo/xp-music`.
-2. Compila, comprueba y prueba el arranque de los seis targets. En Windows x64 no
-   recompila: verifica la firma Authenticode del EXE del draft contra la huella
-   configurada y lo prueba tal cual. El resto se compila con la misma clave pública y
-   genera sus firmas del updater.
+2. Compila, comprueba y prueba el arranque de los seis targets. En Windows no recompila:
+   verifica la firma Authenticode de cada EXE del draft contra la huella configurada y
+   lo prueba tal cual. Linux se compila con la misma clave pública y genera sus firmas
+   del updater; macOS se compila sin updater.
 3. Verifica criptográficamente con `minisign` **todas** las firmas del updater, sube los
-   archivos al draft (salvo el EXE x64, que ya estaba) y calcula el SHA-256 de cada uno.
+   archivos al draft (salvo los EXE de Windows, que ya estaban) y calcula el SHA-256 de cada uno.
 4. Escribe en las notas de la release, **encima** de las notas del mantenedor, una tabla
    *Sistema (SO y arquitectura) · SHA-256 · Descarga* con los instaladores; el texto del
    enlace es el nombre del archivo, que ya indica el formato. Los archivos del actualizador
