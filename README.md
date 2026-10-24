@@ -45,6 +45,24 @@ Por eso, en Linux cerrar la ventana sale de la app por defecto; activa «Cerrar 
 la bandeja» solo si tu escritorio muestra ese icono.
 Linux usa MPRIS para los controles multimedia; no incluye los botones de miniatura,
 la pausa al bloquear la sesión ni el clic a través de las zonas transparentes de las máscaras.
+### NixOS / Nix
+
+El repositorio incluye un flake (solo `x86_64-linux`):
+
+```bash
+nix run github:Iznardo/xp-music          # probar
+nix profile install github:Iznardo/xp-music
+nix develop                              # entorno de desarrollo (cargo, node, WebKitGTK…)
+```
+
+En la configuración del sistema, con el overlay `overlays.default` o
+`inputs.xp-music.packages.${system}.default`. Se compila desde el código fuente, así que
+**no** usa los `.deb`/AppImage de las releases. yt-dlp y Deno vienen de nixpkgs
+(`XP_MUSIC_TOOLS`), por lo que ni la app ni sus actualizaciones automáticas los
+sustituyen: se actualizan con tu `flake.lock`. Al estar en `/nix/store`, tampoco se
+autoactualiza; usa `nix flake update`.
+Si un yt-dlp antiguo falla con YouTube, actualiza `nixpkgs` y reconstruye.
+
 Las releases firmadas ofrecen actualizaciones desde la propia app:
 - **AppImage:** reemplaza el archivo original; debe estar en una carpeta donde puedas escribir.
 - **`.deb`:** instala la nueva versión solicitando autorización de administrador.
