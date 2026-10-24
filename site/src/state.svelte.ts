@@ -1,6 +1,7 @@
 // Estado de la web: ruta (hash), tema y última versión. El reproductor está en player.svelte.ts.
 
 import { REPO } from "./content";
+import { classify, type Build } from "./builds";
 
 export type Theme = "blue" | "olive" | "silver";
 
@@ -25,7 +26,8 @@ export function setTheme(t: Theme) {
   localStorage.setItem("xp-theme", t);
 }
 
-export type Asset = { name: string; size: number; url: string; downloads: number };
+/** Un instalador de la release. `sha256`: el que calcula GitHub al subirlo. */
+export type Asset = Build & { name: string; size: number; url: string; sha256: string | null };
 export type Release = { tag: string; date: string; url: string; assets: Asset[] };
 
 /** Última versión publicada (API de GitHub, sin autenticar: 60 peticiones/hora por IP). */
@@ -38,12 +40,12 @@ fetch(`${REPO.replace("github.com", "api.github.com/repos")}/releases/latest`)
       tag: j.tag_name,
       date: new Date(j.published_at).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }),
       url: j.html_url,
-      assets: j.assets.map((a: { name: string; size: number; browser_download_url: string; download_count: number }) => ({
-        name: a.name,
-        size: a.size,
-        url: a.browser_download_url,
-        downloads: a.download_count,
-      })),
+      assets: j.assets.flatMap((a: { name: string; size: number; browser_download_url: string; digest?: string | null }) => {
+        const build = classify(a.name);
+        if (!build) return [];
+        const sha256 = a.digest?.startsWith("sha256:") ? a.digest.slice(7) : null;
+        return [{ ...build, name: a.name, size: a.size, url: a.browser_download_url, sha256 }];
+      }),
     };
   })
   .catch(() => (release.failed = true));

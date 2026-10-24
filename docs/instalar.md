@@ -1,7 +1,7 @@
 # Instalar
 
 XP Music funciona en **Windows 10/11** y, de forma experimental, en **Linux x86_64**.
-Todas las descargas están en la página de [Releases](https://github.com/Iznardo/xp-music/releases).
+Todas las descargas están en la página de [Releases](https://github.com/Iznardo/xp-music/releases/latest).
 
 ## Windows
 
