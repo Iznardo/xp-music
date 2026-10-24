@@ -1,5 +1,5 @@
-// Reflejo en el frontend de los ajustes del backend (principio II: Rust es la fuente de verdad).
-// Se hidrata al montar y se mantiene al día con `settings://changed`.
+// Frontend mirror of the backend settings (principle II: Rust is the source of truth).
+// Hydrated on mount and kept up to date with `settings://changed`.
 
 import { commands, events, type AppError, type Settings } from "../bindings";
 import { setLanguage } from "../i18n.svelte";

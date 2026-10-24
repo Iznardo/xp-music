@@ -1,7 +1,7 @@
-// Imágenes de un skin: se decodifican en el marco (Chromium lee BMP, PNG, JPEG y
-// GIF) y el color clave (transparencyColor / clippingColor) pasa a transparente.
-// Se guardan los píxeles para la forma de la ventana, los mapas de botones y
-// los clics que deben ignorar lo transparente.
+// Skin images: decoded in the frame (Chromium reads BMP, PNG, JPEG and GIF) and
+// the key color (transparencyColor / clippingColor) becomes transparent.
+// The pixels are kept for the window shape, the button maps and the clicks
+// that must ignore transparent areas.
 
 import { parseColor } from "./util.js";
 
@@ -17,11 +17,11 @@ export class Images {
     this.zip = zip;
     /** @type {Map<string, Promise<SkinImage | null>>} */
     this.cache = new Map();
-    /** Nombres que no se encontraron o no se pudieron leer. */
+    /** Names that were not found or could not be read. */
     this.missing = new Set();
   }
 
-  /** Imagen con el color clave aplicado (o null). @param {string} name @param {unknown} [key] */
+  /** Image with the key color applied (or null). @param {string} name @param {unknown} [key] */
   get(name, key) {
     if (!name || typeof name !== "string") return Promise.resolve(null);
     const color = parseColor(key);
@@ -34,14 +34,14 @@ export class Images {
     return p;
   }
 
-  /** Píxeles tal cual (mapas de botones y de posición). @param {string} name */
+  /** Pixels as they are (button and position maps). @param {string} name */
   raw(name) {
     return this.get(name, null);
   }
 
   /** @param {string} name @param {number[] | null} color */
   async #load(name, color) {
-    // Recursos internos de WMP (res://…, WMPImage_…): no existen fuera de WMP.
+    // WMP internal resources (res://…, WMPImage_…): they do not exist outside WMP.
     if (/^res:|^wmpimage_/i.test(name)) return null;
     const bytes = this.zip.read(name);
     if (!bytes) {
@@ -81,7 +81,7 @@ export class Images {
   }
 }
 
-/** ¿Pixel opaco en (x, y)? @param {SkinImage} img @param {number} x @param {number} y */
+/** Is the pixel at (x, y) opaque? @param {SkinImage} img @param {number} x @param {number} y */
 export function opaqueAt(img, x, y) {
   x = Math.floor(x);
   y = Math.floor(y);
@@ -89,7 +89,7 @@ export function opaqueAt(img, x, y) {
   return img.data.data[(y * img.w + x) * 4 + 3] > 0;
 }
 
-/** Color [r, g, b] en (x, y) o null fuera. @param {SkinImage} img @param {number} x @param {number} y */
+/** Color [r, g, b] at (x, y), or null if outside. @param {SkinImage} img @param {number} x @param {number} y */
 export function colorAt(img, x, y) {
   x = Math.floor(x);
   y = Math.floor(y);
@@ -100,11 +100,11 @@ export function colorAt(img, x, y) {
 }
 
 /**
- * Suaviza el borde de lo recortado por color: un recorte por color clave deja
- * escalones (en WMP también). Se difumina la máscara (gaussiana 5×5) y cada
- * píxel opaco del borde toma una opacidad según cuánto de él queda dentro: las
- * esquinas de los escalones se redondean y lo de dentro no cambia. Lo
- * transparente sigue transparente (su color es el color clave).
+ * Smooths the edge of what was cut out by color: a key-color cutout leaves
+ * jagged steps (in WMP too). The mask is blurred (5×5 gaussian) and each
+ * opaque pixel on the edge takes an opacity based on how much of it remains
+ * inside: the corners of the steps get rounded and the interior does not change.
+ * Transparent areas stay transparent (their color is the key color).
  * @param {ImageData} img
  */
 function feather(img) {

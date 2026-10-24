@@ -1,4 +1,4 @@
-//! Servicio de YouTube Music: sesión, cliente, caché y operaciones (specs/003).
+//! YouTube Music service: session, client, cache and operations (specs/003).
 
 use std::future::Future;
 use std::path::PathBuf;
@@ -24,12 +24,12 @@ use crate::domain::{
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::storage::Db;
 
-/// Peticiones simultáneas a YouTube como máximo (NFR-003-02).
+/// Maximum simultaneous requests to YouTube (NFR-003-02).
 const MAX_CONCURRENT: usize = 4;
-/// Una sesión importada del navegador se refresca si tiene más de esto.
+/// A session imported from the browser is refreshed if it is older than this.
 const SESSION_REFRESH_AFTER: u64 = 3600;
 
-// ------------------------------------------------------------------ contrato
+// ------------------------------------------------------------------ contract
 
 #[derive(Serialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -44,23 +44,23 @@ pub struct AccountInfo {
 pub enum AuthStatus {
     SignedOut,
     SignedIn(AccountInfo),
-    /// La sesión caducó y no se pudo renovar sola.
+    /// The session expired and could not be renewed automatically.
     Expired(Option<String>),
 }
 
-/// De dónde viene una cuenta candidata al importar.
+/// Where a candidate account comes from when importing.
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all_fields = "camelCase")]
 pub enum AccountSource {
-    /// Perfil del navegador + contenedor (`originAttributes`).
+    /// Browser profile + container (`originAttributes`).
     Browser {
         profile: String,
         container: String,
         container_name: String,
     },
-    /// Cookie pegada a mano (queda en memoria hasta elegir cuenta).
+    /// Cookie pasted by hand (kept in memory until an account is chosen).
     Pasted,
-    /// Ventana de inicio de sesión de la propia app.
+    /// The app's own sign-in window.
     App,
 }
 
@@ -68,7 +68,7 @@ pub enum AccountSource {
 #[serde(rename_all = "camelCase")]
 pub struct SessionAccount {
     pub source: AccountSource,
-    /// Índice dentro de la sesión (`X-Goog-AuthUser`).
+    /// Index within the session (`X-Goog-AuthUser`).
     pub index: u32,
     pub name: String,
     pub handle: Option<String>,
@@ -81,10 +81,10 @@ pub struct CacheUpdated {
     pub key: String,
 }
 
-// ------------------------------------------------------------------ servicio
+// ------------------------------------------------------------------ service
 
 pub struct YtService {
-    /// `None` en pruebas: no se emiten eventos.
+    /// `None` in tests: no events are emitted.
     app: Option<AppHandle>,
     db: Arc<Db>,
     store: SessionStore,
@@ -93,7 +93,7 @@ pub struct YtService {
     client: tokio::sync::Mutex<Option<Arc<Yt>>>,
     limiter: Semaphore,
     pasted: Mutex<Option<String>>,
-    /// Cookies de la ventana de inicio de sesión, hasta elegir cuenta.
+    /// Cookies from the sign-in window, until an account is chosen.
     app_login: Mutex<Option<super::login::Cookies>>,
 }
 
@@ -112,7 +112,7 @@ impl YtService {
             pasted: Mutex::new(None),
             app_login: Mutex::new(None),
         });
-        // Sesiones viejas importadas del navegador: se renuevan en segundo plano.
+        // Old sessions imported from the browser: renewed in the background.
         let stale = svc.session.read().unwrap().as_ref().is_some_and(|s| {
             (s.source.is_some() || s.app_login)
                 && now_secs().saturating_sub(s.imported_at) > SESSION_REFRESH_AFTER
@@ -121,14 +121,14 @@ impl YtService {
             let s = Arc::clone(&svc);
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = s.refresh_session().await {
-                    tracing::warn!(error = %e, "no se pudo renovar la sesión al arrancar");
+                    tracing::warn!(error = %e, "could not renew the session at startup");
                 }
             });
         }
         svc
     }
 
-    /// Cookies Netscape de la sesión, para que yt-dlp reintente con cuenta.
+    /// The session's Netscape cookies, so yt-dlp can retry with the account.
     pub fn netscape_cookies(&self) -> Option<String> {
         self.session
             .read()
@@ -172,7 +172,7 @@ impl YtService {
         Ok(())
     }
 
-    // ------------------------------------------------------------ cliente
+    // ------------------------------------------------------------ client
 
     async fn build_client(cookie_header: &str, auth_user: u32) -> AppResult<Yt> {
         let http = ytmapi_rs::Client::new().map_err(|e| AppError::internal(e.to_string()))?;
@@ -206,15 +206,15 @@ impl YtService {
         Ok(c)
     }
 
-    /// Ejecuta una consulta autenticada: limita la concurrencia, detecta sesión
-    /// caducada (también la que responde 200 con "Sign in") y la renueva una vez.
+    /// Runs an authenticated query: limits concurrency, detects an expired session
+    /// (including one that answers 200 with "Sign in") and renews it once.
     async fn query(&self, q: impl Fn() -> Raw) -> AppResult<Value> {
         self.require_session()?;
         let _permit = self
             .limiter
             .acquire()
             .await
-            .map_err(|_| AppError::internal("limitador cerrado"))?;
+            .map_err(|_| AppError::internal("limiter closed"))?;
         let mut renewed = false;
         let mut waited = false;
         loop {
@@ -246,9 +246,9 @@ impl YtService {
         }
     }
 
-    // ------------------------------------------------------------ sesión
+    // ------------------------------------------------------------ session
 
-    /// Relee las cookies del navegador de origen y comprueba la cuenta.
+    /// Re-reads the cookies from the source browser and checks the account.
     pub async fn refresh_session(&self) -> AppResult<()> {
         let current = self.session.read().unwrap().clone();
         let Some(mut s) = current else {
@@ -261,7 +261,7 @@ impl YtService {
             let app = self
                 .app
                 .as_ref()
-                .ok_or_else(|| AppError::internal("sin AppHandle"))?;
+                .ok_or_else(|| AppError::internal("no AppHandle"))?;
             super::login::refresh(app)
                 .await
                 .inspect_err(|_| self.mark_expired())?
@@ -281,7 +281,7 @@ impl YtService {
                 .map_err(|e| AppError::internal(e.to_string()))?
                 .inspect_err(|_| self.mark_expired())?
         };
-        // La cuenta puede haber cambiado de índice si se añadieron otras en el navegador.
+        // The account's index may have changed if others were added in the browser.
         let accounts = Self::accounts_in(&header).await?;
         let found = accounts
             .iter()
@@ -309,7 +309,7 @@ impl YtService {
         *self.session.write().unwrap() = Some(s);
         *self.expired.write().unwrap() = false;
         *self.client.lock().await = None;
-        tracing::info!(app_login = s_app_login, "sesión de YouTube Music renovada");
+        tracing::info!(app_login = s_app_login, "YouTube Music session renewed");
         self.emit_status();
         Ok(())
     }
@@ -319,10 +319,10 @@ impl YtService {
         self.emit_status();
     }
 
-    /// Cuentas presentes en una cookie: (índice, nombre, handle, foto).
+    /// Accounts present in a cookie: (index, name, handle, photo).
     ///
-    /// Un solo token para todos los índices y las consultas de cuenta en
-    /// paralelo (antes: token + consulta, una tras otra, por cada índice).
+    /// A single token for all indices and the account queries run in
+    /// parallel (before: token + query, one after the other, for each index).
     async fn accounts_in(
         cookie: &str,
     ) -> AppResult<Vec<(u32, String, Option<String>, Option<String>)>> {
@@ -345,7 +345,7 @@ impl YtService {
         let mut answers: Vec<(u32, AppResult<Value>)> = set.join_all().await;
         answers.sort_by_key(|(i, _)| *i);
 
-        // Mismo criterio que antes, en orden de índice.
+        // Same criteria as before, in index order.
         let mut out = Vec::new();
         for (index, v) in answers {
             let v = match v {
@@ -355,7 +355,7 @@ impl YtService {
             };
             match parse::account_info(&v) {
                 Some((name, handle, photos)) => {
-                    // Con un índice inexistente Google devuelve la cuenta 0 otra vez.
+                    // With a nonexistent index Google returns account 0 again.
                     if out.iter().any(
                         |(_, n, h, _): &(u32, String, Option<String>, Option<String>)| {
                             *n == name && *h == handle
@@ -384,7 +384,7 @@ impl YtService {
         session::detect_profiles()
     }
 
-    /// Cuentas disponibles en un perfil de navegador (todas sus sesiones/contenedores).
+    /// Accounts available in a browser profile (all its sessions/containers).
     pub async fn scan_browser(&self, profile: String) -> AppResult<Vec<SessionAccount>> {
         let path = PathBuf::from(&profile);
         let containers = {
@@ -429,7 +429,7 @@ impl YtService {
                     }))
                 }
                 Err(e) => {
-                    tracing::info!(container = %c.name, error = %e, "contenedor sin cuentas válidas")
+                    tracing::info!(container = %c.name, error = %e, "container without valid accounts")
                 }
             }
         }
@@ -445,12 +445,12 @@ impl YtService {
         Ok(out)
     }
 
-    /// Abre la ventana de inicio de sesión de Google y devuelve las cuentas de esa sesión.
+    /// Opens the Google sign-in window and returns the accounts of that session.
     pub async fn sign_in_app(&self) -> AppResult<Vec<SessionAccount>> {
         let app = self
             .app
             .as_ref()
-            .ok_or_else(|| AppError::internal("sin AppHandle"))?;
+            .ok_or_else(|| AppError::internal("no AppHandle"))?;
         let cookies = super::login::sign_in(app).await?;
         let accounts = Self::accounts_in(&cookies.0).await?;
         *self.app_login.lock().unwrap() = Some(cookies);
@@ -466,7 +466,7 @@ impl YtService {
             .collect())
     }
 
-    /// Cuentas en una cookie pegada a mano.
+    /// Accounts in a cookie pasted by hand.
     pub async fn scan_pasted(&self, raw: String) -> AppResult<Vec<SessionAccount>> {
         let cookie = session::clean_pasted_cookie(&raw)?;
         let accounts = Self::accounts_in(&cookie).await?;
@@ -535,16 +535,13 @@ impl YtService {
         *self.expired.write().unwrap() = false;
         *self.client.lock().await = None;
         self.clear_cache();
-        tracing::info!(
-            index = account.index,
-            "cuenta de YouTube Music seleccionada"
-        );
+        tracing::info!(index = account.index, "YouTube Music account selected");
         self.emit_status();
         Ok(self.status())
     }
 
     pub async fn logout(&self) -> AppResult<()> {
-        // No anunciar desconexión si las credenciales persistidas siguen accesibles.
+        // Don't announce a sign-out if the persisted credentials are still accessible.
         self.store.clear()?;
         let was_app = self
             .session
@@ -553,7 +550,7 @@ impl YtService {
             .as_ref()
             .is_some_and(|s| s.app_login);
         if was_app {
-            // Cerrar sesión de verdad: fuera también el perfil de la ventana de Google.
+            // Really sign out: the Google window's profile goes too.
             let _ = tokio::task::spawn_blocking(super::login::forget).await;
         }
         *self.session.write().unwrap() = None;
@@ -564,7 +561,7 @@ impl YtService {
         Ok(())
     }
 
-    // ------------------------------------------------------------ caché
+    // ------------------------------------------------------------ cache
 
     fn cache_prefix(&self) -> String {
         let s = self.session.read().unwrap();
@@ -606,8 +603,8 @@ impl YtService {
         }
     }
 
-    /// Devuelve la caché al instante si existe; si está vieja, la refresca en
-    /// segundo plano y avisa con `yt://cache-updated` (FR-003-16).
+    /// Returns the cache instantly if present; if stale, refreshes it in the
+    /// background and notifies with `yt://cache-updated` (FR-003-16).
     async fn cached<T, F, Fut>(self: &Arc<Self>, name: &str, ttl: u64, fetch: F) -> AppResult<T>
     where
         T: Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -627,7 +624,7 @@ impl YtService {
                                 let _ = CacheUpdated { key: name }.emit(app);
                             }
                         }
-                        Err(e) => tracing::debug!(error = %e, "no se pudo refrescar la caché"),
+                        Err(e) => tracing::debug!(error = %e, "could not refresh the cache"),
                     }
                 });
             }
@@ -638,7 +635,7 @@ impl YtService {
         Ok(fresh)
     }
 
-    /// Invalida entradas cuyo nombre empiece por `prefix`.
+    /// Invalidates entries whose name starts with `prefix`.
     fn invalidate(&self, prefix: &str) {
         let pattern = format!("{}|{prefix}%", self.cache_prefix());
         let _ = self
@@ -647,7 +644,7 @@ impl YtService {
             .execute("DELETE FROM api_cache WHERE key LIKE ?1", [pattern]);
     }
 
-    // ------------------------------------------------------------ lectura
+    // ------------------------------------------------------------ reads
 
     pub async fn home(self: &Arc<Self>, continuation: Option<String>) -> AppResult<Page<Section>> {
         if let Some(c) = continuation {
@@ -725,7 +722,7 @@ impl YtService {
     }
 
     pub async fn history(self: &Arc<Self>) -> AppResult<Vec<Section>> {
-        // El historial cambia con cada escucha: caché corta.
+        // History changes with every listen: short cache.
         self.cached("history", 60, |s| async move {
             Ok(parse::history_page(
                 &s.query(|| Raw::browse("FEmusic_history")).await?,
@@ -734,7 +731,7 @@ impl YtService {
         .await
     }
 
-    /// Siguiente página de una lista de canciones (playlist, me gusta, biblioteca).
+    /// Next page of a track list (playlist, liked songs, library).
     pub async fn more_tracks(&self, continuation: String) -> AppResult<Page<Track>> {
         Ok(parse::track_page(
             &self
@@ -804,7 +801,7 @@ impl YtService {
             })
             .await?;
         let mut page = parse::search_page(&v);
-        // Con filtro, solo lo pedido (el destacado puede ser de otro tipo).
+        // With a filter, only what was asked for (the top result may be of another type).
         page.items.retain(|i| filter_matches(filter, i));
         Ok(page)
     }
@@ -831,7 +828,7 @@ impl YtService {
         ))
     }
 
-    /// Radio a partir de una canción (incluye la semilla primero).
+    /// Radio from a track (includes the seed first).
     pub async fn radio(&self, seed: TrackId) -> AppResult<Vec<Track>> {
         let v = self
             .query(|| Raw::new("next", json!({ "videoId": seed.0, "playlistId": format!("RDAMVM{}", seed.0), "isAudioOnly": true, "enablePersistentPlaylistPanel": true })))
@@ -839,7 +836,7 @@ impl YtService {
         Ok(parse::radio_page(&v).items)
     }
 
-    /// Datos del reproductor web (URL de historial y sonoridad).
+    /// Web player data (history URL and loudness).
     pub async fn player_info(&self, id: &TrackId) -> AppResult<parse::PlayerInfo> {
         Ok(parse::player_info(
             &self
@@ -848,19 +845,19 @@ impl YtService {
         ))
     }
 
-    /// Registra una escucha en el historial (FR-003-14).
+    /// Records a listen in the history (FR-003-14).
     pub async fn report_listen(&self, tracking_url: String) -> AppResult<()> {
         self.require_session()?;
         let yt = self.client().await?;
         use ytmapi_rs::common::YoutubeID;
         yt.add_history_item(ytmapi_rs::common::SongTrackingUrl::from_raw(tracking_url))
             .await
-            .map_err(|e| super::innertube::map_error("historial", &e))?;
+            .map_err(|e| super::innertube::map_error("history", &e))?;
         self.invalidate("history");
         Ok(())
     }
 
-    // ------------------------------------------------------------ escritura
+    // ------------------------------------------------------------ writes
 
     pub async fn rate(&self, id: TrackId, status: LikeStatus) -> AppResult<()> {
         let path = match status {
@@ -941,8 +938,8 @@ impl YtService {
     }
 }
 
-/// ¿La respuesta es la de alguien sin sesión? (YouTube responde 200 con un
-/// mensaje "Sign in" en lugar de un error).
+/// Is the response that of someone who isn't signed in? (YouTube answers 200 with a
+/// "Sign in" message instead of an error).
 fn signed_out(v: &Value) -> bool {
     parse::find_all(v, "messageRenderer")
         .into_iter()
@@ -970,7 +967,7 @@ fn filter_matches(filter: SearchFilter, item: &MediaItem) -> bool {
     }
 }
 
-/// Primera miniatura de al menos `px` de ancho (o la mayor).
+/// First thumbnail at least `px` wide (or the largest).
 #[allow(dead_code)]
 pub fn best_thumbnail(thumbs: &[Thumbnail], px: u32) -> Option<&Thumbnail> {
     thumbs
@@ -984,7 +981,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn detecta_respuesta_sin_sesion() {
+    fn detects_signed_out_response() {
         let v = json!({ "contents": { "itemSectionRenderer": { "contents": [ { "messageRenderer": {
             "button": { "buttonRenderer": { "navigationEndpoint": { "signInEndpoint": { "hack": true } } } } } } ] } } });
         assert!(signed_out(&v));
@@ -996,13 +993,13 @@ mod tests {
 
 #[cfg(test)]
 mod live_tests {
-    //! Contra la cuenta real (solo lectura):
-    //! `cargo test --lib -- --ignored --nocapture servicio_real`
+    //! Against the real account (read-only):
+    //! `cargo test --lib -- --ignored --nocapture real_service`
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
-    async fn servicio_real_de_punta_a_punta() {
+    async fn real_service_end_to_end() {
         let dir = std::env::temp_dir().join(format!("xp-music-live-{}", rand::random::<u32>()));
         std::fs::create_dir_all(&dir).unwrap();
         let db = Arc::new(Db::open(&dir.join("t.db")).unwrap());
@@ -1012,21 +1009,21 @@ mod live_tests {
             .detect_browsers()
             .into_iter()
             .next()
-            .expect("perfil de navegador");
+            .expect("browser profile");
         let accounts = yt.scan_browser(profile.path).await.unwrap();
         for a in &accounts {
             println!(
-                "cuenta: {} {:?} (índice {}) en {:?}",
+                "account: {} {:?} (index {}) in {:?}",
                 a.name, a.handle, a.index, a.source
             );
         }
         let wanted = std::env::var("XP_MUSIC_ACCOUNT_NAME")
-            .expect("XP_MUSIC_ACCOUNT_NAME con el nombre de tu cuenta");
+            .expect("XP_MUSIC_ACCOUNT_NAME with your account name");
         let account = accounts
             .into_iter()
             .find(|a| a.name == wanted)
-            .expect("cuenta esperada");
-        println!("estado: {:?}", yt.select_account(account).await.unwrap());
+            .expect("expected account");
+        println!("status: {:?}", yt.select_account(account).await.unwrap());
 
         let t = std::time::Instant::now();
         let pls = yt.library_playlists().await.unwrap();
@@ -1037,7 +1034,7 @@ mod live_tests {
         );
         let t = std::time::Instant::now();
         let again = yt.library_playlists().await.unwrap();
-        println!("playlists desde caché: {} ms", t.elapsed().as_millis());
+        println!("playlists from cache: {} ms", t.elapsed().as_millis());
         assert_eq!(pls, again);
 
         let mine = pls
@@ -1047,31 +1044,31 @@ mod live_tests {
             .unwrap();
         let detail = yt.playlist(mine.id.clone()).await.unwrap();
         println!(
-            "playlist {}: {} pistas, propia={}",
+            "playlist {}: {} tracks, owned={}",
             detail.summary.title,
             detail.tracks.items.len(),
             detail.owned
         );
 
         let liked = yt.liked_songs().await.unwrap();
-        println!("me gusta: {}", liked.items.len());
+        println!("liked: {}", liked.items.len());
         let hist = yt.history().await.unwrap();
         println!(
-            "historial: {:?}",
+            "history: {:?}",
             hist.iter()
                 .map(|s| (&s.title, s.items.len()))
                 .collect::<Vec<_>>()
         );
         let home = yt.home(None).await.unwrap();
         println!(
-            "inicio: {:?} · más: {}",
+            "home: {:?} · more: {}",
             home.items.iter().map(|s| &s.title).collect::<Vec<_>>(),
             home.continuation.is_some()
         );
         if let Some(c) = home.continuation {
             let more = yt.home(Some(c)).await.unwrap();
             println!(
-                "inicio (2ª página): {:?}",
+                "home (2nd page): {:?}",
                 more.items.iter().map(|s| &s.title).collect::<Vec<_>>()
             );
         }
@@ -1084,7 +1081,7 @@ mod live_tests {
         ] {
             let r = yt.search("aventura".into(), f).await.unwrap();
             println!(
-                "buscar {f:?}: {} resultados · más: {}",
+                "search {f:?}: {} results · more: {}",
                 r.items.len(),
                 r.continuation.is_some()
             );
@@ -1092,21 +1089,21 @@ mod live_tests {
                 && let Some(c) = r.continuation
             {
                 let more = yt.more_search(c, f).await.unwrap();
-                println!("  2ª página: {}", more.items.len());
+                println!("  2nd page: {}", more.items.len());
             }
         }
         println!(
-            "sugerencias: {:?}",
+            "suggestions: {:?}",
             yt.suggestions("romeo".into()).await.unwrap()
         );
         let radio = yt.radio(TrackId("yQd4xQBlBa0".into())).await.unwrap();
-        println!("radio: {} pistas", radio.len());
+        println!("radio: {} tracks", radio.len());
         let album = yt
             .album(BrowseId("MPREb_WixYTw0z5H2".into()))
             .await
             .unwrap();
         println!(
-            "álbum: {} ({} pistas)",
+            "album: {} ({} tracks)",
             album.summary.title,
             album.tracks.len()
         );
@@ -1115,7 +1112,7 @@ mod live_tests {
             .await
             .unwrap();
         println!(
-            "artista: {} · {} top · {} secciones",
+            "artist: {} · {} top · {} sections",
             artist.summary.name,
             artist.top_songs.len(),
             artist.sections.len()
@@ -1130,27 +1127,27 @@ mod live_tests {
             info.loudness_db
         );
 
-        // Renovación desde el navegador (como si hubiera caducado).
+        // Renewal from the browser (as if it had expired).
         yt.refresh_session().await.unwrap();
-        println!("tras renovar: {:?}", yt.status());
+        println!("after renewing: {:?}", yt.status());
         let _ = std::fs::remove_dir_all(dir);
     }
 }
 
 #[cfg(test)]
 mod dev_setup {
-    /// Deja la app conectada con la cuenta indicada (datos reales de la app):
-    /// `cargo test --lib -- --ignored preparar_sesion_real`
+    /// Leaves the app signed in with the given account (the app's real data):
+    /// `cargo test --lib -- --ignored prepare_real_session`
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
-    async fn preparar_sesion_real() {
+    async fn prepare_real_session() {
         use super::*;
         let dirs = crate::state::AppDirs::resolve().unwrap();
         let db = Arc::new(Db::open(&dirs.data.join("xp-music.db")).unwrap());
         let yt = YtService::new(None, db, dirs.data.clone());
         let profile = yt.detect_browsers().into_iter().next().unwrap();
         let wanted = std::env::var("XP_MUSIC_ACCOUNT_NAME")
-            .expect("XP_MUSIC_ACCOUNT_NAME con el nombre de tu cuenta");
+            .expect("XP_MUSIC_ACCOUNT_NAME with your account name");
         let account = yt
             .scan_browser(profile.path)
             .await
@@ -1164,21 +1161,21 @@ mod dev_setup {
 
 #[cfg(test)]
 mod bench_accounts {
-    //! Red real, solo lectura (menú de cuenta) con la sesión guardada en la app:
-    //! `cargo test --lib bench_cuentas -- --ignored --nocapture`.
+    //! Real network, read-only (account menu) with the session stored in the app:
+    //! `cargo test --lib bench_accounts -- --ignored --nocapture`.
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
-    async fn bench_cuentas() {
+    async fn bench_accounts() {
         let dirs = crate::state::AppDirs::resolve().unwrap();
         let store = SessionStore::new(&dirs.data);
-        let cookie = store.load().expect("sesión guardada").cookie_header;
-        for vuelta in 0..3 {
+        let cookie = store.load().expect("stored session").cookie_header;
+        for round in 0..3 {
             let t = std::time::Instant::now();
             let accounts = YtService::accounts_in(&cookie).await.unwrap();
             println!(
-                "vuelta {vuelta}: {} cuentas en {} ms",
+                "round {round}: {} accounts in {} ms",
                 accounts.len(),
                 t.elapsed().as_millis()
             );

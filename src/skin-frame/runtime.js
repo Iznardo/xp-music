@@ -1,6 +1,6 @@
-// Motor de un skin: construye la vista desde el .wms, ejecuta sus scripts con el
-// modelo de WMP, mantiene las expresiones wmpprop:/wmpenabled: al día, reparte los
-// clics y calcula la forma de la ventana.
+// Skin engine: builds the view from the .wms, runs its scripts with the WMP
+// model, keeps the wmpprop:/wmpenabled: expressions up to date, dispatches
+// clicks and computes the window shape.
 
 import { parseWms, findTag } from "./wms.js";
 import { decodeText } from "./zip.js";
@@ -47,7 +47,7 @@ class View extends Subview {
     clearInterval(this._timer);
     this._timer = 0;
     if (!this._timerOn || this._interval <= 0 || !this._rt.started) return;
-    // Hay skins con timerInterval="10": más de ~30 veces por segundo no aporta nada.
+    // Some skins use timerInterval="10": more than ~30 times per second adds nothing.
     this._timer = window.setInterval(() => this._rt.fire(this, "timer"), Math.max(33, this._interval));
   }
   _naturalW() {
@@ -58,7 +58,7 @@ class View extends Subview {
   }
 }
 
-/** Etiqueta → clase del elemento. */
+/** Tag → element class. */
 function classFor(/** @type {string} */ tag) {
   if (tag === "subview") return Subview;
   if (tag === "buttongroup") return ButtonGroup;
@@ -73,11 +73,11 @@ function classFor(/** @type {string} */ tag) {
   return null;
 }
 
-/** Elementos sin dibujo que sí son conocidos (no cuentan como no soportados). */
+/** Known elements with no drawing (they do not count as unsupported). */
 const KNOWN_STUBS = new Set(["equalizersettings", "videosettings", "automenu", "popup", "skinstudio", "copyright", "unsupported", "bars", "visualization", "alchemy", "column", "item"]);
-/** Objetos del reproductor cuyos eventos se declaran como elementos. */
+/** Player objects whose events are declared as elements. */
 const HOLDERS = new Set(["player", "controls", "settings", "currentmedia", "network", "mediacenter", "currentplaylist"]);
-/** Nombres globales que el propio motor necesita: un skin no puede taparlos. */
+/** Global names the engine itself needs: a skin cannot shadow them. */
 const RESERVED = new Set(
   ("Math Object Array String Number Boolean Date JSON Proxy Promise Map Set WeakMap Symbol Error TypeError RegExp URL Blob Response " +
     "Uint8Array Uint8ClampedArray DataView ArrayBuffer TextDecoder DecompressionStream OffscreenCanvas ImageData createImageBitmap " +
@@ -110,17 +110,17 @@ export class Runtime {
     this.title = "";
     /** @type {View | null} */
     this.view = null;
-    /** @type {Map<string, El>} id en minúsculas → elemento */
+    /** @type {Map<string, El>} lowercase id → element */
     this.ids = new Map();
     /** @type {El[]} */
     this.all = [];
     /** @type {{ el: El, prop: string, fn: () => unknown, last: unknown }[]} */
     this.bindings = [];
-    /** @type {Map<string, Map<string, string[]>>} objeto → evento → código */
+    /** @type {Map<string, Map<string, string[]>>} object → event → code */
     this.listeners = new Map();
     /** @type {string[]} */
     this.scripts = [];
-    /** Código de manejadores y expresiones (para los nombres globales). */
+    /** Code of handlers and expressions (for the global names). */
     this.code = /** @type {string[]} */ ([]);
     /** @type {(() => void)[]} */
     this.deferred = [];
@@ -131,18 +131,18 @@ export class Runtime {
     this.errors = 0;
     this.fromBinding = false;
     this.started = false;
-    /** Hasta que no hay nombres globales ni scripts, no se ejecuta código del skin. */
+    /** No skin code runs until the global names and scripts are in place. */
     this.ready = false;
     /** @type {any} */
     this.event = null;
-    /** Evento del navegador que se está atendiendo. @type {Event | null} */
+    /** Browser event being handled. @type {Event | null} */
     this.domEvent = null;
     this.compiled = new Map();
     this.anims = new Map();
     this.stubbed = /** @type {string[]} */ ([]);
     /** @type {Set<string>} */
     this.baseline = new Set();
-    /** Propiedades del modelo: en JScript `player.settings.mute()` lee la propiedad. */
+    /** Model properties: in JScript `player.settings.mute()` reads the property. */
     this.props = getterNames([
       ...["player", "controls", "settings", "currentplaylist", "currentmedia"].map((k) => /** @type {any} */ (k === "player" ? this.model.player : this.model.player[k]).__target),
       /** @type {any} */ (this.model.mediacenter).__target,
@@ -151,16 +151,16 @@ export class Runtime {
     this.handlerCount = 0;
   }
 
-  // --- Carga -----------------------------------------------------------------------
+  // --- Loading -----------------------------------------------------------------------
   async load() {
     const wmsName = this.zip.names().find((n) => /\.wms$/i.test(n));
-    if (!wmsName) throw new Error("El skin no tiene archivo .wms.");
+    if (!wmsName) throw new Error("The skin has no .wms file.");
     const root = parseWms(decodeText(await /** @type {Promise<Uint8Array>} */ (this.zip.read(wmsName))));
     const theme = findTag(root, "theme") ?? root;
     this.title = theme.attrs.title ?? "";
     for (const s of theme.children.filter((c) => c.tag === "script")) this.scripts.push(s.text);
     const viewNode = findTag(theme, "view");
-    if (!viewNode) throw new Error("El skin no tiene ninguna vista.");
+    if (!viewNode) throw new Error("The skin has no view.");
 
     const view = new View(this, viewNode);
     this.view = view;
@@ -171,14 +171,14 @@ export class Runtime {
       if (!name || /^res:/i.test(name)) continue;
       const bytes = this.zip.read(name);
       if (bytes) this.scripts.push(decodeText(await bytes));
-      else this.log("warn", `Falta el script ${name}`);
+      else this.log("warn", `Missing script ${name}`);
     }
     this.#build(viewNode, view);
 
-    // Las imágenes cargan en paralelo; se espera a todas para medir la vista.
+    // Images load in parallel; wait for all of them to measure the view.
     await this.#settle();
     this.#otherViews(theme, viewNode);
-    /** Lo que ya había en `window` antes del skin (el navegador). */
+    /** What was already in `window` before the skin (the browser). */
     this.baseline = new Set(Object.getOwnPropertyNames(window));
     this.#globals();
     for (const code of this.scripts) {
@@ -195,7 +195,7 @@ export class Runtime {
     return view;
   }
 
-  /** Arranca eventos y temporizadores (con la vista ya en pantalla). */
+  /** Starts events and timers (with the view already on screen). */
   start() {
     this.started = true;
     /** @type {View} */ (this.view)._restartTimer();
@@ -248,11 +248,11 @@ export class Runtime {
     }
   }
 
-  /** Atributos de un elemento: valores, enlaces y manejadores. @param {El} el @param {WmsNode} node */
+  /** Attributes of an element: values, bindings and handlers. @param {El} el @param {WmsNode} node */
   #setup(el, node) {
     this.all.push(el);
     const attrs = { ...node.attrs };
-    // Valores por defecto de los botones y deslizadores con nombre.
+    // Default values for the named buttons and sliders.
     const tag = node.tag;
     const named = /** @type {any} */ (el)._named;
     if (named?.defaults) for (const [k, v] of Object.entries(named.defaults)) if (!(k in attrs)) attrs[k] = v;
@@ -272,7 +272,7 @@ export class Runtime {
       el._id = attrs.id;
       this.ids.set(attrs.id.toLowerCase(), el);
     }
-    // Primero lo que define el tamaño y el color clave, después las imágenes.
+    // First what defines the size and the key color, then the images.
     const order = Object.keys(attrs).sort((a, b) => rank(a) - rank(b));
     for (const k of order) this.#attr(el, k, attrs[k]);
   }
@@ -287,7 +287,7 @@ export class Runtime {
       return;
     }
     const p = el._proxy;
-    // "jscript:wmpenabled:…" también aparece: manda el último prefijo.
+    // "jscript:wmpenabled:…" also appears: the last prefix wins.
     const m = /^\s*(?:jscript\s*:\s*)?(wmpprop|wmpenabled|wmpdisabled|jscript)\s*:(.*)$/is.exec(v);
     if (!m) {
       try {
@@ -326,7 +326,7 @@ export class Runtime {
         return neg ? !ok : ok;
       };
     }
-    this.bindings.push({ el, prop: k, fn, last: Symbol("nada") });
+    this.bindings.push({ el, prop: k, fn, last: Symbol("none") });
   }
 
   /** <player playStateChange="…">, <controls currentPosition_onchange="…">… @param {WmsNode} node @param {string} obj */
@@ -344,7 +344,7 @@ export class Runtime {
     for (const c of node.children) if (HOLDERS.has(c.tag)) this.#holder(c, c.tag);
   }
 
-  /** Ids de las otras vistas: existen (los scripts los tocan) pero no se dibujan. @param {WmsNode} theme @param {WmsNode} current */
+  /** Ids of the other views: they exist (scripts touch them) but are not drawn. @param {WmsNode} theme @param {WmsNode} current */
   #otherViews(theme, current) {
     /** @param {WmsNode} n */
     const walk = (n) => {
@@ -359,10 +359,10 @@ export class Runtime {
     for (const v of theme.children) if (v.tag === "view" && v !== current) walk(v);
   }
 
-  // --- Nombres globales y scripts ---------------------------------------------------
-  /** Los ids y los objetos de WMP, con la grafía que use cada skin. */
+  // --- Global names and scripts ---------------------------------------------------
+  /** The ids and the WMP objects, with whatever spelling each skin uses. */
   #globals() {
-    // Constantes de WMP que los skins usan sin definir (playState y openState).
+    // WMP constants that skins use without defining them (playState and openState).
     const consts = /** @type {Record<string, number>} */ ({});
     "Undefined Stopped Paused Playing ScanForward ScanReverse Buffering Waiting MediaEnded Transitioning Ready Reconnecting Last"
       .split(" ")
@@ -378,13 +378,13 @@ export class Runtime {
     /** @type {Map<string, () => unknown>} */
     const names = new Map();
     for (const [id, el] of this.ids) names.set(id, () => el._proxy);
-    // Los objetos de WMP mandan sobre un elemento que se llame igual (id="player").
+    // WMP objects take precedence over an element with the same name (id="player").
     const m = this.model;
     names.set("player", () => m.player);
     names.set("theme", () => m.theme);
     names.set("mediacenter", () => m.mediacenter);
     names.set("view", () => this.view?._proxy);
-    // Fuera de un evento, `event` existe igualmente (hay skins que leen event.screenWidth al cargar).
+    // Outside an event, `event` still exists (some skins read event.screenWidth on load).
     const idle = wmpObject(Object.assign(new (class Event {})(), { x: 0, y: 0, offsetx: 0, offsety: 0, button: 0, keycode: 0, screenwidth: screen.width, screenheight: screen.height, returnvalue: true }));
     names.set("event", () => this.event ?? idle);
     const tokens = new Set();
@@ -397,7 +397,7 @@ export class Runtime {
       const get = names.get(lt);
       if (!get || RESERVED.has(t)) continue;
       const exact = wmp.has(lt) || [...this.ids.values()].some((e) => e._id === t);
-      // Un nombre del navegador (Date, Image…) solo se tapa si el skin lo usa tal cual.
+      // A browser name (Date, Image…) is only shadowed if the skin uses it exactly as is.
       if (t in window && !exact) continue;
       try {
         Object.defineProperty(window, t, {
@@ -408,12 +408,12 @@ export class Runtime {
           },
         });
       } catch {
-        /* propiedad no configurable del navegador (top, location…) */
+        /* non-configurable browser property (top, location…) */
       }
     }
   }
 
-  /** Funciones que llaman los skins pero no definen (venían de la librería de WMP). */
+  /** Functions skins call but do not define (they came from the WMP library). */
   #stubs() {
     const calls = new Set();
     for (const src of [...this.scripts, ...this.code]) {
@@ -426,7 +426,7 @@ export class Runtime {
     }
   }
 
-  /** `x.mute()` → `x.mute` cuando `mute` es una propiedad (COM lo permite). @param {string} code */
+  /** `x.mute()` → `x.mute` when `mute` is a property (COM allows it). @param {string} code */
   fix(code) {
     return code.replace(/\.([A-Za-z_]\w*)\s*\(\s*\)/g, (m, n) => (this.props.has(n.toLowerCase()) ? `.${n}` : m));
   }
@@ -440,7 +440,7 @@ export class Runtime {
       try {
         f = new Function("__ctx", expr ? `with (__ctx) { return (${body}); }` : `with (__ctx) {\n${body}\n}`);
       } catch (err) {
-        this.#error("sintaxis", err);
+        this.#error("syntax", err);
         f = () => undefined;
       }
       this.compiled.set(key, f);
@@ -449,10 +449,10 @@ export class Runtime {
   }
 
   /**
-   * Ámbito de un manejador o expresión: como en WMP, los nombres sueltos son
-   * propiedades y métodos del propio elemento (`moveTo(left, top, 500)`), salvo
-   * que el skin defina algo global con ese nombre. Lo del navegador (top, name…)
-   * no cuenta: ahí gana el elemento.
+   * Scope of a handler or expression: as in WMP, bare names are properties and
+   * methods of the element itself (`moveTo(left, top, 500)`), unless the skin
+   * defines something global with that name. Browser built-ins (top, name…)
+   * do not count: the element wins there.
    * @param {El | null} el @param {Record<string, unknown>} [extra]
    */
   scope(el, extra) {
@@ -481,7 +481,7 @@ export class Runtime {
     return ctx;
   }
 
-  /** Ejecuta código de un manejador. */
+  /** Runs the code of a handler. */
   run(/** @type {string} */ code, /** @type {El | null} */ el, /** @type {Event | null} */ e = null, /** @type {Record<string, unknown>} */ extra = {}) {
     const f = this.#compile(code, false);
     const prev = this.event;
@@ -490,7 +490,7 @@ export class Runtime {
     try {
       f.call(el?._proxy ?? null, this.scope(el, Object.keys(extra).length ? extra : undefined));
     } catch (err) {
-      this.#error(el ? `${el._tag}${el._id ? `#${el._id}` : ""}` : "evento", err);
+      this.#error(el ? `${el._tag}${el._id ? `#${el._id}` : ""}` : "event", err);
     } finally {
       this.event = prev;
     }
@@ -504,11 +504,11 @@ export class Runtime {
     if (code) this.run(code, el, null, extra);
   }
 
-  /** Eventos de player/controls/settings… @param {string} obj @param {string} key @param {Record<string, unknown>} [extra] */
+  /** Events of player/controls/settings… @param {string} obj @param {string} key @param {Record<string, unknown>} [extra] */
   emit(obj, key, extra) {
     const map = this.listeners.get(obj);
     if (!map) return;
-    // playStateChange y PlayState_onchange son el mismo aviso.
+    // playStateChange and PlayState_onchange are the same notification.
     const alias = key.endsWith("change") && !key.includes("_") ? `${key.slice(0, -6)}_onchange` : null;
     for (const k of alias ? [key, alias] : [key]) for (const code of map.get(k) ?? []) this.run(code, null, null, extra);
   }
@@ -538,7 +538,7 @@ export class Runtime {
     );
   }
 
-  // --- Enlaces wmpprop: -------------------------------------------------------------
+  // --- wmpprop: bindings -------------------------------------------------------------
   refreshSoon() {
     if (this._refreshQueued) return;
     this._refreshQueued = true;
@@ -553,7 +553,7 @@ export class Runtime {
     this.fromBinding = true;
     try {
       for (const b of this.bindings) {
-        // No se mueve el control mientras el usuario lo arrastra.
+        // The control is not moved while the user is dragging it.
         if (b.prop === "value" && /** @type {any} */ (b.el)._dragging) continue;
         let v;
         try {
@@ -576,7 +576,7 @@ export class Runtime {
     }
   }
 
-  // --- Estado de la app ---------------------------------------------------------------
+  // --- App state ---------------------------------------------------------------
   /** @param {Partial<Runtime["state"]>} next */
   setState(next) {
     const before = { ...this.state, playstate: this.player.playstate, status: this.player.status, pos: this.player.controls.currentpositionstring };
@@ -616,7 +616,7 @@ export class Runtime {
     return this.model.media(this.queue.items[i] ?? null);
   }
 
-  /** Orden de la app con efecto inmediato aquí (los controles no esperan al eco). */
+  /** App command with immediate effect here (controls do not wait for the echo). */
   command(/** @type {string} */ c, /** @type {unknown} */ v) {
     const s = this.state;
     if (c === "volume") s.volume = /** @type {number} */ (v);
@@ -634,7 +634,7 @@ export class Runtime {
     this.send({ t: "pref", k: key.toLowerCase(), v: value });
   }
 
-  // --- Animaciones ---------------------------------------------------------------------
+  // --- Animations ---------------------------------------------------------------------
   /** @param {El} el @param {Record<string, number>} to @param {number} ms @param {string} endEvent */
   animate(el, to, ms, endEvent) {
     const key = `${this.all.indexOf(el)}:${Object.keys(to).join(",")}`;
@@ -657,13 +657,13 @@ export class Runtime {
     this.anims.set(key, requestAnimationFrame(step));
   }
 
-  // --- Ratón y forma ---------------------------------------------------------------------
+  // --- Mouse and shape ---------------------------------------------------------------------
   /** @param {El[]} els */
   paintOrder(els) {
     return els.map((e, i) => ({ e, i })).sort((a, b) => a.e._z - b.e._z || a.i - b.i).map((x) => x.e);
   }
 
-  /** Posición del elemento en la vista. @param {El} el */
+  /** Position of the element in the view. @param {El} el */
   absPos(el) {
     let x = 0;
     let y = 0;
@@ -685,7 +685,7 @@ export class Runtime {
     this._shapeTimer = setTimeout(() => this.#sendShape(), 80);
   }
 
-  /** Rectángulos (en píxeles CSS) de lo que pinta la vista. */
+  /** Rectangles (in CSS pixels) of what the view paints. */
   coverage() {
     const view = /** @type {View} */ (this.view);
     const W = Math.max(1, Math.min(4096, Math.round(view.width) || 1));
@@ -719,7 +719,7 @@ export class Runtime {
     paint(view, 0, 0);
     let covered = 0;
     for (let i = 0; i < mask.length; i++) covered += mask[i];
-    // Sin nada que dibuje forma (o casi), la ventana es el rectángulo entero.
+    // With nothing that draws a shape (or almost nothing), the window is the whole rectangle.
     if (covered === W * H || covered < (W * H) / 100) return null;
     /** @type {[number, number, number, number][]} */
     const rects = [];
@@ -759,7 +759,7 @@ export class Runtime {
     this.send({ t: "shape", rects: msg });
   }
 
-  // --- Errores ------------------------------------------------------------------------------
+  // --- Errors ------------------------------------------------------------------------------
   /** @param {string} where @param {unknown} e */
   #error(where, e) {
     this.errors++;
@@ -772,7 +772,7 @@ export class Runtime {
   }
 }
 
-/** Orden en que se aplican los atributos. @param {string} k */
+/** Order in which attributes are applied. @param {string} k */
 function rank(k) {
   if (k === "transparencycolor" || k === "clippingcolor") return 0;
   if (k === "width" || k === "height" || k === "min" || k === "max" || k === "direction" || k === "bordersize") return 1;
@@ -780,12 +780,12 @@ function rank(k) {
   return 2;
 }
 
-/** "onClick" → "click"; "value_onchange" se queda igual. @param {string} k */
+/** "onClick" → "click"; "value_onchange" stays the same. @param {string} k */
 function eventKey(k) {
   return /^on[a-z]/.test(k) && !k.includes("_") ? k.slice(2) : k;
 }
 
-/** Nombres de las propiedades (getters) de unos objetos y sus prototipos. @param {object[]} objs */
+/** Names of the properties (getters) of some objects and their prototypes. @param {object[]} objs */
 function getterNames(objs) {
   const out = new Set();
   for (let o of objs) {

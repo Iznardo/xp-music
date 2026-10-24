@@ -1,5 +1,5 @@
-// Acción `use:focusOnMount`: da el foco al montar (alternativa accesible a `autofocus`
-// para diálogos modales, donde el foco inicial es lo esperado).
+// `use:focusOnMount` action: gives focus on mount (an accessible alternative to
+// `autofocus` for modal dialogs, where initial focus is expected).
 export function focusOnMount(node: HTMLElement) {
   queueMicrotask(() => node.focus());
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Barra lateral de WMP 9 (FR-004-02): la cuenta arriba y siete tareas apiladas con búsqueda.
-  // La pieza (forma y fondo) la dibuja App; aquí solo va el contenido.
+  // WMP 9 side bar (FR-004-02): the account on top and seven stacked tasks with search.
+  // The piece (shape and background) is drawn by App; only the content goes here.
   import { router } from "../../router.svelte";
   import { auth } from "../../stores/auth.svelte";
   import { ui } from "../../stores/ui.svelte";
@@ -37,7 +37,7 @@
     if (query.trim()) router.go({ name: "search", filter: "All", query: query.trim() });
   }
 
-  // Al llegar a una búsqueda por otra vía (menú, atajos), refleja el texto.
+  // When a search is reached another way (menu, shortcuts), mirror its text.
   $effect(() => {
     if (router.route.name === "search") {
       query = router.route.query;
@@ -47,7 +47,7 @@
 </script>
 
 <nav class="side">
-  <!-- La cuenta, arriba del todo. -->
+  <!-- The account, at the very top. -->
   <div class="user">
     {#if auth.accountName}
       <button
@@ -97,7 +97,7 @@
     text-shadow: var(--side-text-shadow);
     cursor: pointer;
   }
-  /* Separadores: línea clara con sombra, como los de WMP 9. */
+  /* Separators: light line with a shadow, like WMP 9's. */
   .task::after {
     content: "";
     position: absolute;

@@ -1,9 +1,9 @@
-// Carga asíncrona con estado (cargando / error / datos) para las vistas.
+// Async loading with state (loading / error / data) for the views.
 //
-// Con `key`, los datos se guardan en memoria: al volver a una vista se muestran al
-// instante; si tienen menos de `FRESH_MS` no se vuelven a pedir y, si son más
-// viejos, se muestran igualmente y se refrescan en segundo plano. Las peticiones
-// iguales que coinciden en el tiempo se unifican en una sola.
+// With `key`, data is kept in memory: returning to a view shows it instantly; if it
+// is younger than `FRESH_MS` it is not requested again and, if older, it is still
+// shown and refreshed in the background. Identical requests that overlap in time
+// are merged into one.
 
 import type { AppError } from "./bindings";
 
@@ -13,12 +13,12 @@ const FRESH_MS = 60_000;
 const cache = new Map<string, { data: unknown; at: number }>();
 const inflight = new Map<string, Promise<Res<unknown>>>();
 
-/// Al cambiar de cuenta o cerrar sesión, lo guardado deja de valer.
+/// When switching account or signing out, whatever is stored is no longer valid.
 export function clearResourceCache() {
   cache.clear();
 }
 
-/// Ejecuta `fetcher` una sola vez para todas las peticiones simultáneas de `key`.
+/// Runs `fetcher` only once for all simultaneous requests for `key`.
 export function shared<T>(key: string, fetcher: () => Promise<Res<T>>): Promise<Res<T>> {
   const running = inflight.get(key) as Promise<Res<T>> | undefined;
   if (running) return running;
@@ -35,7 +35,7 @@ export class Resource<T> {
 
   constructor(
     private fetcher: () => Promise<Res<T>>,
-    /// Función (no valor) para que siga a las props de la vista si cambian.
+    /// A function (not a value) so it follows the view's props if they change.
     private keyOf?: () => string,
   ) {
     const hit = keyOf ? cache.get(keyOf()) : undefined;
@@ -50,12 +50,12 @@ export class Resource<T> {
       if (Date.now() - hit.at < FRESH_MS) return;
     }
     const seq = ++this.#seq;
-    // Con datos ya en pantalla no se muestra "Cargando…": se refresca por detrás.
+    // With data already on screen, "Loading…" is not shown: it refreshes behind the scenes.
     this.loading = !hit;
     this.error = null;
     try {
       const r = key ? await shared(key, this.fetcher) : await this.fetcher();
-      if (seq !== this.#seq) return; // Llegó tarde: ya se pidió otra cosa.
+      if (seq !== this.#seq) return; // Arrived late: something else was already requested.
       if (r.status === "ok") {
         this.data = r.data;
         if (key) cache.set(key, { data: r.data, at: Date.now() });

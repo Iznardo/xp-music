@@ -1,4 +1,4 @@
-//! Actualización de la propia app desde las releases públicas de GitHub (specs/007).
+//! Self-update of the app from the public GitHub releases (specs/007).
 //!
 //! `latest.json` de la última release dice qué versión hay y dónde está el
 //! instalador; el updater de Tauri comprueba su firma con la clave pública, que
@@ -20,7 +20,7 @@ use tauri_specta::Event;
 
 use crate::error::{AppError, AppResult, ErrorCode};
 
-/// Siempre apunta a la última release publicada.
+/// Always points to the latest published release.
 const LATEST_JSON: &str =
     "https://github.com/Iznardo/xp-music/releases/latest/download/latest.json";
 const LAST_CHECK_KEY: &str = "update.last_check";
@@ -39,7 +39,7 @@ pub struct UpdateInfo {
 #[derive(Serialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdaterStatus {
-    /// Las actualizaciones automáticas están disponibles en esta instalación.
+    /// Automatic updates are available in this installation.
     pub enabled: bool,
     pub pending: Option<UpdateInfo>,
 }
@@ -67,7 +67,7 @@ fn installation_allows_updates(
                     | BundleType::Nsis
             )
         )
-        // El marcador del bundle puede seguir siendo Deb tras reempaquetar en Nix.
+        // The bundle marker may still be Deb after repackaging in Nix.
         && executable.is_some_and(|path| !path.starts_with("/nix/store"))
 }
 
@@ -128,12 +128,12 @@ pub async fn check(app: &AppHandle) -> AppResult<Option<UpdateInfo>> {
         (info, u)
     });
     if let Some((info, _)) = pending.as_ref() {
-        tracing::info!(version = %info.version, "hay una versión nueva de XP Music");
+        tracing::info!(version = %info.version, "a new version of XP Music is available");
     }
     Ok(pending.as_ref().map(|(i, _)| i.clone()))
 }
 
-/// Comprobación al arrancar, como mucho una vez al día.
+/// Check at startup, at most once a day.
 pub fn spawn_startup_check(app: AppHandle, db: std::sync::Arc<crate::storage::Db>) {
     if !enabled() {
         return;
@@ -158,13 +158,13 @@ pub fn spawn_startup_check(app: AppHandle, db: std::sync::Arc<crate::storage::Db
             Ok(Some(info)) => {
                 let _ = info.emit(&app);
             }
-            Ok(None) => tracing::info!("XP Music está al día"),
-            Err(e) => tracing::info!(error = %e, "no se pudo comprobar la actualización"),
+            Ok(None) => tracing::info!("XP Music is up to date"),
+            Err(e) => tracing::info!(error = %e, "could not check for updates"),
         }
     });
 }
 
-// ---------------------------------------------------------------- comandos
+// ---------------------------------------------------------------- commands
 
 #[tauri::command]
 #[specta::specta]
@@ -191,7 +191,7 @@ pub async fn update_check(app: AppHandle) -> AppResult<Option<UpdateInfo>> {
     check(&app).await
 }
 
-/// Descarga e instala la versión pendiente y reinicia la app.
+/// Downloads and installs the pending version and restarts the app.
 #[tauri::command]
 #[specta::specta]
 pub async fn update_install(app: AppHandle) -> AppResult<()> {
@@ -212,22 +212,22 @@ pub async fn update_install(app: AppHandle) -> AppResult<()> {
             ),
         ));
     };
-    tracing::info!(version = %update.version, "descargando actualización");
+    tracing::info!(version = %update.version, "downloading update");
     let fail = |e: tauri_plugin_updater::Error| {
-        tracing::error!(error = %e, "fallo al actualizar");
+        tracing::error!(error = %e, "update failed");
         AppError::internal(tr!(
             "Could not install the update: {e}",
             "No se pudo instalar la actualización: {e}",
             e = e
         ))
     };
-    // Primero se descarga (y se verifica la firma); si falla, todo sigue como estaba.
+    // Download first (and verify the signature); if it fails, everything stays as it was.
     let bytes = update.download(|_, _| {}, || {}).await.map_err(fail)?;
-    // Guardar sin parar la reproducción: la instalación puede fallar o cancelarse.
+    // Save without stopping playback: the installation may fail or be cancelled.
     if let Some(player) = app.try_state::<std::sync::Arc<crate::player::service::PlayerService>>() {
         player.save_now();
     }
-    tracing::info!(version = %update.version, "instalando actualización");
+    tracing::info!(version = %update.version, "installing update");
     update.install(bytes).map_err(fail)?;
     app.restart();
 }
@@ -286,14 +286,14 @@ mod tests {
                     false,
                 ));
             }
-            // La exclusión de Nix respeta los límites de los componentes de la ruta.
+            // The Nix exclusion respects path component boundaries.
             assert!(installation_allows_updates(
                 Some("key"),
                 Some(bundle.clone()),
                 Some(Path::new("/nix/store-other/bin/xp-music")),
                 false,
             ));
-            // Opt-out explícito, Flatpak y Snap comparten este veto.
+            // Explicit opt-out, Flatpak and Snap share this veto.
             assert!(!installation_allows_updates(
                 Some("key"),
                 Some(bundle),

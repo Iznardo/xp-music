@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Iconos grandes estilo explorador de XP (FR-004-07): portada + título + subtítulo.
+  // Large XP Explorer-style icons (FR-004-07): cover + title + subtitle.
   import type { MediaItem } from "../../bindings";
   import { hintTrack, itemSubtitle, itemThumbs, itemTitle, openItem, playTracks, trackMenu } from "../../actions";
   import { ui, type MenuItem } from "../../stores/ui.svelte";
@@ -22,7 +22,7 @@
     <button class="tile" class:round={!!item.Artist} onmouseenter={() => item.Track && hintTrack(item.Track.id)} ondblclick={() => openItem(item)} onkeydown={(e) => e.key === "Enter" && openItem(item)} oncontextmenu={(e) => menu(item, e)} title={itemTitle(item)}>
       <span class="art">
         <span class="ph">♫</span>
-        <!-- Algunas listas automáticas no traen portada válida: se queda el icono. -->
+        <!-- Some automatic lists come without a valid cover: the icon stays. -->
         {#if src}<img {src} alt="" loading="lazy" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = "hidden")} />{/if}
         {#if item.Track}<span class="badge">♪</span>{/if}
       </span>

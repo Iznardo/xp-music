@@ -1,24 +1,24 @@
-// Arranque del marco del skin. Corre aislado (iframe sandbox sin mismo origen):
-// no ve la app ni su IPC; solo habla con la ventana por postMessage.
+// Skin frame bootstrap. Runs isolated (sandboxed iframe without same-origin):
+// it cannot see the app or its IPC; it only talks to the window via postMessage.
 
 import { openZip } from "./zip.js";
 import { Runtime } from "./runtime.js";
 
 const host = window.parent;
 
-// Defensa extra: el marco va sin origen, su CSP no le deja conectar más que con
-// skin.localhost y la app no le da permisos; aun así, WebView2 inyecta en todos
-// los marcos los objetos de la IPC de Tauri y su canal `chrome.webview`. Se
-// anulan antes de cargar ningún skin. `__TAURI_INTERNALS__` e `ipc` no se dejan
-// borrar, pero sin `chrome.webview` y con esta CSP no llegan a nada: el marco lo
-// comprueba al cargar y solo avisa si la IPC respondiera.
+// Extra defense: the frame has no origin, its CSP only lets it connect to
+// skin.localhost and the app grants it no permissions; even so, WebView2 injects
+// Tauri's IPC objects and its `chrome.webview` channel into every frame. They are
+// nullified before any skin loads. `__TAURI_INTERNALS__` and `ipc` cannot be
+// deleted, but without `chrome.webview` and with this CSP they reach nothing: the
+// frame checks this on load and only warns if the IPC were to respond.
 const exposed = ["__TAURI_INTERNALS__", "__TAURI__", "ipc", "__TAURI_IPC__", "__TAURI_POST_MESSAGE__"].filter((k) => k in window);
 for (const k of exposed) {
   try {
     delete (/** @type {any} */ (window))[k];
     Object.defineProperty(window, k, { value: undefined, configurable: false, writable: false });
   } catch {
-    /* no configurable: queda, pero sin canal */
+    /* not configurable: it stays, but without a channel */
   }
 }
 const chromeObj = /** @type {any} */ (window).chrome;
@@ -26,7 +26,7 @@ if (chromeObj?.webview) {
   try {
     Object.defineProperty(chromeObj, "webview", { value: undefined, configurable: false, writable: false });
   } catch {
-    /* queda, pero la CSP no le deja salir */
+    /* it stays, but the CSP does not let it out */
   }
 }
 /** @param {any} msg */
@@ -53,20 +53,20 @@ window.addEventListener("unhandledrejection", (e) => send({ t: "log", level: "wa
 
 /** @param {{ url: string, prefs?: Record<string, string>, state?: any, queue?: any }} m */
 async function init(m) {
-  // Comprobación activa: la IPC de la app no debe responder desde aquí.
+  // Active check: the app IPC must not respond from here.
   fetch("http://ipc.localhost/plugin%3Aapp%7Cversion", { method: "POST", body: "{}" })
-    .then((r) => send({ t: "log", level: "error", msg: `aislamiento: la IPC respondió desde el marco (${r.status})` }))
+    .then((r) => send({ t: "log", level: "error", msg: `isolation: the IPC responded from the frame (${r.status})` }))
     .catch(() => {});
-  // El otro camino de la IPC (window.ipc → chrome.webview) tampoco debe funcionar.
+  // The other IPC path (window.ipc → chrome.webview) must not work either.
   try {
     /** @type {any} */ (window).ipc?.postMessage("{}");
-    send({ t: "log", level: "error", msg: "aislamiento: window.ipc.postMessage no falló" });
+    send({ t: "log", level: "error", msg: "isolation: window.ipc.postMessage did not fail" });
   } catch {
-    /* lo esperado */
+    /* expected */
   }
   try {
     const res = await fetch(m.url);
-    if (!res.ok) throw new Error(`No se pudo leer el skin (${res.status}).`);
+    if (!res.ok) throw new Error(`Could not read the skin (${res.status}).`);
     const zip = openZip(await res.arrayBuffer());
     rt = new Runtime(zip, send, { prefs: m.prefs });
     if (m.state) rt.setState(m.state);
@@ -94,7 +94,7 @@ function stats(rt) {
   };
 }
 
-/** Ratón y teclado: el motor decide qué elemento recibe cada cosa. @param {Runtime} rt */
+/** Mouse and keyboard: the engine decides which element receives each thing. @param {Runtime} rt */
 function attach(rt) {
   const view = /** @type {import("./elements.js").El} */ (rt.view);
   /** @type {import("./elements.js").El | null} */
@@ -143,7 +143,7 @@ function attach(rt) {
       t._pointer("down", local(t, e), e);
       return;
     }
-    // Fuera de los controles: se arrastra la ventana (si es parte del skin).
+    // Outside the controls: drag the window (if it is part of the skin).
     if (inside(rt, e.clientX, e.clientY)) send({ t: "win", c: "drag" });
   });
   root.addEventListener("pointerup", (e) => {
@@ -163,14 +163,14 @@ function attach(rt) {
     e.preventDefault();
     send({ t: "win", c: "menu", x: e.clientX, y: e.clientY });
   });
-  // Atajos de la app (Ctrl+1 vuelve al modo completo, Ctrl+P…).
+  // App shortcuts (Ctrl+1 goes back to full mode, Ctrl+P…).
   window.addEventListener("keydown", (e) => {
     if (e.target instanceof HTMLInputElement) return;
     send({ t: "key", key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey });
   });
 }
 
-/** ¿El punto es parte visible del skin? @param {Runtime} rt @param {number} x @param {number} y */
+/** Is the point a visible part of the skin? @param {Runtime} rt @param {number} x @param {number} y */
 function inside(rt, x, y) {
   const c = rt.coverage();
   if (!c) return true;

@@ -1,7 +1,7 @@
-//! Resolución de `TrackId` → URL de audio (specs/002, principio III).
+//! Resolution of `TrackId` → audio URL (specs/002, principle III).
 //!
-//! `YtDlpResolver` invoca el sidecar yt-dlp; `CachedResolver` evita repetirlo
-//! mientras la URL siga vigente (yt-dlp tarda ~3,5 s, ver spike/FINDINGS.md).
+//! `YtDlpResolver` invokes the yt-dlp sidecar; `CachedResolver` avoids repeating
+//! it while the URL is still valid (yt-dlp takes ~3.5 s, see spike/FINDINGS.md).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ use crate::domain::TrackId;
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::storage::Db;
 
-/// Margen antes de `expire` a partir del cual una URL ya no se reutiliza.
+/// Margin before `expire` after which a URL is no longer reused.
 const EXPIRY_MARGIN: Duration = Duration::from_secs(10 * 60);
 const YT_DLP_TIMEOUT: Duration = Duration::from_secs(25);
 
@@ -40,17 +40,17 @@ pub struct ResolvedStream {
     pub itag: u32,
     pub content_length: Option<u64>,
     pub duration_ms: Option<u32>,
-    /// Segundos Unix (parámetro `expire` de la URL).
+    /// Unix seconds (the URL's `expire` parameter).
     pub expires_at: u64,
     pub user_agent: Option<String>,
-    /// Arranque rápido: esta URL solo sirve el principio y la completa llega
-    /// aquí más tarde (ver `fast.rs`). Nunca se guarda en caché.
+    /// Fast start: this URL only serves the start and the full one arrives
+    /// here later (see `fast.rs`). Never cached.
     #[serde(skip)]
     pub upgrade: Option<Upgrade>,
 }
 
-/// Hueco donde llega la resolución completa de una pista que ya está sonando
-/// con la URL del arranque rápido.
+/// Slot where the full resolution arrives for a track that is already playing
+/// with the fast-start URL.
 #[derive(Clone, Default)]
 pub struct Upgrade(Arc<(Mutex<Option<AppResult<ResolvedStream>>>, std::sync::Condvar)>);
 
@@ -60,7 +60,7 @@ impl Upgrade {
         self.0.1.notify_all();
     }
 
-    /// Espera hasta `timeout`; `None` si aún no ha llegado.
+    /// Waits up to `timeout`; `None` if it has not arrived yet.
     pub fn wait(&self, timeout: Duration) -> Option<AppResult<ResolvedStream>> {
         let guard = self.0.0.lock().unwrap();
         let (guard, _) = self
@@ -93,12 +93,12 @@ impl ResolvedStream {
     }
 }
 
-/// Bloqueante: se llama desde `spawn_blocking` o hilos propios.
+/// Blocking: called from `spawn_blocking` or dedicated threads.
 pub trait StreamResolver: Send + Sync {
     fn resolve(&self, id: &TrackId, pref: FormatPreference) -> AppResult<ResolvedStream>;
-    /// Olvida lo que se tenga en caché de `id` (URL caducada o rechazada).
+    /// Forgets whatever is cached for `id` (expired or rejected URL).
     fn invalidate(&self, _id: &TrackId) {}
-    /// Resolución ya disponible sin esperar (caché válida).
+    /// Resolution already available without waiting (valid cache).
     fn cached(&self, _id: &TrackId, _pref: FormatPreference) -> Option<ResolvedStream> {
         None
     }
@@ -113,8 +113,8 @@ pub struct ToolPaths {
 }
 
 impl ToolPaths {
-    /// Busca en `XP_MUSIC_TOOLS`, los recursos del paquete, junto al ejecutable
-    /// o `tools/` del repositorio en desarrollo.
+    /// Looks in `XP_MUSIC_TOOLS`, the package resources, next to the executable
+    /// or `tools/` in the repository during development.
     pub fn locate() -> Option<Self> {
         let mut candidates: Vec<PathBuf> = Vec::new();
         if let Some(dir) = std::env::var_os("XP_MUSIC_TOOLS") {
@@ -137,9 +137,9 @@ impl ToolPaths {
             .iter()
             .map(|d| d.join(format!("deno{}", std::env::consts::EXE_SUFFIX)))
             .find(|p| p.is_file())?;
-        // La copia que actualiza la propia app (007) tiene prioridad; si no, la incluida.
-        // Se prefiere la versión "onedir" (`yt-dlp/yt-dlp.exe`): no se descomprime en cada
-        // uso y arranca ~0,7 s antes que el ejecutable de un solo archivo.
+        // The copy updated by the app itself (007) takes priority; otherwise the bundled one.
+        // The "onedir" version (`yt-dlp/yt-dlp.exe`) is preferred: it is not unpacked on
+        // every use and starts ~0.7 s faster than the single-file executable.
         let yt_dlp = crate::tools::updated_yt_dlp()
             .filter(|p| p.is_file())
             .or_else(|| {
@@ -158,7 +158,7 @@ impl ToolPaths {
 
 pub struct YtDlpResolver {
     tools: ToolPaths,
-    /// Da las cookies de la sesión (formato Netscape), solo para el reintento (NFR-002-05).
+    /// Provides the session cookies (Netscape format), only for the retry (NFR-002-05).
     cookies: Option<CookieProvider>,
     failures: std::sync::atomic::AtomicU32,
 }
@@ -190,7 +190,7 @@ impl YtDlpResolver {
         pref: FormatPreference,
         cookies: Option<&Path>,
     ) -> AppResult<ResolvedStream> {
-        // Se vuelven a buscar en cada uso: tras una actualización se usa la copia nueva.
+        // Looked up again on every use: after an update the new copy is used.
         let tools = ToolPaths::locate().unwrap_or_else(|| self.tools.clone());
         let mut cmd = Command::new(&tools.yt_dlp);
         cmd.args([
@@ -199,7 +199,7 @@ impl YtDlpResolver {
             "-j",
             "--no-playlist",
             "--no-warnings",
-            // Solo hace falta el formato progresivo: sin manifiestos HLS/DASH (~0,3 s menos).
+            // Only the progressive format is needed: no HLS/DASH manifests (~0.3 s less).
             "--extractor-args",
             "youtube:skip=hls,dash,translated_subs",
         ])
@@ -223,8 +223,8 @@ impl YtDlpResolver {
                 .lines()
                 .rev()
                 .find(|l| !l.trim().is_empty())
-                .unwrap_or("sin salida");
-            tracing::warn!(track = %id.0, error = %last, "yt-dlp falló");
+                .unwrap_or("no output");
+            tracing::warn!(track = %id.0, error = %last, "yt-dlp failed");
             return Err(AppError::new(
                 ErrorCode::ResolveFailed,
                 tr!(
@@ -239,7 +239,7 @@ impl YtDlpResolver {
 
 fn parse_info(id: &TrackId, stdout: &[u8]) -> AppResult<ResolvedStream> {
     let info: YtDlpInfo = serde_json::from_slice(stdout).map_err(|e| {
-        tracing::warn!(error = %e, "JSON de yt-dlp no válido");
+        tracing::warn!(error = %e, "invalid yt-dlp JSON");
         AppError::new(
             ErrorCode::ResolveFailed,
             tr!(
@@ -253,7 +253,7 @@ fn parse_info(id: &TrackId, stdout: &[u8]) -> AppResult<ResolvedStream> {
         .split(['?', '&'])
         .find_map(|kv| kv.strip_prefix("expire="))
         .and_then(|v| v.parse().ok())
-        // Sin `expire` se asume la vida típica de 6 h.
+        // Without `expire`, assume the typical lifetime of 6 h.
         .unwrap_or_else(|| {
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -280,7 +280,7 @@ fn run_with_timeout(mut cmd: Command, timeout: Duration) -> AppResult<std::proce
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
-            tracing::error!(error = %e, "no se pudo lanzar yt-dlp");
+            tracing::error!(error = %e, "could not launch yt-dlp");
             AppError::new(
                 ErrorCode::ResolveFailed,
                 tr!(
@@ -289,7 +289,7 @@ fn run_with_timeout(mut cmd: Command, timeout: Duration) -> AppResult<std::proce
                 ),
             )
         })?;
-    // Leer stdout/stderr en hilos para que el proceso no se bloquee con la tubería llena.
+    // Read stdout/stderr in threads so the process does not block on a full pipe.
     let mut out = child.stdout.take().expect("stdout");
     let mut err = child.stderr.take().expect("stderr");
     let out_h = std::thread::spawn(move || {
@@ -312,7 +312,7 @@ fn run_with_timeout(mut cmd: Command, timeout: Duration) -> AppResult<std::proce
         }
         if start.elapsed() > timeout {
             let _ = child.kill();
-            tracing::warn!("yt-dlp superó el tiempo límite");
+            tracing::warn!("yt-dlp exceeded the time limit");
             return Err(AppError::new(
                 ErrorCode::ResolveFailed,
                 tr!(
@@ -330,7 +330,7 @@ fn run_with_timeout(mut cmd: Command, timeout: Duration) -> AppResult<std::proce
     })
 }
 
-/// Fallos seguidos a partir de los cuales se sospecha de un yt-dlp desfasado (FR-007-09).
+/// Consecutive failures after which an outdated yt-dlp is suspected (FR-007-09).
 const FAILS_BEFORE_UPDATE: u32 = 2;
 
 impl StreamResolver for YtDlpResolver {
@@ -344,10 +344,10 @@ impl StreamResolver for YtDlpResolver {
         if self.failures.fetch_add(1, Ordering::Relaxed) + 1 < FAILS_BEFORE_UPDATE {
             return res;
         }
-        // YouTube cambia a menudo y una versión nueva de yt-dlp suele arreglarlo.
+        // YouTube changes often and a new yt-dlp version usually fixes it.
         match crate::tools::update_yt_dlp(true) {
             Ok(Some(v)) => {
-                tracing::info!(version = %v, track = %id.0, "reintentando con yt-dlp actualizado");
+                tracing::info!(version = %v, track = %id.0, "retrying with updated yt-dlp");
                 self.failures.store(0, Ordering::Relaxed);
                 self.resolve_once(id, pref)
             }
@@ -364,7 +364,7 @@ impl YtDlpResolver {
                 let Some(netscape) = self.cookies.as_ref().and_then(|f| f()) else {
                     return Err(first);
                 };
-                // Fichero temporal (yt-dlp lo reescribe); se borra al terminar.
+                // Temporary file (yt-dlp rewrites it); deleted when done.
                 let tmp = std::env::temp_dir().join(format!(
                     "xp-music-cookies-{}-{}.txt",
                     std::process::id(),
@@ -387,7 +387,7 @@ impl YtDlpResolver {
                         return Err(AppError::internal(e.to_string()));
                     }
                 }
-                tracing::info!(track = %id.0, "reintentando yt-dlp con sesión");
+                tracing::info!(track = %id.0, "retrying yt-dlp with session");
                 let res = self.run(id, pref, Some(&tmp));
                 let _ = std::fs::remove_file(&tmp);
                 res
@@ -396,7 +396,7 @@ impl YtDlpResolver {
     }
 }
 
-/// Sustituto cuando no se encuentran yt-dlp/deno: cada intento da un error claro.
+/// Stand-in when yt-dlp/deno are not found: every attempt gives a clear error.
 pub struct MissingTools;
 
 impl StreamResolver for MissingTools {
@@ -411,14 +411,15 @@ impl StreamResolver for MissingTools {
     }
 }
 
-// ---------------------------------------------------------------- caché
+// ---------------------------------------------------------------- cache
 
 pub struct CachedResolver<R> {
     inner: R,
     db: Arc<Db>,
     mem: Mutex<HashMap<(String, u32), ResolvedStream>>,
-    /// Resoluciones en marcha: quien pida la misma pista espera a esa en vez de
-    /// lanzar otro yt-dlp (p. ej. doble clic mientras se resolvía al pasar el ratón).
+    /// Resolutions in flight: whoever asks for the same track waits for that one
+    /// instead of launching another yt-dlp (e.g. double click while it was being
+    /// resolved on hover).
     inflight: Mutex<HashMap<(String, u32), Arc<Flight>>>,
 }
 
@@ -472,13 +473,13 @@ impl<R: StreamResolver> CachedResolver<R> {
                 (&key.0, key.1, json, s.expires_at as i64),
             );
             if let Err(e) = res {
-                tracing::warn!(error = %e, "no se pudo guardar la resolución en caché");
+                tracing::warn!(error = %e, "could not store the resolution in the cache");
             }
         }
         self.mem.lock().unwrap().insert(key, s.clone());
     }
 
-    /// Borra entradas caducadas (se llama al arrancar).
+    /// Deletes expired entries (called at startup).
     pub fn purge_expired(&self) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -495,7 +496,7 @@ impl<R: StreamResolver> StreamResolver for CachedResolver<R> {
     fn resolve(&self, id: &TrackId, pref: FormatPreference) -> AppResult<ResolvedStream> {
         let key = (id.0.clone(), pref.itag());
         if let Some(s) = self.lookup(&key) {
-            tracing::debug!(track = %id.0, "resolución desde caché");
+            tracing::debug!(track = %id.0, "resolution from cache");
             return Ok(s);
         }
         let (flight, leader) = {
@@ -510,12 +511,12 @@ impl<R: StreamResolver> StreamResolver for CachedResolver<R> {
             }
         };
         if !leader {
-            tracing::debug!(track = %id.0, "esperando a la resolución en marcha");
+            tracing::debug!(track = %id.0, "waiting for the in-flight resolution");
             let mut r = flight.result.lock().unwrap();
             while r.is_none() {
                 r = flight.done.wait(r).unwrap();
             }
-            return r.clone().expect("resultado");
+            return r.clone().expect("result");
         }
         let t0 = std::time::Instant::now();
         let res = self.inner.resolve(id, pref);
@@ -556,7 +557,7 @@ mod tests {
     impl StreamResolver for Fake {
         fn resolve(&self, id: &TrackId, _: FormatPreference) -> AppResult<ResolvedStream> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            // Como yt-dlp: tarda un poco.
+            // Like yt-dlp: it takes a little while.
             std::thread::sleep(std::time::Duration::from_millis(50));
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -576,10 +577,10 @@ mod tests {
     }
 
     #[test]
-    fn peticiones_simultaneas_comparten_una_resolucion() {
+    fn simultaneous_requests_share_one_resolution() {
         let (r, _db) = cached(3600);
         let r = Arc::new(r);
-        let hilos: Vec<_> = (0..4)
+        let threads: Vec<_> = (0..4)
             .map(|_| {
                 let r = Arc::clone(&r);
                 std::thread::spawn(move || {
@@ -587,7 +588,7 @@ mod tests {
                 })
             })
             .collect();
-        for h in hilos {
+        for h in threads {
             assert!(h.join().unwrap().is_ok());
         }
         assert_eq!(r.inner.calls.load(Ordering::SeqCst), 1);
@@ -608,7 +609,7 @@ mod tests {
     }
 
     #[test]
-    fn reutiliza_mientras_es_valida() {
+    fn reuses_while_valid() {
         let (r, _) = cached(6 * 3600);
         let id = TrackId("abc".into());
         let a = r.resolve(&id, FormatPreference::Aac128).unwrap();
@@ -618,8 +619,8 @@ mod tests {
     }
 
     #[test]
-    fn no_reutiliza_si_caduca_pronto() {
-        let (r, _) = cached(60); // caduca dentro del margen de 10 min
+    fn does_not_reuse_if_it_expires_soon() {
+        let (r, _) = cached(60); // expires within the 10 min margin
         let id = TrackId("abc".into());
         r.resolve(&id, FormatPreference::Aac128).unwrap();
         r.resolve(&id, FormatPreference::Aac128).unwrap();
@@ -627,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn sobrevive_a_reinicio_via_sqlite_e_invalida() {
+    fn survives_restart_via_sqlite_and_invalidates() {
         let (r, db) = cached(6 * 3600);
         let id = TrackId("abc".into());
         r.resolve(&id, FormatPreference::Aac128).unwrap();
@@ -642,7 +643,7 @@ mod tests {
         assert_eq!(
             r2.inner.calls.load(Ordering::SeqCst),
             0,
-            "debe venir de SQLite"
+            "must come from SQLite"
         );
         r2.invalidate(&id);
         r2.resolve(&id, FormatPreference::Aac128).unwrap();
@@ -650,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn parsea_salida_de_yt_dlp() {
+    fn parses_yt_dlp_output() {
         let json = br#"{"url":"https://rr3.googlevideo.com/videoplayback?expire=1792466577&itag=140","format_id":"140","filesize":3449447,"duration":213.0,"http_headers":{"User-Agent":"Mozilla/5.0"}}"#;
         let s = parse_info(&TrackId("dQw4w9WgXcQ".into()), json).unwrap();
         assert_eq!(s.itag, 140);
@@ -660,11 +661,11 @@ mod tests {
         assert_eq!(s.user_agent.as_deref(), Some("Mozilla/5.0"));
     }
 
-    /// Prueba real con yt-dlp: `cargo test -- --ignored resuelve_de_verdad`.
+    /// Real test with yt-dlp: `cargo test -- --ignored resolves_for_real`.
     #[test]
     #[ignore]
-    fn resuelve_de_verdad() {
-        let tools = ToolPaths::locate().expect("tools/ con yt-dlp y deno");
+    fn resolves_for_real() {
+        let tools = ToolPaths::locate().expect("tools/ with yt-dlp and deno");
         let s = YtDlpResolver::new(tools, None)
             .resolve(&TrackId("dQw4w9WgXcQ".into()), FormatPreference::Aac128)
             .unwrap();

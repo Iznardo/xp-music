@@ -1,6 +1,6 @@
-// Modelo de objetos de WMP que usan los skins (player, theme, mediacenter…),
-// conectado al reproductor de la app. Lo que no tiene sentido aquí (CD, DVD,
-// abrir archivos…) existe pero no hace nada, para que los scripts no fallen.
+// WMP object model used by skins (player, theme, mediacenter…), connected to the
+// app's player. What makes no sense here (CD, DVD, opening files…) exists but
+// does nothing, so scripts do not fail.
 
 import { wmpObject, bool, num, timeString } from "./util.js";
 
@@ -57,7 +57,7 @@ class Media {
     if (a === "duration") return String(this.duration);
     return "";
   }
-  /** Así lo llaman algunos skins. @param {string} attr */
+  /** That is what some skins call it. @param {string} attr */
   getinfo(attr) {
     return this.getiteminfo(attr);
   }
@@ -116,7 +116,7 @@ class Controls {
   }
   set currentposition(v) {
     const s = num(v);
-    // Las barras de posición lo reasignan sin parar: solo se salta si cambia de verdad.
+    // Position bars reassign this constantly: only seek if it really changes.
     if (Math.abs(s - this.currentposition) < 0.75) return;
     this._rt.command("seek", Math.max(0, Math.round(s * 1000)));
   }
@@ -246,7 +246,7 @@ class PlaylistObj {
   }
 }
 
-/** Algo que existe pero no hace nada (CD, DVD, subtítulos, colecciones…). */
+/** Something that exists but does nothing (CD, DVD, captions, collections…). */
 function inert(extra = {}) {
   return wmpObject(Object.assign(new (class Inert {})(), { count: 0, item: () => null, isavailable: () => false, getall: () => wmpObject({ count: 0, item: () => null }), getbyname: () => wmpObject({ count: 0, item: () => null }) }, extra));
 }
@@ -340,7 +340,7 @@ class Theme {
   }
   /** @param {string} id */
   openview(id) {
-    this._rt.log("info", `openView("${id}") no está soportado todavía`);
+    this._rt.log("info", `openView("${id}") is not supported yet`);
   }
   openviewrelative(/** @type {string} */ id) {
     this.openview(id);
@@ -353,7 +353,7 @@ class Theme {
   savepreference(name, value) {
     this._rt.savePref(String(name), String(value));
   }
-  /** WMP devuelve "--" si no hay nada guardado. @param {string} name */
+  /** WMP returns "--" if nothing is stored. @param {string} name */
   loadpreference(name) {
     return this._rt.prefs[String(name).toLowerCase()] ?? "--";
   }
@@ -404,7 +404,7 @@ class MediaCenter {
   }
 }
 
-/** Métodos y propiedades de la vista (la ventana del skin). */
+/** Methods and properties of the view (the skin window). */
 export const viewMethods = {
   close() {
     /** @type {any} */ (this)._rt.send({ t: "win", c: "close" });
@@ -426,7 +426,7 @@ export function createModel(rt) {
   return {
     player: wmpObject(new Player(rt)),
     theme: wmpObject(new Theme(rt)),
-    // MEDIACENTER: valores que los skins leen y escriben (visualización elegida…).
+    // MEDIACENTER: values that skins read and write (chosen visualization…).
     mediacenter: wmpObject(new MediaCenter()),
     media: (/** @type {Item | null} */ it) => wmpObject(new Media(it)),
   };

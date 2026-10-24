@@ -1,22 +1,22 @@
-// Reflejo del reproductor del backend (principio II). Se hidrata al montar
-// (la WebView puede recrearse) y se mantiene al día con los eventos.
+// Mirror of the backend player (principle II). Hydrated on mount (the WebView
+// can be recreated) and kept up to date with events.
 //
-// Los eventos traen el estado completo; para no recalcular (ni repintar) lo que
-// no ha cambiado, se reconcilian con lo que ya hay en vez de sustituirlo: la cola,
-// si tiene las mismas canciones, conserva su lista (y con ella la selección y el
-// orden de la tabla), y del estado solo se asignan los campos distintos.
+// Events carry the full state; to avoid recomputing (or repainting) what hasn't
+// changed, they are reconciled with what is already there instead of replacing it:
+// the queue, if it has the same songs, keeps its list (and with it the selection and
+// the table order), and only the fields that differ are assigned to the state.
 
 import { commands, events, type AppError, type PlayerState, type QueueSnapshot, type Track } from "../bindings";
 
-/// Mismas canciones en el mismo orden (comparando ids: con 3000 filas es rápido).
+/// Same songs in the same order (comparing ids: fast even with 3000 rows).
 function sameTracks(a: Track[], b: Track[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i]!.id !== b[i]!.id) return false;
   return true;
 }
 
-/// Asigna en `target` solo lo que difiere de `source` (claves de primer nivel;
-/// los objetos anidados se comparan por contenido).
+/// Assigns to `target` only what differs from `source` (top-level keys;
+/// nested objects are compared by content).
 function patch<T extends object>(target: T, source: T) {
   for (const key of Object.keys(source) as (keyof T)[]) {
     const next = source[key];
@@ -44,7 +44,7 @@ class PlayerStore {
       this.queue = next;
       return;
     }
-    // Mismas canciones: solo cambian el índice actual y los modos.
+    // Same songs: only the current index and the modes change.
     const { tracks: _same, ...rest } = next;
     patch(cur, { ...cur, ...rest });
   }

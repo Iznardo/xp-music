@@ -1,4 +1,4 @@
-XP Music incluye software de terceros. Sus licencias:
+XP Music includes third-party software. Their licenses:
 
 ================================================================================
 yt-dlp  (https://github.com/yt-dlp/yt-dlp)  -  Unlicense
@@ -29,8 +29,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <http://unlicense.org/>
 
-La distribución de yt-dlp para Windows incluye a su vez componentes con sus
-propias licencias (Python y otros); se enumeran en
+The Windows distribution of yt-dlp in turn bundles components with their own
+licenses (Python and others); they are listed at
 https://github.com/yt-dlp/yt-dlp/blob/master/THIRD_PARTY_LICENSES.txt
 
 ================================================================================
@@ -81,10 +81,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-Otras dependencias
+Other dependencies
 ================================================================================
 
-El resto de bibliotecas (Tauri, Svelte, Symphonia, cpal, rustfft y demás) se
-distribuyen bajo licencias MIT, Apache-2.0 o similares; la lista completa está
-en Cargo.lock y package-lock.json del código fuente:
+The remaining libraries (Tauri, Svelte, Symphonia, cpal, rustfft and others) are
+distributed under MIT, Apache-2.0 or similar licenses; the full list is in
+Cargo.lock and package-lock.json in the source code:
 https://github.com/Iznardo/xp-music

@@ -1,10 +1,10 @@
-//! Inicio de sesión dentro de la app: una ventana WebView2 con su propio perfil
-//! (`%LOCALAPPDATA%\xp-music\login`) abre la página de Google; al llegar a
-//! music.youtube.com con sesión se leen sus cookies. Así funciona con cualquier
-//! navegador (o sin ninguno) y sirve para pasar la app a otras personas.
+//! In-app sign-in: a WebView2 window with its own profile
+//! (`%LOCALAPPDATA%\xp-music\login`) opens the Google page; once it reaches
+//! music.youtube.com with a session, its cookies are read. This works with any
+//! browser (or none) and makes it possible to hand the app to other people.
 //!
-//! El mismo perfil se reutiliza, con la ventana oculta, para **renovar** la sesión
-//! cuando Google rota las cookies: basta con volver a cargar music.youtube.com.
+//! The same profile is reused, with the window hidden, to **renew** the session
+//! when Google rotates the cookies: reloading music.youtube.com is enough.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -18,12 +18,12 @@ use crate::error::{AppError, AppResult, ErrorCode};
 
 const LABEL: &str = "login";
 const MUSIC: &str = "https://music.youtube.com/";
-/// Inicio de sesión de Google que vuelve a YouTube Music.
+/// Google sign-in that returns to YouTube Music.
 const SIGN_IN: &str = "https://accounts.google.com/ServiceLogin?service=youtube&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26next%3Dhttps%253A%252F%252Fmusic.youtube.com%252F";
-/// Para la renovación en segundo plano.
+/// For the background renewal.
 const REFRESH_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Cookies listas para usar: (cabecera `Cookie` de music.youtube.com, Netscape para yt-dlp).
+/// Ready-to-use cookies: (`Cookie` header for music.youtube.com, Netscape format for yt-dlp).
 pub type Cookies = (String, String);
 
 fn data_dir() -> AppResult<PathBuf> {
@@ -34,7 +34,7 @@ fn data_dir() -> AppResult<PathBuf> {
         })
 }
 
-/// Abre la ventana de inicio de sesión y espera a que termine (o se cierre).
+/// Opens the sign-in window and waits for it to finish (or be closed).
 pub async fn sign_in(app: &AppHandle) -> AppResult<Cookies> {
     if let Some(w) = app.get_webview_window(LABEL) {
         let _ = w.set_focus();
@@ -49,8 +49,8 @@ pub async fn sign_in(app: &AppHandle) -> AppResult<Cookies> {
     run(app, SIGN_IN, true, None).await
 }
 
-/// Vuelve a cargar YouTube Music con el perfil guardado, sin enseñar nada, y
-/// devuelve las cookies nuevas.
+/// Reloads YouTube Music with the saved profile, without showing anything, and
+/// returns the new cookies.
 pub async fn refresh(app: &AppHandle) -> AppResult<Cookies> {
     if app.get_webview_window(LABEL).is_some() {
         return Err(AppError::new(
@@ -61,17 +61,17 @@ pub async fn refresh(app: &AppHandle) -> AppResult<Cookies> {
     run(app, MUSIC, false, Some(REFRESH_TIMEOUT)).await
 }
 
-/// Borra el perfil del inicio de sesión (al cerrar sesión).
+/// Deletes the sign-in profile (on sign-out).
 pub fn forget() {
     if let Ok(dir) = data_dir() {
-        // WebView2 puede tardar un momento en soltar los ficheros.
+        // WebView2 may take a moment to release the files.
         for _ in 0..10 {
             if !dir.exists() || std::fs::remove_dir_all(&dir).is_ok() {
                 return;
             }
             std::thread::sleep(Duration::from_millis(300));
         }
-        tracing::warn!("no se pudo borrar el perfil de inicio de sesión");
+        tracing::warn!("could not delete the sign-in profile");
     }
 }
 
@@ -90,7 +90,7 @@ async fn run(
     let builder = WebviewWindowBuilder::new(
         app,
         LABEL,
-        WebviewUrl::External(start.parse().expect("URL fija")),
+        WebviewUrl::External(start.parse().expect("fixed URL")),
     )
     .title(tr!(
         "Sign in to YouTube Music - XP Music",
@@ -107,14 +107,14 @@ async fn run(
         {
             return;
         }
-        // Leer cookies dentro de un manejador de eventos bloquea WebView2: otro hilo.
+        // Reading cookies inside an event handler blocks WebView2: use another thread.
         let tx = Arc::clone(&on_load_tx);
         let done = Arc::clone(&on_load_done);
         std::thread::spawn(move || {
             let result = read(&win);
             let has_session = result.is_ok();
-            // Sin sesión todavía (p. ej. página de bienvenida): se sigue esperando
-            // salvo en la renovación, donde no habrá nadie para iniciar sesión.
+            // No session yet (e.g. welcome page): keep waiting, except when
+            // renewing, where nobody will be there to sign in.
             if !has_session && win.is_visible().unwrap_or(false) {
                 return;
             }
@@ -128,7 +128,7 @@ async fn run(
         });
     });
     let win = builder.build().map_err(|e| {
-        tracing::error!(error = %e, "no se pudo abrir la ventana de inicio de sesión");
+        tracing::error!(error = %e, "could not open the sign-in window");
         AppError::internal(tr!(
             "Could not open the sign-in window: {e}",
             "No se pudo abrir la ventana de inicio de sesión: {e}",
@@ -136,7 +136,7 @@ async fn run(
         ))
     })?;
 
-    // Si el usuario cierra la ventana sin terminar.
+    // If the user closes the window without finishing.
     let close_tx = Arc::clone(&tx);
     let close_done = Arc::clone(&finished);
     win.on_window_event(move |e| {
@@ -216,7 +216,7 @@ fn to_cookies(cookies: &[&Cookie<'static>]) -> Cookies {
     let mut netscape = String::from("# Netscape HTTP Cookie File\n");
     for c in cookies {
         let domain = c.domain().unwrap_or_default();
-        // WebView2 da el dominio sin punto inicial aunque valga para subdominios.
+        // WebView2 gives the domain without a leading dot even if it covers subdomains.
         let host = if domain.starts_with('.') {
             domain.to_owned()
         } else {
@@ -246,7 +246,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cabecera_y_netscape_desde_cookies() {
+    fn header_and_netscape_from_cookies() {
         let a = Cookie::build(("SAPISID", "abc"))
             .domain("youtube.com")
             .path("/")

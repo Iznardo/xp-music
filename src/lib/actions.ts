@@ -1,4 +1,4 @@
-// Acciones sobre canciones y colecciones, compartidas por todas las vistas y menús.
+// Actions on songs and collections, shared by all views and menus.
 
 import { commands, type MediaItem, type QueueSource, type Track } from "./bindings";
 import { router } from "./router.svelte";
@@ -15,7 +15,7 @@ async function check<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"
   return r.data;
 }
 
-/// Para órdenes sin resultado: ¿ha ido bien? (Su `data` es `null`, igual que un fallo en `check`.)
+/// For commands with no result: did it succeed? (Its `data` is `null`, same as a failure in `check`.)
 async function succeeded(p: Promise<{ status: "ok"; data: unknown } | { status: "error"; error: { message: string } }>): Promise<boolean> {
   const r = await p;
   if (r.status === "error") ui.error(r.error.message);
@@ -27,19 +27,19 @@ export async function playTracks(tracks: Track[], index = 0, source: QueueSource
   await check(commands.queueSet(tracks, index, source));
 }
 
-/// Una sola canción suelta: suena ella y después su radio (como YouTube Music).
-/// Empieza a sonar ya; la radio se pide a la vez y se añade detrás al llegar.
+/// A single standalone song: it plays, then its radio (like YouTube Music).
+/// It starts playing right away; the radio is requested at the same time and appended when it arrives.
 export async function playWithRadio(track: Track) {
   await playTracks([track], 0, { Radio: track.id });
   const radio = (await check(commands.ytRadio(track.id))) ?? [];
-  // Si mientras tanto se eligió otra cosa, no se toca la cola nueva.
+  // If something else was chosen in the meantime, leave the new queue alone.
   const q = await commands.queueGet();
   if (q.tracks.length !== 1 || q.tracks[0]?.id !== track.id) return;
   const rest = radio.filter((r) => r.id !== track.id);
   if (rest.length) await commands.queueAdd(rest, "End");
 }
 
-/// Carga una lista de reproducción entera en la cola y empieza a sonar.
+/// Loads a whole playlist into the queue and starts playing.
 export async function playPlaylist(id: string) {
   ui.status = t.views.loading;
   const d = await check(commands.ytPlaylist(id));
@@ -48,7 +48,7 @@ export async function playPlaylist(id: string) {
 }
 
 let lastHint: string | null = null;
-/// Avisa al reproductor de que esta canción probablemente se va a pedir.
+/// Tells the player this song is likely to be requested soon.
 export function hintTrack(id: string | undefined) {
   if (!id || id === lastHint) return;
   lastHint = id;
@@ -87,7 +87,7 @@ export async function addToNewPlaylist(tracks: Track[]) {
   await library.refresh();
 }
 
-/// "Nueva lista…" y tus listas, para añadirles canciones.
+/// "New playlist…" and your playlists, to add songs to them.
 export function playlistChoices(tracks: Track[]): MenuItem[] {
   return [
     { kind: "item", label: t.menu.newPlaylist, action: () => addToNewPlaylist(tracks) },
@@ -96,7 +96,7 @@ export function playlistChoices(tracks: Track[]): MenuItem[] {
   ];
 }
 
-/// Menú contextual de una o varias canciones (FR-004-09).
+/// Context menu for one or several songs (FR-004-09).
 export function trackMenu(tracks: Track[], opts: { onPlay?: () => void; queueIndex?: number } = {}): MenuItem[] {
   const one = tracks.length === 1 ? tracks[0]! : null;
   const items: MenuItem[] = [
@@ -125,7 +125,7 @@ export function trackMenu(tracks: Track[], opts: { onPlay?: () => void; queueInd
   return items;
 }
 
-/// Abrir un elemento de Inicio/búsqueda/artista.
+/// Open an item from Home/search/artist.
 export async function openItem(item: MediaItem) {
   if (item.Track) return playWithRadio(item.Track);
   if (item.Playlist) return router.go({ name: "playlist", id: item.Playlist.id });
@@ -153,7 +153,7 @@ export function artistNames(track: Track): string {
   return track.artists.map((a) => a.name).join(", ");
 }
 
-/// "3:07" a partir de milisegundos.
+/// "3:07" from milliseconds.
 export function fmtTime(ms: number | null | undefined): string {
   if (ms == null || ms < 0) return "";
   const s = Math.floor(ms / 1000);

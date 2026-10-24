@@ -1,8 +1,9 @@
-//! Orquesta cola + resolvedor + motor y publica el estado (specs/002).
+//! Orchestrates queue + resolver + engine and publishes the state (specs/002).
 //!
-//! Los métodos públicos se llaman desde comandos Tauri y vuelven enseguida: lo
-//! lento (yt-dlp, red, radio) va a hilos o tareas aparte, y un número de
-//! secuencia descarta los resultados que llegan cuando el usuario ya pidió otra cosa.
+//! The public methods are called from Tauri commands and return right away: the
+//! slow parts (yt-dlp, network, radio) go to separate threads or tasks, and a
+//! sequence number discards results that arrive after the user already asked for
+//! something else.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -28,23 +29,23 @@ use crate::error::{AppError, AppResult, ErrorCode};
 use crate::settings::Settings;
 use crate::storage::Db;
 
-/// Se precarga la siguiente pista cuando quedan menos de estos ms.
+/// The next track is preloaded when fewer than this many ms remain.
 const PRELOAD_BEFORE_END_MS: u32 = 20_000;
-/// Reintentos por pista cuando la descarga falla a mitad.
+/// Retries per track when the download fails midway.
 const MAX_STREAM_RETRIES: u32 = 2;
 const SAVE_DEBOUNCE: Duration = Duration::from_secs(2);
-/// Cada cuánto se marca la posición para guardarla mientras suena.
+/// How often the position is flagged for saving while playing.
 const POSITION_SAVE_EVERY_MS: u32 = 10_000;
-/// Posición guardada aparte de la cola (tabla `settings`).
+/// Position saved separately from the queue (`settings` table).
 const POSITION_KEY: &str = "player.position_ms";
-/// Pistas siguientes que se resuelven por adelantado (yt-dlp tarda segundos).
+/// Upcoming tracks that are resolved ahead of time (yt-dlp takes seconds).
 const PREFETCH_AHEAD: usize = 3;
 
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
 pub type StateObserver = Box<dyn Fn(&PlayerState) + Send + Sync>;
 
-/// Más canciones cuando se acaba la cola (implementado en `yt::playback`).
+/// More songs when the queue runs out (implemented in `yt::playback`).
 pub trait RadioProvider: Send + Sync {
     fn continue_radio(
         &self,
@@ -53,7 +54,7 @@ pub trait RadioProvider: Send + Sync {
     ) -> BoxFuture<AppResult<Vec<Track>>>;
 }
 
-/// Registro de escuchas en el historial (implementado en `yt::playback`).
+/// Recording of plays in the history (implemented in `yt::playback`).
 pub trait PlaybackReporter: Send + Sync {
     fn on_track_started(&self, id: TrackId);
 }
@@ -72,7 +73,7 @@ struct Inner {
     volume: f32,
     muted: bool,
     error: Option<AppError>,
-    /// Pista cargada (o cargándose) en el motor.
+    /// Track loaded (or loading) in the engine.
     loaded: Option<TrackId>,
     load_seq: u64,
     preload_for: Option<TrackId>,
@@ -89,17 +90,17 @@ pub struct PlayerService {
     reporter: Arc<dyn PlaybackReporter>,
     inner: Mutex<Inner>,
     dirty: AtomicBool,
-    /// La cola cambió desde el último guardado. Si solo cambió la posición, se
-    /// guarda ella sola (antes se reescribía la cola entera: MB cada 10 s).
+    /// The queue changed since the last save. If only the position changed, it is
+    /// saved on its own (the whole queue used to be rewritten: MBs every 10 s).
     queue_dirty: AtomicBool,
-    /// Quien quiera enterarse de cada cambio de estado sin depender de la WebView
-    /// (bandeja, controles multimedia de Windows, notificaciones).
+    /// Anyone who wants to learn about every state change without depending on the
+    /// WebView (tray, Windows media controls, notifications).
     observers: Mutex<Vec<StateObserver>>,
     prefetch_tx: Sender<Vec<TrackId>>,
-    /// Pistas que el usuario probablemente va a pedir (ratón encima, fila
-    /// seleccionada). Carril aparte para no esperar a la precarga de la cola.
+    /// Tracks the user is likely to request (mouse hover, selected row).
+    /// Separate lane so it doesn't wait on the queue prefetch.
     hint_tx: Sender<Vec<TrackId>>,
-    /// Arranque rápido (008): URL del principio del audio en ~0,3 s.
+    /// Fast start (008): URL of the start of the audio in ~0.3 s.
     fast_start: Mutex<Option<FastStart>>,
 }
 
@@ -169,7 +170,7 @@ impl PlayerService {
         thread::Builder::new()
             .name("player-events".into())
             .spawn(move || pump.event_loop(ev_rx))
-            .expect("hilo de eventos del reproductor");
+            .expect("player events thread");
         let saver = Arc::downgrade(&svc);
         thread::Builder::new()
             .name("player-saver".into())
@@ -182,7 +183,7 @@ impl PlayerService {
                     }
                 }
             })
-            .expect("hilo de guardado de la cola");
+            .expect("queue saver thread");
         svc
     }
 
@@ -190,7 +191,7 @@ impl PlayerService {
         self.inner.lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    // ------------------------------------------------------------ estado
+    // ------------------------------------------------------------ state
 
     pub fn state(&self) -> PlayerState {
         let i = self.lock();
@@ -222,7 +223,7 @@ impl PlayerService {
             f(&state);
         }
         if let Err(e) = state.emit(&self.app) {
-            tracing::warn!(error = %e, "no se pudo emitir player://state");
+            tracing::warn!(error = %e, "could not emit player://state");
         }
     }
 
@@ -242,9 +243,9 @@ impl PlayerService {
         let _ = PlayerError(err).emit(&self.app);
     }
 
-    // ------------------------------------------------------------ carga
+    // ------------------------------------------------------------ loading
 
-    /// Resuelve la pista actual de la cola y la carga en el motor.
+    /// Resolves the queue's current track and loads it in the engine.
     fn play_current(self: &Arc<Self>, start_ms: u32, autoplay: bool) {
         let (track, seq) = {
             let mut i = self.lock();
@@ -262,12 +263,12 @@ impl PlayerService {
             i.preload_for = None;
             (track, i.load_seq)
         };
-        // Lo que sonaba (o se estaba abriendo) se corta ya: si no, con ⏭ rápido
-        // seguiría sonando la canción intermedia mientras se resuelve la nueva.
+        // Whatever was playing (or opening) is cut right away: otherwise, with quick ⏭
+        // the intermediate song would keep playing while the new one resolves.
         self.engine.send(EngineCmd::Stop);
         self.emit_state();
-        // Sin la pista actual en caché, las siguientes esperan a que termine su
-        // yt-dlp (`resolve_for_play`): varios a la vez en frío lo retrasan todo.
+        // Without the current track in cache, the next ones wait for its yt-dlp to
+        // finish (`resolve_for_play`): several at once when cold slow everything down.
         if self
             .resolver
             .cached(&track.id, FormatPreference::Aac128)
@@ -282,7 +283,7 @@ impl PlayerService {
             {
                 let mut i = svc.lock();
                 if i.load_seq != seq {
-                    return; // El usuario ya pidió otra canción.
+                    return; // The user already asked for another song.
                 }
                 if let Ok(s) = &result {
                     i.duration_ms = i.duration_ms.or(s.duration_ms);
@@ -303,8 +304,8 @@ impl PlayerService {
         *self.fast_start.lock().unwrap() = Some(f);
     }
 
-    /// Lo que se carga en el motor: de la caché, con arranque rápido (y la
-    /// resolución completa en paralelo) o, si no, esperando a yt-dlp.
+    /// What gets loaded into the engine: from the cache, with fast start (and the
+    /// full resolution in parallel) or, failing that, waiting for yt-dlp.
     fn resolve_for_play(self: &Arc<Self>, id: &TrackId) -> AppResult<ResolvedStream> {
         let pref = FormatPreference::Aac128;
         if let Some(s) = self.resolver.cached(id, pref) {
@@ -326,11 +327,11 @@ impl PlayerService {
         let t0 = std::time::Instant::now();
         match fast(id) {
             Ok(mut head) => {
-                tracing::info!(track = %id.0, ms = t0.elapsed().as_millis() as u64, "arranque rápido");
+                tracing::info!(track = %id.0, ms = t0.elapsed().as_millis() as u64, "fast start");
                 head.upgrade = Some(upgrade);
                 Ok(head)
             }
-            // Sin arranque rápido: lo de siempre (la resolución ya va en marcha).
+            // No fast start: the usual way (the resolution is already underway).
             Err(_) => loop {
                 if let Some(r) = upgrade.wait(Duration::from_secs(1)) {
                     break r;
@@ -339,15 +340,15 @@ impl PlayerService {
         }
     }
 
-    /// Resuelve ya las pistas que el usuario está a punto de elegir.
+    /// Resolves right now the tracks the user is about to pick.
     pub fn hint(&self, ids: Vec<TrackId>) {
         if !ids.is_empty() {
             let _ = self.hint_tx.send(ids);
         }
     }
 
-    /// Pide resolver en segundo plano las próximas pistas para que ⏭ y las
-    /// transiciones no esperen a yt-dlp.
+    /// Asks to resolve the upcoming tracks in the background so that ⏭ and
+    /// transitions don't wait on yt-dlp.
     fn prefetch_upcoming(&self) {
         let ids: Vec<TrackId> = {
             let i = self.lock();
@@ -395,12 +396,12 @@ impl PlayerService {
         thread::spawn(
             move || match svc.resolver.resolve(&next, FormatPreference::Aac128) {
                 Ok(stream) => svc.engine.send(EngineCmd::Preload { stream }),
-                Err(e) => tracing::warn!(track = %next.0, error = %e, "no se pudo precargar"),
+                Err(e) => tracing::warn!(track = %next.0, error = %e, "could not preload"),
             },
         );
     }
 
-    // ------------------------------------------------------------ transporte
+    // ------------------------------------------------------------ transport
 
     pub fn play(self: &Arc<Self>) {
         let (loaded, has_track, position) = {
@@ -414,7 +415,7 @@ impl PlayerService {
         if loaded {
             self.engine.send(EngineCmd::Play);
         } else if has_track {
-            // Cola restaurada al arrancar: se carga en la posición guardada.
+            // Queue restored at startup: load it at the saved position.
             self.play_current(position, true);
         }
     }
@@ -539,7 +540,7 @@ impl PlayerService {
         self.emit_state();
     }
 
-    /// Registra un observador de estado (006) y le pasa el estado actual.
+    /// Registers a state observer (006) and passes it the current state.
     pub fn observe(&self, f: StateObserver) {
         f(&self.state());
         self.observers
@@ -548,22 +549,22 @@ impl PlayerService {
             .push(f);
     }
 
-    /// Activa o desactiva la copia de PCM para el analizador (005).
+    /// Turns the PCM copy for the analyzer on or off (005).
     pub fn set_tap(&self, on: bool) {
         self.engine.send(EngineCmd::SetTap(on));
     }
 
-    /// Derivación de PCM nueva (si la salida se abrió o cambió desde la última vez).
+    /// New PCM tap (if the output was opened or changed since the last time).
     pub fn take_tap(&self) -> Option<crate::audio::output::PcmTap> {
         self.engine.take_tap()
     }
 
-    /// Sonido de la interfaz (004), mezclado sobre la salida.
+    /// UI sound (004), mixed over the output.
     pub fn play_sound(&self, s: crate::audio::sounds::UiSound) {
         self.engine.send(EngineCmd::PlaySound(s));
     }
 
-    /// Ganancia de normalización de la pista actual (003, `loudnessDb`).
+    /// Normalization gain of the current track (003, `loudnessDb`).
     pub fn set_gain_db(&self, db: f32) {
         self.engine.send(EngineCmd::SetGainDb(db));
     }
@@ -580,7 +581,7 @@ impl PlayerService {
         Ok(())
     }
 
-    // ------------------------------------------------------------ cola
+    // ------------------------------------------------------------ queue
 
     pub fn queue_set(
         self: &Arc<Self>,
@@ -665,7 +666,7 @@ impl PlayerService {
         self.emit_queue();
     }
 
-    /// "Me gusta" dado o quitado: la canción de la cola (y la que suena) lo refleja.
+    /// "Like" given or removed: the song in the queue (and the playing one) reflects it.
     pub fn set_like(&self, id: &TrackId, status: LikeStatus) {
         if self.lock().queue.set_like(id, status) {
             self.emit_queue();
@@ -678,7 +679,7 @@ impl PlayerService {
         self.emit_queue();
     }
 
-    /// Fin de la cola: autoplay con radio o parada.
+    /// End of the queue: autoplay with radio or stop.
     fn on_queue_end(self: &Arc<Self>) {
         let (autoplay, seed, exclude) = {
             let i = self.lock();
@@ -705,14 +706,14 @@ impl PlayerService {
                 }
                 Ok(_) => svc.stop(),
                 Err(e) => {
-                    tracing::warn!(error = %e, "autoplay sin resultados");
+                    tracing::warn!(error = %e, "autoplay returned no results");
                     svc.stop();
                 }
             }
         });
     }
 
-    // ------------------------------------------------------------ eventos del motor
+    // ------------------------------------------------------------ engine events
 
     fn event_loop(self: Arc<Self>, rx: Receiver<EngineEvent>) {
         for ev in rx {
@@ -728,7 +729,7 @@ impl PlayerService {
                     EngineState::Buffering => PlaybackStatus::Buffering,
                     EngineState::Playing => PlaybackStatus::Playing,
                     EngineState::Paused => PlaybackStatus::Paused,
-                    // El fin de pista llega como `Ended`; la parada la gestiona `stop`.
+                    // End of track arrives as `Ended`; stopping is handled by `stop`.
                     EngineState::Idle => return,
                 };
                 {
@@ -748,15 +749,15 @@ impl PlayerService {
                 {
                     let mut i = self.lock();
                     if gapless {
-                        // Solo vale si es justo la siguiente de la cola; si no, es
-                        // una precarga que quedó obsoleta tras un cambio del usuario.
+                        // Only valid if it is exactly the next one in the queue; otherwise it is
+                        // a preload that became stale after a user change.
                         let expected = i
                             .queue
                             .peek_next(true)
                             .and_then(|n| i.queue.track_at(n))
                             .map(|t| t.id.clone());
                         if expected.as_ref() != Some(&track_id) {
-                            tracing::warn!(track = %track_id.0, "transición sin hueco obsoleta; se ignora");
+                            tracing::warn!(track = %track_id.0, "stale gapless transition; ignoring");
                             return;
                         }
                         i.queue.advance(true);
@@ -764,7 +765,7 @@ impl PlayerService {
                         i.position_ms = 0;
                         i.preload_for = None;
                     } else if i.loaded.as_ref() != Some(&track_id) {
-                        return; // Llegó tarde: ya se pidió otra pista.
+                        return; // Arrived late: another track was already requested.
                     }
                     i.duration_ms = duration_ms.or(i.duration_ms);
                     i.retries = 0;
@@ -838,7 +839,7 @@ impl PlayerService {
                     i.retries += 1;
                     i.retries <= MAX_STREAM_RETRIES
                 };
-                tracing::warn!(track = %track_id.0, position_ms, expired, retry, "fallo del stream");
+                tracing::warn!(track = %track_id.0, position_ms, expired, retry, "stream failure");
                 if retry {
                     if expired {
                         self.resolver.invalidate(&track_id);
@@ -855,13 +856,13 @@ impl PlayerService {
                 }
             }
             EngineEvent::PreloadFailed { track_id } => {
-                tracing::warn!(track = %track_id.0, "precarga fallida; se cargará al llegar");
+                tracing::warn!(track = %track_id.0, "preload failed; will load on arrival");
             }
             EngineEvent::Error(e) => self.fail(e),
         }
     }
 
-    // ------------------------------------------------------------ persistencia
+    // ------------------------------------------------------------ persistence
 
     pub fn save_now(&self) {
         let (position, queue_json) = {
@@ -874,9 +875,9 @@ impl PlayerService {
             });
             (i.position_ms, json)
         };
-        // La posición, sola y pequeña: es lo que cambia cada pocos segundos.
+        // The position, on its own and small: it is what changes every few seconds.
         if let Err(e) = self.db.kv_set(POSITION_KEY, &position.to_string()) {
-            tracing::warn!(error = %e, "no se pudo guardar la posición");
+            tracing::warn!(error = %e, "could not save the position");
         }
         let Some(Ok(json)) = queue_json else { return };
         let now = SystemTime::now()
@@ -889,7 +890,7 @@ impl PlayerService {
             (json, now),
         );
         if let Err(e) = res {
-            tracing::warn!(error = %e, "no se pudo guardar la cola");
+            tracing::warn!(error = %e, "could not save the queue");
         }
     }
 
@@ -899,8 +900,8 @@ impl PlayerService {
     }
 }
 
-/// Hilo que resuelve (y deja en caché) las pistas que le llegan, de una en
-/// una. Si llega una lista nueva, abandona la anterior.
+/// Thread that resolves (and caches) the tracks it receives, one at a
+/// time. If a new list arrives, it abandons the previous one.
 fn spawn_prefetcher(name: &str, resolver: Arc<dyn StreamResolver>, rx: Receiver<Vec<TrackId>>) {
     thread::Builder::new()
         .name(name.into())
@@ -913,14 +914,14 @@ fn spawn_prefetcher(name: &str, resolver: Arc<dyn StreamResolver>, rx: Receiver<
                             continue 'list;
                         }
                         if let Err(e) = resolver.resolve(id, FormatPreference::Aac128) {
-                            tracing::debug!(track = %id.0, error = %e, "no se pudo resolver por adelantado");
+                            tracing::debug!(track = %id.0, error = %e, "could not resolve ahead of time");
                         }
                     }
                     break;
                 }
             }
         })
-        .expect("hilo de resolución anticipada");
+        .expect("prefetch thread");
 }
 
 fn restore(db: &Db) -> (Queue, u32) {
@@ -932,18 +933,18 @@ fn restore(db: &Db) -> (Queue, u32) {
         .ok();
     match json.map(|j| serde_json::from_str::<Persisted>(&j)) {
         Some(Ok(p)) => {
-            // La posición más reciente está guardada aparte.
+            // The most recent position is saved separately.
             let position_ms = db
                 .kv_get(POSITION_KEY)
                 .ok()
                 .flatten()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(p.position_ms);
-            tracing::info!(tracks = p.queue.len(), position_ms, "cola restaurada");
+            tracing::info!(tracks = p.queue.len(), position_ms, "queue restored");
             (p.queue, position_ms)
         }
         Some(Err(e)) => {
-            tracing::warn!(error = %e, "cola guardada no válida; se empieza vacía");
+            tracing::warn!(error = %e, "saved queue is invalid; starting empty");
             (Queue::new(), 0)
         }
         None => (Queue::new(), 0),
@@ -952,7 +953,7 @@ fn restore(db: &Db) -> (Queue, u32) {
 
 #[cfg(test)]
 mod bench {
-    //! Medidas de coste (no son pruebas de corrección):
+    //! Cost measurements (not correctness tests):
     //! `cargo test --lib bench_ -- --ignored --nocapture`.
     use super::*;
     use crate::domain::{AlbumRef, ArtistRef, BrowseId, Thumbnail};
@@ -995,7 +996,7 @@ mod bench {
     }
 
     #[test]
-    fn la_posicion_guardada_aparte_manda_al_restaurar() {
+    fn separately_saved_position_wins_on_restore() {
         let db = Db::open_in_memory().unwrap();
         let mut q = Queue::new();
         q.set(
@@ -1022,7 +1023,7 @@ mod bench {
 
     #[test]
     #[ignore]
-    fn bench_guardado_de_posicion_y_ajustes() {
+    fn bench_position_and_settings_save() {
         let db = Db::open_in_memory().unwrap();
         let mut q = Queue::new();
         q.set(
@@ -1050,16 +1051,16 @@ mod bench {
                 .unwrap();
         });
         println!(
-            "ANTES guardar posición (cola de 3000): {ms:.2} ms y {} KB por guardado",
+            "BEFORE saving position (3000-track queue): {ms:.2} ms and {} KB per save",
             json.len() / 1024
         );
         let ms = time(2000, || {
             db.kv_set(POSITION_KEY, "123456").unwrap();
         });
-        println!("AHORA guardar posición: {ms:.4} ms y 6 bytes por guardado");
+        println!("NOW saving position: {ms:.4} ms and 6 bytes per save");
         let ms = time(2000, || {
             let _ = Settings::load(&db).unwrap();
         });
-        println!("Settings::load: {:.4} ms por lectura", ms);
+        println!("Settings::load: {:.4} ms per read", ms);
     }
 }

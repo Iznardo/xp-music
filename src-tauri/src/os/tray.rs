@@ -1,4 +1,4 @@
-//! Icono del área de notificación con menú dinámico (FR-006-01/02).
+//! Notification-area icon with a dynamic menu (FR-006-01/02).
 
 use std::sync::{Arc, Mutex};
 
@@ -11,7 +11,7 @@ use crate::player::service::PlayerService;
 use crate::player::types::{PlaybackStatus, PlayerState};
 use crate::yt::service::YtService;
 
-/// Lo que cambia el menú; si no cambia, no se reconstruye.
+/// What changes the menu; if it does not change, the menu is not rebuilt.
 #[derive(Clone, PartialEq, Default)]
 struct MenuKey {
     playing: bool,
@@ -123,7 +123,7 @@ pub fn create(
     let liked_now = Arc::new(Mutex::new(initial.clone()));
     let liked_for_menu = Arc::clone(&liked_now);
     let tray: TrayIcon = TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().cloned().expect("icono de la app"))
+        .icon(app.default_window_icon().cloned().expect("app icon"))
         .tooltip("XP Music")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -132,9 +132,9 @@ pub fn create(
             "next" => p.next(),
             "previous" => p.previous(),
             "show" => super::show_main(app),
-            // Salida de emergencia si una máscara no deja volver.
+            // Emergency exit if a skin does not let you go back.
             "full" => {
-                tracing::info!("bandeja: volver al modo completo");
+                tracing::info!("tray: back to full mode");
                 super::show_main(app);
                 let _ = app.emit("ui://full-mode", ());
             }
@@ -150,7 +150,7 @@ pub fn create(
                         LikeStatus::Indifferent
                     };
                     if let Err(e) = yt.rate(track.id, status).await {
-                        tracing::warn!(error = %e, "no se pudo marcar Me gusta desde la bandeja");
+                        tracing::warn!(error = %e, "could not set Like from the tray");
                     }
                 });
                 liked_for_menu.lock().unwrap().liked = like;
@@ -174,7 +174,7 @@ pub fn create(
         })
         .build(app)?;
 
-    // Menú y texto emergente al día con el reproductor.
+    // Keep the menu and tooltip up to date with the player.
     let app2 = app.clone();
     player.observe(Box::new(move |s| {
         let k = key(s);
@@ -201,7 +201,7 @@ fn refresh(tray: &TrayIcon, app: &AppHandle, k: &MenuKey) {
         Ok(m) => {
             let _ = tray.set_menu(Some(m));
         }
-        Err(e) => tracing::warn!(error = %e, "no se pudo actualizar el menú de la bandeja"),
+        Err(e) => tracing::warn!(error = %e, "could not update the tray menu"),
     }
 }
 

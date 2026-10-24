@@ -4,12 +4,12 @@ import "./styles/base.css";
 import App from "./App.svelte";
 import { commands } from "./lib/bindings";
 
-// La WebView no tiene consola visible: los errores van al log de la app.
+// The WebView has no visible console: errors go to the app log.
 addEventListener("error", (e) => void commands.uiLog("error", `${e.message} (${e.filename}:${e.lineno})`));
-addEventListener("unhandledrejection", (e) => void commands.uiLog("error", `promesa rechazada: ${String(e.reason?.stack ?? e.reason)}`));
+addEventListener("unhandledrejection", (e) => void commands.uiLog("error", `unhandled rejection: ${String(e.reason?.stack ?? e.reason)}`));
 
 const target = document.getElementById("app");
-if (!target) throw new Error("falta #app");
+if (!target) throw new Error("missing #app");
 
 export default mount(App, { target });
-void commands.uiLog("info", `UI montada en ${location.hash || "(sin ruta)"}`);
+void commands.uiLog("info", `UI mounted at ${location.hash || "(no route)"}`);

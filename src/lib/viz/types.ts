@@ -1,11 +1,11 @@
-// Contrato común de los renderizadores de visualización (specs/005/plan.md).
+// Common contract for the visualization renderers (specs/005/plan.md).
 
 import type { VizFrame } from "../bindings";
 
-/// Fotograma ya normalizado (specta tipa los `f32` como `number | null`).
+/// Already-normalized frame (specta types `f32` as `number | null`).
 export type VizData = { bands: number[]; peaks: number[]; wave: number[]; level: number; beat: number; bass: number };
 
-/// El backend envía bandas y picos como bytes 0..255 y la onda como -127..127.
+/// The backend sends bands and peaks as bytes 0..255 and the wave as -127..127.
 export function toData(f: VizFrame): VizData {
   const n = (x: number | null) => x ?? 0;
   const u = (x: number) => x / 255;
@@ -13,11 +13,11 @@ export function toData(f: VizFrame): VizData {
 }
 
 export interface VizRenderer {
-  /// Dibuja un fotograma. `t` en segundos (para animaciones continuas).
+  /// Draws a frame. `t` in seconds (for continuous animations).
   draw(frame: VizData, t: number): void;
   resize(width: number, height: number): void;
   dispose(): void;
-  /// Si necesita animarse aunque no lleguen datos nuevos (WebGL con rastro).
+  /// Whether it needs to animate even when no new data arrives (WebGL with trails).
   readonly continuous: boolean;
 }
 

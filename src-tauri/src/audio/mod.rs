@@ -1,4 +1,4 @@
-//! Motor de audio (specs/002).
+//! Audio engine (specs/002).
 
 pub mod decoder;
 pub mod engine;

@@ -1,6 +1,6 @@
-//! Herramientas externas y su mantenimiento (specs/007): versiones y
-//! actualización automática de yt-dlp, que es lo que más se rompe cuando
-//! YouTube cambia algo.
+//! External tools and their maintenance (specs/007): versions and
+//! automatic updates of yt-dlp, which is what breaks the most when
+//! YouTube changes something.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -44,9 +44,9 @@ pub fn set_resource_dir(dir: PathBuf) {
     let _ = RESOURCE_DIR.set(dir);
 }
 const SUMS: &str = "SHA2-256SUMS";
-/// Comprobación automática como mucho una vez al día (FR-007-08).
+/// Automatic check at most once a day (FR-007-08).
 const CHECK_EVERY: Duration = Duration::from_secs(24 * 3600);
-/// Tras fallos de resolución, una comprobación forzada como mucho cada hora (FR-007-09).
+/// After resolution failures, a forced check at most once an hour (FR-007-09).
 const FORCED_EVERY: Duration = Duration::from_secs(3600);
 
 #[derive(Serialize, Type, Clone, Debug, PartialEq)]
@@ -55,22 +55,22 @@ pub struct ToolVersions {
     pub app: String,
     pub yt_dlp: Option<String>,
     pub deno: Option<String>,
-    /// La copia de yt-dlp en uso la ha actualizado la propia app.
+    /// The yt-dlp copy in use was updated by the app itself.
     pub yt_dlp_updated: bool,
 }
 
-/// Carpeta de las herramientas actualizadas por la app.
+/// Folder of the tools updated by the app.
 pub fn bin_dir() -> Option<PathBuf> {
     Some(dirs::data_local_dir()?.join("xp-music").join("bin"))
 }
 
-/// `XP_MUSIC_TOOLS` (p. ej. el paquete de Nix) aporta yt-dlp y deno: los gestiona quien
-/// los instala, no la app.
+/// `XP_MUSIC_TOOLS` (e.g. the Nix package) provides yt-dlp and deno: whoever installs
+/// them manages them, not the app.
 fn managed_externally() -> bool {
     std::env::var_os("XP_MUSIC_TOOLS").is_some()
 }
 
-/// yt-dlp actualizado por la app (puede no existir).
+/// yt-dlp updated by the app (may not exist).
 pub fn updated_yt_dlp() -> Option<PathBuf> {
     if managed_externally() {
         return None;
@@ -133,7 +133,7 @@ fn http() -> reqwest::blocking::Client {
         .user_agent(concat!("xp-music/", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(120))
         .build()
-        .expect("cliente HTTP")
+        .expect("HTTP client")
 }
 
 fn net_err(what: &str, e: impl std::fmt::Display) -> AppError {
@@ -149,8 +149,8 @@ fn net_err(what: &str, e: impl std::fmt::Display) -> AppError {
 
 static LAST: Mutex<Option<Instant>> = Mutex::new(None);
 
-/// Actualiza yt-dlp si hay versión nueva. Devuelve la versión instalada si cambió.
-/// `force`: ignora el límite diario (pero no el horario, para no machacar GitHub).
+/// Updates yt-dlp if there is a new version. Returns the installed version if it changed.
+/// `force`: ignores the daily limit (but not the hourly one, to avoid hammering GitHub).
 pub fn update_yt_dlp(force: bool) -> AppResult<Option<String>> {
     update_inner(force, false)
 }
@@ -179,10 +179,10 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
         .send()
         .and_then(|r| r.error_for_status())
         .and_then(|r| r.json())
-        .map_err(|e| net_err("consulta de versiones de yt-dlp", e))?;
+        .map_err(|e| net_err("yt-dlp version query", e))?;
     let current = ToolPaths::locate().and_then(|t| version_of(&t.yt_dlp));
     if !reinstall && current.as_deref() == Some(rel.tag_name.as_str()) {
-        tracing::info!(version = %rel.tag_name, "yt-dlp ya está al día");
+        tracing::info!(version = %rel.tag_name, "yt-dlp is already up to date");
         return Ok(None);
     }
     let Some(asset) = asset_name(std::env::consts::OS, std::env::consts::ARCH) else {
@@ -207,7 +207,7 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
         .get(sums_url)
         .send()
         .and_then(|r| r.text())
-        .map_err(|e| net_err("descarga de sumas", e))?;
+        .map_err(|e| net_err("checksum download", e))?;
     let expected = sums
         .lines()
         .find_map(|l| {
@@ -226,26 +226,26 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
         .get(zip_url)
         .send()
         .and_then(|r| r.error_for_status())
-        .map_err(|e| net_err("descarga de yt-dlp", e))?
+        .map_err(|e| net_err("yt-dlp download", e))?
         .read_to_end(&mut zip_bytes)
-        .map_err(|e| net_err("descarga de yt-dlp", e))?;
+        .map_err(|e| net_err("yt-dlp download", e))?;
     let got: String = Sha256::digest(&zip_bytes)
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
     if got != expected {
-        tracing::error!("hash de yt-dlp no coincide; se descarta");
+        tracing::error!("yt-dlp hash mismatch; discarding");
         return Err(AppError::internal(tr!(
             "The downloaded yt-dlp package failed verification.",
             "El paquete descargado de yt-dlp no pasó la verificación."
         )));
     }
     install(&zip_bytes)?;
-    tracing::info!(desde = ?current, hasta = %rel.tag_name, "yt-dlp actualizado");
+    tracing::info!(from = ?current, to = %rel.tag_name, "yt-dlp updated");
     Ok(Some(rel.tag_name))
 }
 
-/// Descomprime en `bin/yt-dlp.new`, comprueba que arranca y sustituye a la anterior.
+/// Unpacks into `bin/yt-dlp.new`, checks that it starts and replaces the previous one.
 fn install(zip_bytes: &[u8]) -> AppResult<()> {
     let bin = bin_dir().ok_or_else(|| {
         AppError::internal(tr!("No local data folder.", "Sin carpeta de datos local."))
@@ -283,7 +283,7 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
             let mut f = archive
                 .by_index(i)
                 .map_err(|e| AppError::internal(e.to_string()))?;
-            // `enclosed_name` rechaza rutas que saldrían de la carpeta (../).
+            // `enclosed_name` rejects paths that would escape the folder (../).
             let Some(rel) = f.enclosed_name() else {
                 continue;
             };
@@ -308,7 +308,7 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        // ponytail: onefile arranca algo más lento; evita bibliotecas Python incompatibles en AppImage.
+        // ponytail: onefile starts a bit slower; avoids incompatible Python libraries in AppImage.
         std::fs::write(&exe, zip_bytes).map_err(io)?;
         std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).map_err(io)?;
     }
@@ -328,9 +328,9 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// Lanza yt-dlp y deno una vez al abrir la app: el primer arranque en frío
-/// (antivirus que los analiza, disco) es lo más lento y si no lo paga la primera
-/// canción, cuyo arranque rápido solo cubre ~1 min.
+/// Launches yt-dlp and deno once when the app opens: the first cold start
+/// (antivirus scanning them, disk) is the slowest part, and this way the first
+/// song doesn't pay for it, since its fast start only covers ~1 min.
 pub fn spawn_warmup() {
     std::thread::Builder::new()
         .name("tools-warmup".into())
@@ -341,31 +341,28 @@ pub fn spawn_warmup() {
             let t0 = std::time::Instant::now();
             let _ = version_of(&tools.yt_dlp);
             let _ = version_of(&tools.deno);
-            tracing::debug!(
-                ms = t0.elapsed().as_millis() as u64,
-                "herramientas precalentadas"
-            );
+            tracing::debug!(ms = t0.elapsed().as_millis() as u64, "tools warmed up");
         })
         .ok();
 }
 
-/// Comprobación diaria en segundo plano al arrancar.
+/// Daily background check at startup.
 pub fn spawn_daily_check() {
     std::thread::Builder::new()
         .name("ytdlp-update".into())
         .spawn(|| {
-            // Que no compita con el arranque ni con la primera canción.
+            // Don't compete with startup or the first song.
             std::thread::sleep(Duration::from_secs(60));
             if let Err(e) = update_yt_dlp(false) {
-                tracing::info!(error = %e, "no se pudo comprobar yt-dlp");
+                tracing::info!(error = %e, "could not check yt-dlp");
             }
         })
         .ok();
 }
 
-// ---------------------------------------------------------------- comandos
+// ---------------------------------------------------------------- commands
 
-/// Versiones de la app y de las herramientas (pestaña "Acerca de").
+/// Versions of the app and the tools ("About" tab).
 #[tauri::command]
 #[specta::specta]
 pub async fn tools_versions() -> ToolVersions {
@@ -379,18 +376,18 @@ pub async fn tools_versions() -> ToolVersions {
         })
 }
 
-/// Busca ya una versión nueva de yt-dlp. Devuelve la instalada si ha cambiado.
+/// Checks for a new yt-dlp version right now. Returns the installed one if it changed.
 #[tauri::command]
 #[specta::specta]
 pub async fn tools_update_now() -> AppResult<Option<String>> {
-    // Lo pide el usuario: sin límite de frecuencia.
+    // The user asked for it: no rate limit.
     *LAST.lock().unwrap() = None;
     tauri::async_runtime::spawn_blocking(|| update_yt_dlp(true))
         .await
         .map_err(|e| AppError::internal(e.to_string()))?
 }
 
-/// Abre la carpeta de registros en el Explorador.
+/// Opens the logs folder in the file explorer.
 #[tauri::command]
 #[specta::specta]
 pub fn tools_open_logs_dir() -> AppResult<()> {
@@ -403,8 +400,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_de_deno_se_recorta() {
-        // Simula la primera línea de `deno --version`.
+    fn deno_version_is_trimmed() {
+        // Simulates the first line of `deno --version`.
         let first = "deno 2.9.7 (stable, release, x86_64-pc-windows-msvc)";
         let v = first
             .strip_prefix("deno ")
@@ -434,7 +431,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn instalar_conserva_ejecutable_y_rechaza_version_rota() {
+    fn install_keeps_executable_and_rejects_broken_version() {
         let bin =
             std::env::temp_dir().join(format!("xp-music-tools-test-{}", rand::random::<u32>()));
         let package = |script: &str| script.as_bytes().to_vec();
@@ -446,12 +443,12 @@ mod tests {
         std::fs::remove_dir_all(bin).unwrap();
     }
 
-    /// Descarga real: `cargo test --lib -- --ignored --nocapture actualizar_yt_dlp_real`.
+    /// Real download: `cargo test --lib -- --ignored --nocapture update_yt_dlp_for_real`.
     #[test]
     #[ignore]
-    fn actualizar_yt_dlp_real() {
-        println!("antes: {:?}", versions());
-        println!("resultado: {:?}", update_inner(true, true));
-        println!("después: {:?}", versions());
+    fn update_yt_dlp_for_real() {
+        println!("before: {:?}", versions());
+        println!("result: {:?}", update_inner(true, true));
+        println!("after: {:?}", versions());
     }
 }

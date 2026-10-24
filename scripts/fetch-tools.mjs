@@ -62,7 +62,7 @@ function tryRun(command, args) {
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} terminó con código ${result.status}`);
+  if (result.status !== 0) throw new Error(`${command} exited with code ${result.status}`);
 }
 
 // GNU tar no abre zips; bsdtar (Windows 10+, macOS) sí; en Linux suele haber unzip.
@@ -97,10 +97,10 @@ async function main() {
       const { version, asset, sha256, repo } = spec;
       console.log(`Descargando ${asset} ${version} (${target})…`);
       const response = await fetch(`https://github.com/${repo}/releases/download/${version}/${asset}`);
-      if (!response.ok) throw new Error(`Descarga de ${asset}: HTTP ${response.status}`);
+      if (!response.ok) throw new Error(`Download of ${asset} failed: HTTP ${response.status}`);
       const bytes = Buffer.from(await response.arrayBuffer());
       if (createHash("sha256").update(bytes).digest("hex") !== sha256) {
-        throw new Error(`SHA-256 de ${asset} no coincide con tools.lock.json`);
+        throw new Error(`SHA-256 of ${asset} does not match tools.lock.json`);
       }
       const out = join(tools, spec.path);
       const dir = spec === plan.ytDlp ? join(tools, "yt-dlp") : tools;

@@ -1,11 +1,11 @@
 import { commands } from "./bindings";
 
-// Router mínimo por hash (sin dependencias). Rutas:
-//   #/now                     Reproducción actual
-//   #/home                    Inicio (recomendaciones)
-//   #/library/<sección>       Biblioteca: playlists | songs | liked | albums | artists | history
+// Minimal hash router (no dependencies). Routes:
+//   #/now                     Now playing
+//   #/home                    Home (recommendations)
+//   #/library/<section>       Library: playlists | songs | liked | albums | artists | history
 //   #/playlist/<id>  #/album/<id>  #/artist/<id>
-//   #/search/<filtro>/<texto>
+//   #/search/<filter>/<text>
 
 export type Route =
   | { name: "now" }
@@ -62,12 +62,12 @@ class Router {
   constructor() {
     addEventListener("hashchange", () => {
       this.route = parse(location.hash);
-      // El backend la guarda para cuando la WebView se recree (AC-004-05).
+      // The backend stores it for when the WebView is recreated (AC-004-05).
       void commands.uiSetLastRoute(location.hash);
     });
   }
 
-  /// Al arrancar sin ruta (WebView recreada), vuelve a la última vista.
+  /// On startup with no route (WebView recreated), goes back to the last view.
   async restore(): Promise<void> {
     if (location.hash) return;
     const last = await commands.uiGetLastRoute();
@@ -82,7 +82,7 @@ class Router {
     }
   }
 
-  /// Pestaña de la barra de tareas a la que pertenece la ruta actual.
+  /// Taskbar tab the current route belongs to.
   get tab(): "now" | "library" | "home" | "search" {
     const n = this.route.name;
     if (n === "now" || n === "home" || n === "search") return n;

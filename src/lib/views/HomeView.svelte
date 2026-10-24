@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Inicio: recomendaciones de YouTube Music en filas de iconos grandes (FR-004-07).
+  // Home: YouTube Music recommendations in rows of large icons (FR-004-07).
   import { commands, type Page, type Section } from "../bindings";
   import { Resource } from "../resource.svelte";
   import { auth } from "../stores/auth.svelte";
@@ -22,7 +22,7 @@
     if (r.status === "ok") res.data = { items: [...d.items, ...r.data.items], continuation: r.data.continuation };
   }
 
-  // Carga más secciones al llegar al final, como la web.
+  // Loads more sections when reaching the end, like the web app.
   function scroll(e: Event) {
     const el = e.currentTarget as HTMLElement;
     if (el.scrollTop + el.clientHeight > el.scrollHeight - 200) void more();

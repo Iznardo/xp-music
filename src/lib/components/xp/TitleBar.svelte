@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Franja superior del cuerpo del skin WMP 9: botón redondo con todos los menús a
-  // la izquierda, zona para arrastrar y tres botones redondos a la derecha. Los
-  // botones de ventana están en la pestaña de la lista (PlaylistTab).
+  // Top strip of the WMP 9 skin body: a round button with all the menus on the
+  // left, a drag area and three round buttons on the right. The window buttons
+  // are in the list tab (PlaylistTab).
   import { ui, type MenuItem } from "../../stores/ui.svelte";
   import { menuBar } from "../../menus";
   import { t } from "../../i18n.svelte";
@@ -17,7 +17,7 @@
   <button class="menu" title={t.top.menu} aria-label={t.top.menu} onclick={openMenu}>
     <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" /><circle cx="8" cy="8" r="1.4" /></svg>
   </button>
-  <!-- Como en WMP 9, sin título: la franja solo sirve para arrastrar la ventana. -->
+  <!-- As in WMP 9, no title: the strip is only for dragging the window. -->
   <span class="grow" data-tauri-drag-region></span>
   <div class="rounds">
     <button title={ui.sideCollapsed ? t.side.show : t.side.hide} aria-label={ui.sideCollapsed ? t.side.show : t.side.hide} onclick={() => ui.toggleSide()}>

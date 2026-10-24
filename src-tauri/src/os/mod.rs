@@ -1,5 +1,5 @@
-//! Integración con el sistema (specs/006): bandeja, ventana desechable, controles
-//! multimedia del sistema, notificaciones, autoarranque y atajos globales.
+//! System integration (specs/006): tray, disposable window, system media
+//! controls, notifications, autostart and global shortcuts.
 
 pub mod media;
 #[cfg(windows)]
@@ -39,7 +39,7 @@ pub struct OsState {
     pub quitting: AtomicBool,
 }
 
-/// Muestra la ventana principal; si se destruyó al cerrar, la vuelve a crear (FR-006-03).
+/// Shows the main window; if it was destroyed on close, recreates it (FR-006-03).
 pub fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.unminimize();
@@ -55,25 +55,25 @@ pub fn show_main(app: &AppHandle) {
         .find(|w| w.label == "main")
         .cloned()
     else {
-        tracing::error!("falta la configuración de la ventana principal");
+        tracing::error!("main window configuration is missing");
         return;
     };
     match WebviewWindowBuilder::from_config(app, &cfg).and_then(|b| b.build()) {
         Ok(w) => {
             let _ = w.set_focus();
-            // Botones de la miniatura: la ventana es nueva, hay que volver a engancharlos.
+            // Thumbnail buttons: the window is new, they must be attached again.
             #[cfg(windows)]
             if let Ok(h) = w.hwnd() {
                 let raw = h.0 as isize;
                 let _ = app.run_on_main_thread(move || taskbar::attach(raw));
             }
-            tracing::info!("ventana principal creada");
+            tracing::info!("main window created");
         }
-        Err(e) => tracing::error!(error = %e, "no se pudo crear la ventana principal"),
+        Err(e) => tracing::error!(error = %e, "could not create the main window"),
     }
 }
 
-/// Cierra la ventana principal: con ella se destruye la WebView y su memoria.
+/// Closes the main window: the WebView and its memory are destroyed with it.
 pub fn hide_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.close();
@@ -85,7 +85,7 @@ pub fn main_visible(app: &AppHandle) -> bool {
         .is_some_and(|w| w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false))
 }
 
-/// Salir de verdad: guarda la cola y termina el proceso.
+/// Really quit: saves the queue and ends the process.
 pub fn quit(app: &AppHandle) {
     if let Some(os) = app.try_state::<OsState>() {
         os.quitting.store(true, Ordering::Release);
@@ -102,7 +102,7 @@ pub fn relocalize(app: &AppHandle) {
     }
 }
 
-/// Aplica los ajustes que tocan el sistema: autoarranque y atajos globales.
+/// Applies the settings that touch the system: autostart and global shortcuts.
 pub fn apply_settings(app: &AppHandle, s: &Settings) {
     if crate::i18n::set(s.language) {
         relocalize(app);
@@ -115,7 +115,7 @@ pub fn apply_settings(app: &AppHandle, s: &Settings) {
         _ => Ok(()),
     };
     if let Err(e) = res {
-        tracing::warn!(error = %e, "no se pudo cambiar el inicio con Windows");
+        tracing::warn!(error = %e, "could not change launch at Windows login");
     }
 
     let gs = app.global_shortcut();
@@ -137,7 +137,7 @@ pub fn apply_settings(app: &AppHandle, s: &Settings) {
             }
         });
         if let Err(e) = res {
-            tracing::warn!(atajo = accel, error = %e, "no se pudo registrar el atajo global");
+            tracing::warn!(shortcut = accel, error = %e, "could not register the global shortcut");
         }
     };
     bind(&s.hotkeys.play_pause, |_, p| p.toggle());

@@ -1,8 +1,8 @@
-//! Ajustes persistentes (FR-001-04).
+//! Persistent settings (FR-001-04).
 //!
-//! Se guardan como un único JSON en la tabla `settings` (clave `app`). Al
-//! cargar se fusiona sobre los valores por defecto, así que un JSON antiguo
-//! sin los campos nuevos sigue siendo válido.
+//! Stored as a single JSON in the `settings` table (key `app`). On load it is
+//! merged over the defaults, so an old JSON without the new fields is still
+//! valid.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -35,12 +35,12 @@ pub enum VizPreset {
     Waves,
     Ambience,
     Battery,
-    /// Rayos que brotan del centro con rastro (estilo "Ambiente: Agua" de WMP 9).
+    /// Rays bursting from the center with a trail (WMP 9 "Ambience: Water" style).
     #[default]
     Water,
-    /// Plasma psicodélico con remolinos.
+    /// Psychedelic plasma with swirls.
     Alchemy,
-    /// Túnel en espiral hipnótico.
+    /// Hypnotic spiral tunnel.
     Spiral,
     Cover,
 }
@@ -56,19 +56,19 @@ pub struct Settings {
     pub volume: f32,
     pub normalize_volume: bool,
     pub audio_quality: AudioQuality,
-    /// `None` = dispositivo predeterminado.
+    /// `None` = default device.
     pub output_device: Option<String>,
     pub close_to_tray: bool,
     pub start_minimized: bool,
     pub launch_at_login: bool,
     pub report_history: bool,
-    /// `None` = sin visualización.
+    /// `None` = no visualization.
     pub visualization: Option<VizPreset>,
     pub xp_sounds: bool,
     pub notifications: bool,
-    /// Pausar al bloquear la sesión de Windows (006).
+    /// Pause when the Windows session is locked (006).
     pub pause_on_lock: bool,
-    /// Atajos globales (006). Formato `Ctrl+Alt+P`; `None` = sin atajo.
+    /// Global shortcuts (006). Format `Ctrl+Alt+P`; `None` = no shortcut.
     pub hotkeys: HotkeySettings,
 }
 
@@ -106,7 +106,7 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Ajusta valores fuera de rango en lugar de rechazarlos.
+    /// Clamps out-of-range values instead of rejecting them.
     fn sanitized(mut self) -> Self {
         self.volume = if self.volume.is_finite() {
             self.volume.clamp(0.0, 1.0)
@@ -136,8 +136,8 @@ impl Settings {
         })
     }
 
-    /// Fusiona el JSON guardado sobre los valores por defecto; si está corrupto,
-    /// devuelve los predeterminados.
+    /// Merges the stored JSON over the defaults; if it is corrupt, returns the
+    /// defaults.
     fn from_stored_json(json: &str) -> Self {
         let merged = serde_json::from_str::<serde_json::Value>(json).and_then(|stored| {
             let mut base = serde_json::to_value(Settings::default())?;
@@ -149,7 +149,7 @@ impl Settings {
         });
         merged
             .unwrap_or_else(|e| {
-                tracing::warn!(error = %e, "ajustes corruptos; se usan los predeterminados");
+                tracing::warn!(error = %e, "corrupt settings; using defaults");
                 Settings::default()
             })
             .sanitized()
@@ -171,13 +171,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sin_guardar_devuelve_predeterminados() {
+    fn unsaved_returns_defaults() {
         let db = Db::open_in_memory().unwrap();
         assert_eq!(Settings::load(&db).unwrap(), Settings::default());
     }
 
     #[test]
-    fn guarda_y_carga() {
+    fn saves_and_loads() {
         let db = Db::open_in_memory().unwrap();
         let s = Settings {
             theme: Theme::Olive,
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn volumen_fuera_de_rango_se_recorta() {
+    fn out_of_range_volume_is_clamped() {
         let db = Db::open_in_memory().unwrap();
         let s = Settings {
             volume: 7.0,
@@ -201,20 +201,17 @@ mod tests {
     }
 
     #[test]
-    fn json_antiguo_sin_campos_nuevos_es_valido() {
+    fn old_json_without_new_fields_is_valid() {
         let s = Settings::from_stored_json(r#"{"theme":"Silver"}"#);
         assert_eq!(s.theme, Theme::Silver);
         assert_eq!(s.volume, 0.8);
     }
 
     #[test]
-    fn json_corrupto_da_predeterminados() {
+    fn corrupt_json_gives_defaults() {
+        assert_eq!(Settings::from_stored_json("{not json"), Settings::default());
         assert_eq!(
-            Settings::from_stored_json("{no es json"),
-            Settings::default()
-        );
-        assert_eq!(
-            Settings::from_stored_json(r#"{"theme":"Rosa"}"#),
+            Settings::from_stored_json(r#"{"theme":"Pink"}"#),
             Settings::default()
         );
     }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Cabecera de playlist / álbum / artista: portada, títulos y botones (FR-004-05).
+  // Playlist / album / artist header: cover, titles and buttons (FR-004-05).
   import type { Snippet } from "svelte";
   import type { Thumbnail } from "../../bindings";
   import { thumbSrc } from "../../thumb";

@@ -1,22 +1,22 @@
-//! Sonidos de la interfaz (FR-004-16), sintetizados: no son los de Windows XP,
-//! solo comparten el carácter (clics suaves y campanillas cortas).
+//! UI sounds (FR-004-16), synthesized: they are not the Windows XP ones, they
+//! just share their character (soft clicks and short chimes).
 
 use serde::Deserialize;
 use specta::Type;
 
 #[derive(Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UiSound {
-    /// Clic al navegar.
+    /// Click when navigating.
     Navigate,
-    /// Aviso suave (mensajes informativos).
+    /// Soft notice (informational messages).
     Notify,
     /// Error.
     Error,
-    /// Pregunta / advertencia.
+    /// Question / warning.
     Exclamation,
 }
 
-/// Una nota con ataque corto y caída exponencial, con dos armónicos.
+/// A note with a short attack and exponential decay, with two harmonics.
 fn note(
     out: &mut [f32],
     rate: f32,
@@ -36,7 +36,7 @@ fn note(
     }
 }
 
-/// Muestras intercaladas para `channels` canales a `rate` Hz.
+/// Interleaved samples for `channels` channels at `rate` Hz.
 pub fn synth(sound: UiSound, rate: u32, channels: u16) -> Vec<f32> {
     let r = rate as f32;
     let secs = match sound {
@@ -48,7 +48,7 @@ pub fn synth(sound: UiSound, rate: u32, channels: u16) -> Vec<f32> {
     let mut mono = vec![0.0f32; (secs * r) as usize];
     match sound {
         UiSound::Navigate => {
-            // Clic: un golpe agudo muy corto con ruido filtrado.
+            // Click: a very short high-pitched hit with filtered noise.
             note(&mut mono, r, 0.0, 2200.0, 0.004, 0.10, (0.0, 0.0));
             let mut seed = 0x2545_f491_u32;
             let mut lp = 0.0f32;
@@ -75,7 +75,7 @@ pub fn synth(sound: UiSound, rate: u32, channels: u16) -> Vec<f32> {
             }
         }
     }
-    // Fundido final para evitar el chasquido del corte.
+    // Final fade-out to avoid a click at the cut.
     let fade = (0.01 * r) as usize;
     let len = mono.len();
     for (k, s) in mono.iter_mut().enumerate().skip(len.saturating_sub(fade)) {
@@ -96,7 +96,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sonidos_cortos_y_sin_saturar() {
+    fn sounds_are_short_and_do_not_clip() {
         for s in [
             UiSound::Navigate,
             UiSound::Notify,
@@ -106,22 +106,19 @@ mod tests {
             let v = synth(s, 48_000, 2);
             assert!(
                 !v.is_empty() && v.len() < 48_000 * 2,
-                "{s:?} debe durar menos de 1 s"
+                "{s:?} must last less than 1 s"
             );
             let peak = v.iter().fold(0.0f32, |m, x| m.max(x.abs()));
-            assert!(peak > 0.02 && peak <= 0.6, "{s:?}: pico {peak}");
-            assert!(
-                v.last().unwrap().abs() < 1e-3,
-                "{s:?} debe terminar en silencio"
-            );
+            assert!(peak > 0.02 && peak <= 0.6, "{s:?}: peak {peak}");
+            assert!(v.last().unwrap().abs() < 1e-3, "{s:?} must end in silence");
         }
     }
 
     #[test]
-    fn respeta_canales() {
+    fn respects_channels() {
         let v = synth(UiSound::Notify, 44_100, 8);
         assert_eq!(v.len() % 8, 0);
-        // Solo los dos primeros canales llevan señal.
+        // Only the first two channels carry signal.
         assert!(v.chunks(8).all(|f| f[2..].iter().all(|x| *x == 0.0)));
     }
 }

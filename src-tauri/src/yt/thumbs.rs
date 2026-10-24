@@ -1,5 +1,5 @@
-//! Portadas con caché en disco, servidas a la UI por el protocolo `thumb`
-//! (`http://thumb.localhost/<url codificada>` en Windows) (FR-003-17).
+//! Cover art cached on disk, served to the UI through the `thumb` protocol
+//! (`http://thumb.localhost/<encoded url>` on Windows) (FR-003-17).
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -13,11 +13,11 @@ use url::Url;
 
 use crate::storage::Db;
 
-/// Tope de la caché; al pasarlo se borra lo menos usado hasta bajar al 90 %.
+/// Cache cap; once exceeded, the least recently used entries are deleted down to 90 %.
 const MAX_BYTES: i64 = 200 * 1024 * 1024;
-/// Tamaño máximo de una imagen.
+/// Maximum size of one image.
 const MAX_IMAGE: usize = 4 * 1024 * 1024;
-/// Redirecciones que se siguen como mucho (cada salto se vuelve a validar).
+/// Maximum number of redirects followed (each hop is validated again).
 const MAX_REDIRECTS: usize = 5;
 
 pub struct ThumbCache {
@@ -29,7 +29,7 @@ pub struct ThumbCache {
 impl ThumbCache {
     pub fn new(dir: PathBuf, db: Arc<Db>) -> Arc<Self> {
         let _ = std::fs::create_dir_all(&dir);
-        // Una redirección a un host fuera de la lista lo convertiría en proxy abierto.
+        // A redirect to a host outside the allowlist would turn it into an open proxy.
         let redirects = Policy::custom(|attempt| {
             if attempt.previous().len() < MAX_REDIRECTS && permitted(attempt.url()) {
                 attempt.follow()
@@ -41,11 +41,11 @@ impl ThumbCache {
             .timeout(Duration::from_secs(15))
             .redirect(redirects)
             .build()
-            .expect("cliente HTTP");
+            .expect("HTTP client");
         Arc::new(Self { dir, db, http })
     }
 
-    /// Atiende una petición del protocolo (bloqueante: llamar fuera del hilo de UI).
+    /// Handles a protocol request (blocking: call outside the UI thread).
     pub fn handle(&self, req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
         let path = req.uri().path().trim_start_matches('/');
         let Some((url, parsed)) = percent_decode(path).and_then(|u| allowed(&u).map(|p| (u, p)))
@@ -63,8 +63,8 @@ impl ThumbCache {
         }
     }
 
-    /// `url` es la clave de la caché; `parsed`, lo que se pide de verdad (el host
-    /// validado tiene que ser el mismo al que se conecta reqwest).
+    /// `url` is the cache key; `parsed` is what is actually requested (the validated
+    /// host must be the same one reqwest connects to).
     fn get(&self, url: &str, parsed: Url) -> Option<(String, Vec<u8>)> {
         let name = format!("{:016x}", fnv1a(url));
         let file = self.dir.join(&name);
@@ -150,16 +150,16 @@ fn status(code: StatusCode) -> Response<Vec<u8>> {
     Response::builder()
         .status(code)
         .body(Vec::new())
-        .expect("respuesta vacía")
+        .expect("empty response")
 }
 
-/// Solo imágenes de Google/YouTube (evita usar el protocolo como proxy abierto).
-/// Se parsea con el mismo parser que usa reqwest: partir el texto a mano dejaba
-/// pasar `https://evil.com#.ytimg.com` o `https://evil.com\x.ytimg.com`, que
-/// reqwest manda a `evil.com`.
+/// Only Google/YouTube images (avoids using the protocol as an open proxy).
+/// It is parsed with the same parser reqwest uses: splitting the text by hand let
+/// `https://evil.com#.ytimg.com` or `https://evil.com\x.ytimg.com` through, which
+/// reqwest sends to `evil.com`.
 fn allowed(url: &str) -> Option<Url> {
     let parsed = Url::parse(url).ok()?;
-    // Una portada nunca lleva fragmento; rechazarlo cierra la puerta a trucos con `#`.
+    // Cover art never has a fragment; rejecting it closes the door to `#` tricks.
     (parsed.fragment().is_none() && permitted(&parsed)).then_some(parsed)
 }
 
@@ -175,8 +175,8 @@ fn permitted(url: &Url) -> bool {
         return false;
     };
     let path = url.path();
-    // Portadas de las listas automáticas: mixes (`/image/radioart`, `/image/mixart`…)
-    // y las de "Liked Music" y similares (imágenes fijas de gstatic). Solo esas rutas.
+    // Covers of the automatic lists: mixes (`/image/radioart`, `/image/mixart`…)
+    // and those of "Liked Music" and similar (fixed gstatic images). Only those paths.
     if (host == "music.youtube.com" && path.starts_with("/image/"))
         || (host == "www.gstatic.com" && path.starts_with("/youtube/"))
     {
@@ -204,7 +204,7 @@ pub(crate) fn percent_decode(s: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-/// Hash estable (los nombres de archivo no pueden cambiar entre versiones).
+/// Stable hash (file names must not change between versions).
 fn fnv1a(s: &str) -> u64 {
     s.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| {
         (h ^ b as u64).wrapping_mul(0x0100_0000_01b3)
@@ -220,14 +220,14 @@ mod tests {
     }
 
     #[test]
-    fn solo_hosts_de_google() {
+    fn only_google_hosts() {
         assert!(ok("https://lh3.googleusercontent.com/abc=w120-h120"));
         assert!(ok("https://i.ytimg.com/vi/x/hqdefault.jpg"));
         assert!(ok("https://yt3.ggpht.com/x"));
         assert!(!ok("https://evil.com/lh3.googleusercontent.com"));
         assert!(!ok("https://googleusercontent.com.evil.com/x"));
         assert!(!ok("http://lh3.googleusercontent.com/x"));
-        // Listas automáticas: solo las rutas de imágenes.
+        // Automatic lists: image paths only.
         assert!(ok("https://music.youtube.com/image/radioart?r=CjMK"));
         assert!(ok(
             "https://www.gstatic.com/youtube/media/ytm/images/pbg/liked-songs.png"
@@ -237,8 +237,8 @@ mod tests {
     }
 
     #[test]
-    fn el_host_validado_es_el_que_se_pide() {
-        // Con el corte a mano, estas pasaban el filtro y reqwest iba a evil.com.
+    fn validated_host_is_the_requested_one() {
+        // With the hand-rolled split, these passed the filter and reqwest went to evil.com.
         for url in [
             "https://evil.com#.ytimg.com",
             "https://evil.com#/i.ytimg.com/x",
@@ -250,17 +250,17 @@ mod tests {
         ] {
             assert!(!ok(url), "{url}");
         }
-        // Userinfo, puerto y fragmento no hacen falta para una portada.
+        // Userinfo, port and fragment are not needed for cover art.
         assert!(!ok("https://evil.com@i.ytimg.com/x"));
         assert!(!ok("https://i.ytimg.com:8443/x"));
         assert!(!ok("https://i.ytimg.com/vi/x/hqdefault.jpg#a"));
-        // Lo que se pide es el host que se validó.
+        // What is requested is the host that was validated.
         let u = allowed("https://i.ytimg.com/vi/x/hqdefault.jpg").unwrap();
         assert_eq!(u.host_str(), Some("i.ytimg.com"));
     }
 
     #[test]
-    fn redirecciones_solo_a_hosts_permitidos() {
+    fn redirects_only_to_allowed_hosts() {
         let ok = |u: &str| permitted(&Url::parse(u).unwrap());
         assert!(ok("https://lh3.googleusercontent.com/a"));
         assert!(!ok("https://evil.com/a"));
@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn decodifica_url() {
+    fn decodes_url() {
         assert_eq!(
             percent_decode("https%3A%2F%2Flh3.googleusercontent.com%2Fa%3Dw60-h60").as_deref(),
             Some("https://lh3.googleusercontent.com/a=w60-h60")
@@ -278,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn hash_estable() {
+    fn stable_hash() {
         assert_eq!(fnv1a(""), 0xcbf2_9ce4_8422_2325);
         assert_eq!(fnv1a("a"), 0xaf63_dc4c_8601_ec8c);
     }

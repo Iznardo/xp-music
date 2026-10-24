@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Selector de máscaras, como el de WMP: la lista a la izquierda y una vista
-  // previa a la derecha (la máscara de verdad, en pequeño y sin poder tocarla).
+  // Skin picker, like WMP's: the list on the left and a preview on the right
+  // (the real skin, small and untouchable).
   import { onMount } from "svelte";
   import { commands } from "../bindings";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
@@ -31,7 +31,7 @@
     const m = e.data as Record<string, unknown> | null;
     if (m?.t === "ready") preview = { w: Number(m.w) || 1, h: Number(m.h) || 1, title: String(m.title ?? "") };
     else if (m?.t === "error") failed = true;
-    // Todo lo demás (órdenes, ventana…) se ignora: es solo una vista previa.
+    // Everything else (commands, window…) is ignored: it is only a preview.
   }
 
   function load() {

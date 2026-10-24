@@ -1,5 +1,5 @@
-//! Análisis espectral: ventana de Hann, FFT y 64 bandas logarítmicas (FR-005-01/02).
-//! Lógica pura y sin asignaciones en `analyze` (buffers preasignados).
+//! Spectral analysis: Hann window, FFT and 64 logarithmic bands (FR-005-01/02).
+//! Pure logic with no allocations in `analyze` (preallocated buffers).
 
 use std::sync::Arc;
 
@@ -11,17 +11,17 @@ pub const BANDS: usize = 64;
 pub const WAVE: usize = 256;
 const MIN_HZ: f32 = 20.0;
 const MAX_HZ: f32 = 16_000.0;
-/// Rango dinámico representado: -70 dB → 0, 0 dB → 1.
+/// Dynamic range represented: -70 dB → 0, 0 dB → 1.
 const FLOOR_DB: f32 = -70.0;
 const ATTACK: f32 = 0.6;
 const RELEASE: f32 = 0.15;
 const PEAK_FALL: f32 = 0.01;
-/// Graves que marcan el ritmo (bombo, bajo).
+/// Bass frequencies that set the rhythm (kick drum, bass).
 const BEAT_LO_HZ: f32 = 40.0;
 const BEAT_HI_HZ: f32 = 160.0;
-/// Un golpe es un salto de energía de graves sobre su media reciente…
+/// A beat is a jump in bass energy over its recent average…
 const BEAT_JUMP: f32 = 1.45;
-/// …con un mínimo de fotogramas entre golpes (~0,23 s a 30 fps).
+/// …with a minimum number of frames between beats (~0.23 s at 30 fps).
 const BEAT_GAP: u32 = 7;
 
 pub struct Analyzer {
@@ -29,15 +29,15 @@ pub struct Analyzer {
     window: Vec<f32>,
     buf: Vec<Complex32>,
     scratch: Vec<Complex32>,
-    /// Rango de bins [inicio, fin) de cada banda.
+    /// Bin range [start, end) of each band.
     ranges: Vec<(usize, usize)>,
     pub bands: [f32; BANDS],
     pub peaks: [f32; BANDS],
     pub wave: [f32; WAVE],
     pub level: f32,
-    /// Pulso de ritmo: 1 justo en un golpe y cae rápido (para que los visuales "latan").
+    /// Rhythm pulse: 1 right on a beat and falls quickly (so the visuals "pulse").
     pub beat: f32,
-    /// Energía de graves normalizada a lo que suena la canción (control automático de ganancia).
+    /// Bass energy normalized to how loud the song is (automatic gain control).
     pub bass: f32,
     bass_bins: (usize, usize),
     bass_avg: f32,
@@ -71,8 +71,8 @@ impl Analyzer {
         }
     }
 
-    /// Analiza las últimas `FFT_SIZE` muestras mono y actualiza bandas, picos,
-    /// forma de onda y nivel con suavizado.
+    /// Analyzes the last `FFT_SIZE` mono samples and updates bands, peaks,
+    /// waveform and level with smoothing.
     pub fn analyze(&mut self, mono: &[f32]) {
         debug_assert_eq!(mono.len(), FFT_SIZE);
         let mut sum_sq = 0.0;
@@ -83,7 +83,7 @@ impl Analyzer {
         self.fft
             .process_with_scratch(&mut self.buf, &mut self.scratch);
 
-        // Normalización: un seno de amplitud 1 con Hann da un pico de ~N/4.
+        // Normalization: a sine of amplitude 1 with Hann gives a peak of ~N/4.
         let norm = 4.0 / FFT_SIZE as f32;
         for (b, &(lo, hi)) in self.ranges.iter().enumerate() {
             let mag = self.buf[lo..hi]
@@ -99,7 +99,7 @@ impl Analyzer {
             self.peaks[b] = (self.peaks[b] - PEAK_FALL).max(self.bands[b]);
         }
 
-        // Forma de onda: las últimas WAVE*4 muestras, decimadas.
+        // Waveform: the last WAVE*4 samples, decimated.
         let step = 4;
         let start = FFT_SIZE - WAVE * step;
         for (i, w) in self.wave.iter_mut().enumerate() {
@@ -116,7 +116,7 @@ impl Analyzer {
             .iter()
             .map(|c| (c.norm() * norm).powi(2))
             .sum();
-        // Ganancia automática: referencia = máximo reciente que cae despacio.
+        // Automatic gain: reference = recent maximum that falls slowly.
         self.bass_max = (self.bass_max * 0.996).max(e).max(1e-6);
         self.bass = (e / self.bass_max).sqrt().clamp(0.0, 1.0);
         let avg = self.bass_avg;
@@ -130,7 +130,7 @@ impl Analyzer {
         }
     }
 
-    /// Sin audio (pausa): todo cae suavemente a cero.
+    /// No audio (paused): everything falls smoothly to zero.
     pub fn decay(&mut self) {
         for b in 0..BANDS {
             self.bands[b] *= 1.0 - RELEASE;
@@ -147,8 +147,8 @@ impl Analyzer {
     }
 }
 
-/// Bandas logarítmicas de 20 Hz a 16 kHz. Las graves, más estrechas que un bin,
-/// usan al menos el bin más cercano.
+/// Logarithmic bands from 20 Hz to 16 kHz. The low ones, narrower than a bin,
+/// use at least the nearest bin.
 fn band_ranges(sample_rate: u32) -> Vec<(usize, usize)> {
     let bin_hz = sample_rate as f32 / FFT_SIZE as f32;
     let max_bin = FFT_SIZE / 2;
@@ -171,7 +171,7 @@ fn bass_bins(sample_rate: u32) -> (usize, usize) {
     (lo, hi)
 }
 
-/// Frecuencia central de una banda (para tests y etiquetas).
+/// Center frequency of a band (for tests and labels).
 #[cfg(test)]
 pub fn band_center(b: usize) -> f32 {
     let ratio = (MAX_HZ / MIN_HZ).powf(1.0 / BANDS as f32);
@@ -195,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn seno_de_1khz_activa_su_banda() {
+    fn one_khz_sine_lights_its_band() {
         let mut a = Analyzer::new(48_000);
         settle(&mut a, &sine(1000.0, 48_000.0, 0.8));
         let target = (0..BANDS)
@@ -205,20 +205,20 @@ mod tests {
                     .total_cmp(&(band_center(y) - 1000.0).abs())
             })
             .unwrap();
-        // La banda puede caer justo al lado por redondeo de bins: se mira su vecindad.
+        // The band may land right next to it due to bin rounding: check its neighborhood.
         let near = a.bands[target.saturating_sub(1)..=(target + 1).min(BANDS - 1)]
             .iter()
             .fold(0.0f32, |m, x| m.max(*x));
-        assert!(near > 0.8, "banda de 1 kHz = {near}");
+        assert!(near > 0.8, "1 kHz band = {near}");
         for (b, v) in a.bands.iter().enumerate() {
             if (band_center(b) / 1000.0).log2().abs() > 2.0 {
-                assert!(*v < 0.1, "banda {b} ({} Hz) = {v}", band_center(b));
+                assert!(*v < 0.1, "band {b} ({} Hz) = {v}", band_center(b));
             }
         }
     }
 
     #[test]
-    fn silencio_da_cero_y_decay_lo_mantiene() {
+    fn silence_gives_zero_and_decay_keeps_it() {
         let mut a = Analyzer::new(44_100);
         settle(&mut a, &vec![0.0; FFT_SIZE]);
         assert!(a.bands.iter().all(|v| *v < 0.01));
@@ -227,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn ruido_blanco_reparte_energia() {
+    fn white_noise_spreads_energy() {
         let mut seed = 1u32;
         let noise: Vec<f32> = (0..FFT_SIZE)
             .map(|_| {
@@ -239,7 +239,7 @@ mod tests {
             .collect();
         let mut a = Analyzer::new(48_000);
         settle(&mut a, &noise);
-        // Del medio hacia arriba (bandas anchas) todas tienen energía.
+        // From the middle upward (wide bands) all of them have energy.
         assert!(
             a.bands[24..].iter().all(|v| *v > 0.3),
             "{:?}",
@@ -249,23 +249,23 @@ mod tests {
     }
 
     #[test]
-    fn un_bombo_tras_silencio_es_un_golpe() {
+    fn a_kick_after_silence_is_a_beat() {
         let mut a = Analyzer::new(48_000);
         let quiet = sine(80.0, 48_000.0, 0.02);
         for _ in 0..30 {
             a.analyze(&quiet);
         }
-        assert!(a.beat < 0.1, "sin golpes en un tono constante: {}", a.beat);
+        assert!(a.beat < 0.1, "no beats on a constant tone: {}", a.beat);
         a.analyze(&sine(80.0, 48_000.0, 0.9));
-        assert!(a.beat > 0.99, "golpe = {}", a.beat);
+        assert!(a.beat > 0.99, "beat = {}", a.beat);
         assert!(a.bass > 0.9);
-        // Justo después no hay otro golpe aunque siga fuerte (hueco mínimo).
+        // Right after, there is no other beat even if it stays loud (minimum gap).
         a.analyze(&sine(80.0, 48_000.0, 0.95));
         assert!(a.beat < 0.9);
     }
 
     #[test]
-    fn bandas_validas_y_crecientes() {
+    fn bands_valid_and_increasing() {
         let r = band_ranges(44_100);
         assert_eq!(r.len(), BANDS);
         assert!(r.iter().all(|(lo, hi)| lo < hi && *hi <= FFT_SIZE / 2));

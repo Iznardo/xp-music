@@ -1,9 +1,9 @@
 <script lang="ts">
-  // Barra de menús clásica: clic abre, pasar por encima cambia de menú mientras hay uno abierto.
+  // Classic menu bar: click opens, hovering switches menu while one is open.
   import { ui } from "../../stores/ui.svelte";
   import { menuBar } from "../../menus";
 
-  /// `dark`: integrada en la franja superior del skin (texto blanco, sin fondo).
+  /// `dark`: integrated into the skin's top strip (white text, no background).
   let { dark = false }: { dark?: boolean } = $props();
   const menus = $derived(menuBar());
   let openIndex = $state<number | null>(null);
@@ -14,7 +14,7 @@
     ui.openMenu({ x: r.left, y: r.bottom }, menus[i]!.items());
   }
 
-  // Al cerrarse el menú global, ya no hay ninguno abierto.
+  // When the global menu closes, none is open anymore.
   $effect(() => {
     if (!ui.menu) openIndex = null;
   });

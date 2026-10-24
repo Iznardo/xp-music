@@ -1,6 +1,6 @@
-// Elementos de un skin de WMP. Cada uno es una clase con sus propiedades en
-// minúsculas (los scripts lo ven a través de wmpObject) y un <div> posicionado.
-// Las coordenadas son relativas a su contenedor (view o subview).
+// Elements of a WMP skin. Each one is a class with its properties in lowercase
+// (scripts see it through wmpObject) and a positioned <div>.
+// Coordinates are relative to their container (view or subview).
 
 import { wmpObject, cssColor, parseColor, bool, num, timeString } from "./util.js";
 import { opaqueAt, colorAt } from "./images.js";
@@ -8,7 +8,7 @@ import { opaqueAt, colorAt } from "./images.js";
 /** @typedef {import("./wms.js").WmsNode} WmsNode */
 /** @typedef {import("./images.js").SkinImage} SkinImage */
 
-/** Botones con nombre de WMP: qué hacen al pulsarlos y su estado por defecto. */
+/** Named WMP buttons: what they do when pressed and their default state. */
 const NAMED = /** @type {Record<string, {click?: string, defaults?: Record<string, string>}>} */ ({
   play: { click: "player.controls.play()", defaults: { enabled: "wmpenabled:player.controls.play" } },
   pause: { click: "player.controls.pause()", defaults: { enabled: "wmpenabled:player.controls.pause" } },
@@ -27,7 +27,7 @@ const NAMED = /** @type {Record<string, {click?: string, defaults?: Record<strin
   return: { click: "view.returnToMediaCenter()" },
 });
 
-/** "playbutton" / "playelement" → entrada de NAMED. @param {string} tag */
+/** "playbutton" / "playelement" → NAMED entry. @param {string} tag */
 function named(tag) {
   const m = /^(\w+?)(button|element)$/.exec(tag);
   return m ? NAMED[m[1]] : undefined;
@@ -50,11 +50,11 @@ export class El {
     this._parent = parent;
     /** @type {El[]} */
     this._children = [];
-    /** @type {Record<string, string>} evento (minúsculas, sin "on") → código */
+    /** @type {Record<string, string>} event (lowercase, without "on") → code */
     this._handlers = {};
     this._dom = document.createElement("div");
     this._dom.className = `wmp-${node.tag}`;
-    // Como en WMP, nada se pinta fuera de su propio recuadro.
+    // As in WMP, nothing is painted outside its own box.
     this._dom.style.overflow = "hidden";
     this._left = 0;
     this._top = 0;
@@ -74,21 +74,21 @@ export class El {
     this._transparency = "";
     this._clipping = "";
     this._clippingImage = "";
-    /** Imagen que define la forma (fondo o imagen principal). @type {SkinImage | null} */
+    /** Image that defines the shape (background or main image). @type {SkinImage | null} */
     this._mask = null;
     this._hover = false;
     this._pressed = false;
-    /** Ámbito de sus manejadores (lo crea el motor). @type {object | null} */
+    /** Scope of its handlers (created by the engine). @type {object | null} */
     this._scope = null;
     this.__proxy = wmpObject(this);
   }
 
-  /** Lo que ven los scripts. */
+  /** What scripts see. */
   get _proxy() {
     return this.__proxy;
   }
 
-  // --- Propiedades comunes ---------------------------------------------------
+  // --- Common properties ---------------------------------------------------
   get id() {
     return this._id;
   }
@@ -206,12 +206,12 @@ export class El {
     return this._clippingImage;
   }
   set clippingimage(v) {
-    // Algunos editores escriben clippingImage="0" para "ninguna".
+    // Some editors write clippingImage="0" for "none".
     this._clippingImage = /^(0|none|false)?$/i.test(String(v ?? "").trim()) ? "" : String(v);
     this._loadBackground();
   }
 
-  // --- Métodos de los scripts --------------------------------------------------
+  // --- Script methods --------------------------------------------------
   /** @param {unknown} x @param {unknown} y @param {unknown} ms */
   moveto(x, y, ms) {
     this._rt.animate(this, { left: num(x, this._left), top: num(y, this._top) }, num(ms), "endmove");
@@ -223,8 +223,8 @@ export class El {
   setfocus() {}
   focus() {}
 
-  // --- Interno -----------------------------------------------------------------
-  /** Color clave para las imágenes de este elemento. */
+  // --- Internal -----------------------------------------------------------------
+  /** Key color for the images of this element. */
   _key() {
     return this._transparency || this._clipping || null;
   }
@@ -242,12 +242,12 @@ export class El {
     if (name !== this._bgName) return;
     this._dom.style.backgroundImage = img ? `url("${img.url}")` : "";
     this._dom.style.backgroundRepeat = "no-repeat";
-    // La forma de los clics: clippingImage si la hay; si no, el fondo.
+    // The click shape: clippingImage if there is one; otherwise the background.
     let mask = img;
     if (this._clippingImage) mask = (await this._rt.images.get(this._clippingImage, this._clipping || "#ff00ff")) ?? img;
     this._mask = mask;
-    // Con clippingColor/clippingImage, WMP recorta también lo que hay dentro:
-    // hay skins con imágenes que rellenan con el color clave fuera de la forma.
+    // With clippingColor/clippingImage, WMP also clips what is inside:
+    // some skins have images that fill the area outside the shape with the key color.
     const clip = (this._clipping || this._clippingImage) && mask ? `url("${mask.url}")` : "";
     Object.assign(this._dom.style, { maskImage: clip, maskRepeat: "no-repeat", maskPosition: "0 0", maskMode: "alpha" });
     this._layout();
@@ -262,27 +262,27 @@ export class El {
     this._rt.shapeDirty();
   }
 
-  /** Repinta el estado visual (botones, deslizadores…). */
+  /** Repaints the visual state (buttons, sliders…). */
   _paint() {}
 
-  /** Acepta clics (tiene manejadores o comportamiento propio). */
+  /** Accepts clicks (has handlers or behavior of its own). */
   _interactive() {
     const h = this._handlers;
     return !!(h.click || h.mousedown || h.mouseup || h.dblclick || h.mouseover || h.mouseout || h.mousemove);
   }
 
-  /** ¿El punto (relativo al elemento) le pertenece? */
+  /** Does the point (relative to the element) belong to it? */
   _hits(/** @type {number} */ x, /** @type {number} */ y) {
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return false;
     return this._mask ? opaqueAt(this._mask, x, y) : true;
   }
 
-  /** Destino del puntero dentro de este elemento (o él mismo). @returns {El | null} */
+  /** Pointer target inside this element (or itself). @returns {El | null} */
   _target(/** @type {number} */ x, /** @type {number} */ y) {
     return this._interactive() && this._hits(x, y) ? this : null;
   }
 
-  /** Lo que pinta, para la forma de la ventana: imagen o rectángulo. */
+  /** What it paints, for the window shape: image or rectangle. */
   _coverage() {
     if (this._mask) return this._mask;
     return this._bgColor && cssColor(this._bgColor) ? "rect" : null;
@@ -318,7 +318,7 @@ export class El {
     this._rt.fire(this, "click");
   }
 
-  /** Propiedad cambiada por el usuario o un script: avisa a `prop_onchange`. */
+  /** Property changed by the user or a script: notifies `prop_onchange`. */
   _changed(/** @type {string} */ prop) {
     if (!this._rt.fromBinding) this._rt.fire(this, `${prop}_onchange`);
   }
@@ -466,7 +466,7 @@ export class Button extends El {
 }
 
 // ---------------------------------------------------------------------------------
-/** Botones de un BUTTONGROUP: la forma y el clic salen del color en el mapa. */
+/** Buttons of a BUTTONGROUP: the shape and the click come from the color in the map. */
 export class ButtonElement extends Button {
   /** @param {any} rt @param {WmsNode} node @param {ButtonGroup} group */
   constructor(rt, node, group) {
@@ -486,12 +486,12 @@ export class ButtonElement extends Button {
   set mappingcolor(v) {
     this._mapping = parseColor(v);
   }
-  // En un grupo, el estado lo pinta el grupo con sus imágenes; las propias del
-  // elemento (poco habituales) se ignoran.
+  // In a group, the group paints the state with its images; the element's own
+  // (uncommon) ones are ignored.
   async _setImg() {}
   _layout() {}
 
-  /** Calcula la máscara a partir del mapa del grupo. @param {SkinImage} map */
+  /** Computes the mask from the group map. @param {SkinImage} map */
   _build(map) {
     if (!this._mapping) return;
     const [r, g, b] = this._mapping;
@@ -660,14 +660,14 @@ export class ButtonGroup extends El {
   }
 }
 
-/** El punto, relativo al botón del grupo, sigue dentro de su color. */
+/** The point, relative to the group button, is still inside its color. */
 ButtonElement.prototype._hits = function (x, y) {
   const g = this._group;
   return !!g && g._target(x + this._box.x, y + this._box.y) === this;
 };
 
 // ---------------------------------------------------------------------------------
-/** SLIDER, SEEKSLIDER, VOLUMESLIDER, BALANCESLIDER y PROGRESSBAR. */
+/** SLIDER, SEEKSLIDER, VOLUMESLIDER, BALANCESLIDER and PROGRESSBAR. */
 export class Slider extends El {
   /** @param {any} rt @param {WmsNode} node @param {El | null} parent */
   constructor(rt, node, parent) {
@@ -844,7 +844,7 @@ export class Slider extends El {
     return x >= 0 && y >= 0 && x < this.width && y < this.height;
   }
 
-  /** Valor para un punto del deslizador. @param {{x: number, y: number}} p */
+  /** Value for a point on the slider. @param {{x: number, y: number}} p */
   _valueAt(p) {
     const tw = this._loaded.thumbimage?.w ?? 0;
     const th = this._loaded.thumbimage?.h ?? 0;
@@ -881,13 +881,13 @@ export class Slider extends El {
     if (v === this._value) return;
     this._value = v;
     this._paint();
-    // Con slide="false" el cambio se avisa al soltar.
+    // With slide="false" the change is notified on release.
     if (this._slide) this._changed("value");
   }
 }
 
 // ---------------------------------------------------------------------------------
-/** CUSTOMSLIDER: tira de fotogramas y un mapa en grises que da el valor. */
+/** CUSTOMSLIDER: a frame strip and a grayscale map that gives the value. */
 export class CustomSlider extends El {
   /** @param {any} rt @param {WmsNode} node @param {El | null} parent */
   constructor(rt, node, parent) {
@@ -1155,7 +1155,7 @@ export class Text extends El {
 }
 
 // ---------------------------------------------------------------------------------
-/** Visualización: barras con el análisis del audio de la app. */
+/** Visualization: bars with the app's audio analysis. */
 export class Effects extends El {
   /** @param {any} rt @param {WmsNode} node @param {El | null} parent */
   constructor(rt, node, parent) {
@@ -1257,7 +1257,7 @@ export class Effects extends El {
 }
 
 // ---------------------------------------------------------------------------------
-/** Vídeo: aquí no hay vídeo; se muestra la portada de la canción. */
+/** Video: there is no video here; the song cover is shown. */
 export class Video extends El {
   /** @param {any} rt @param {WmsNode} node @param {El | null} parent */
   constructor(rt, node, parent) {
@@ -1283,7 +1283,7 @@ export class Video extends El {
 }
 
 // ---------------------------------------------------------------------------------
-/** PLAYLIST y similares: la cola de la app. */
+/** PLAYLIST and similar: the app queue. */
 export class Playlist extends El {
   /** @param {any} rt @param {WmsNode} node @param {El | null} parent */
   constructor(rt, node, parent) {
@@ -1389,7 +1389,7 @@ export class Playlist extends El {
 }
 
 // ---------------------------------------------------------------------------------
-/** EDITBOX: un campo de texto sencillo. */
+/** EDITBOX: a simple text field. */
 export class EditBox extends El {
   /** @param {any} rt @param {WmsNode} node @param {El | null} parent */
   constructor(rt, node, parent) {
@@ -1424,19 +1424,19 @@ export class EditBox extends El {
 }
 
 // ---------------------------------------------------------------------------------
-/** Elementos sin dibujo (ecualizador, menús automáticos…) y los desconocidos. */
+/** Elements with no drawing (equalizer, automatic menus…) and unknown ones. */
 export class Stub extends El {
   /** @param {any} rt @param {WmsNode} node @param {El | null} parent */
   constructor(rt, node, parent) {
     super(rt, node, parent);
     this._dom.style.display = "none";
   }
-  // AUTOMENU y POPUP: se abre el menú de la app.
+  // AUTOMENU and POPUP: the app menu opens.
   show() {
     this._rt.send({ t: "win", c: "menu" });
     return 0;
   }
-  // EQUALIZERSETTINGS: valores neutros.
+  // EQUALIZERSETTINGS: neutral values.
   get enabled() {
     return false;
   }

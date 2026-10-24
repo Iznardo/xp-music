@@ -1,5 +1,5 @@
-//! Conexión YouTube Music ↔ reproductor: radio automática, normalización de
-//! volumen y registro de escuchas (FR-003-11/14/15).
+//! YouTube Music ↔ player connection: automatic radio, volume normalization
+//! and listen reporting (FR-003-11/14/15).
 
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::{Duration, Instant};
@@ -11,9 +11,9 @@ use crate::player::service::{BoxFuture, PlaybackReporter, PlayerService, RadioPr
 use crate::settings::Settings;
 use crate::storage::Db;
 
-/// Segundos de escucha antes de registrarla en el historial.
+/// Seconds of listening before it is recorded in the history.
 const REPORT_AFTER: Duration = Duration::from_secs(10);
-/// Pistas que se añaden a la cola cuando se acaba (autoplay).
+/// Tracks added to the queue when it runs out (autoplay).
 const RADIO_BATCH: usize = 25;
 
 pub struct YtRadio(pub Arc<YtService>);
@@ -56,7 +56,7 @@ impl YtReporter {
         }))
     }
 
-    /// El reproductor se crea después del reportero: se conecta aquí.
+    /// The player is created after the reporter: it is connected here.
     pub fn attach(&self, player: &Arc<PlayerService>) {
         let _ = self.0.player.set(Arc::downgrade(player));
     }
@@ -75,14 +75,14 @@ impl PlaybackReporter for YtReporter {
             let info = match inner.yt.player_info(&id).await {
                 Ok(i) => i,
                 Err(e) => {
-                    tracing::debug!(track = %id.0, error = %e, "sin datos del reproductor web");
+                    tracing::debug!(track = %id.0, error = %e, "no web player data");
                     if let Some(p) = &player {
                         p.set_gain_db(0.0);
                     }
                     return;
                 }
             };
-            // YouTube solo atenúa lo que suena por encima de su referencia (no sube lo flojo).
+            // YouTube only attenuates what is above its reference (it doesn't boost quiet tracks).
             if let Some(p) = &player
                 && is_current()
             {
@@ -101,12 +101,12 @@ impl PlaybackReporter for YtReporter {
                 tokio::time::sleep(left).await;
             }
             if !is_current() {
-                return; // Se saltó antes de los 10 s.
+                return; // Skipped before the 10 s mark.
             }
             match inner.yt.report_listen(url).await {
-                Ok(()) => tracing::info!(track = %id.0, "escucha registrada en el historial"),
+                Ok(()) => tracing::info!(track = %id.0, "listen recorded in the history"),
                 Err(e) => {
-                    tracing::warn!(track = %id.0, error = %e, "no se pudo registrar la escucha")
+                    tracing::warn!(track = %id.0, error = %e, "could not record the listen")
                 }
             }
         });

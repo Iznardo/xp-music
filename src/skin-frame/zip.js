@@ -1,6 +1,6 @@
-// Lectura de un .wmz (un zip normal) en el propio marco: directorio central y
-// descompresión con DecompressionStream. Los nombres se buscan sin distinguir
-// mayúsculas y con o sin carpeta, como hace WMP.
+// Reading a .wmz (a regular zip) inside the frame itself: central directory and
+// decompression with DecompressionStream. Names are looked up case-insensitively
+// and with or without folder, like WMP does.
 
 const decoder = new TextDecoder("utf-8");
 const legacy = new TextDecoder("windows-1252");
@@ -16,7 +16,7 @@ export function openZip(buf) {
       break;
     }
   }
-  if (eocd < 0) throw new Error("El archivo no es un .wmz válido.");
+  if (eocd < 0) throw new Error("The file is not a valid .wmz.");
   const count = dv.getUint16(eocd + 10, true);
   let p = dv.getUint32(eocd + 16, true);
   /** @type {Map<string, {name: string, method: number, offset: number, size: number}>} */
@@ -24,7 +24,7 @@ export function openZip(buf) {
   /** @type {Map<string, any>} */
   const byBase = new Map();
   for (let n = 0; n < count; n++) {
-    if (p + 46 > u8.length || dv.getUint32(p, true) !== 0x02014b50) throw new Error("El .wmz está dañado.");
+    if (p + 46 > u8.length || dv.getUint32(p, true) !== 0x02014b50) throw new Error("The .wmz is corrupted.");
     const flags = dv.getUint16(p + 8, true);
     const method = dv.getUint16(p + 10, true);
     const size = dv.getUint32(p + 20, true);
@@ -48,17 +48,17 @@ export function openZip(buf) {
 
   async function inflate(entry) {
     const off = entry.offset;
-    if (dv.getUint32(off, true) !== 0x04034b50) throw new Error(`Entrada dañada: ${entry.name}`);
+    if (dv.getUint32(off, true) !== 0x04034b50) throw new Error(`Corrupted entry: ${entry.name}`);
     const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
     const data = u8.subarray(start, start + entry.size);
     if (entry.method === 0) return data;
-    if (entry.method !== 8) throw new Error(`Compresión no soportada en ${entry.name}`);
+    if (entry.method !== 8) throw new Error(`Unsupported compression in ${entry.name}`);
     const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
     return new Uint8Array(await new Response(stream).arrayBuffer());
   }
 
   return {
-    /** Nombres de todos los archivos. */
+    /** Names of all the files. */
     names: () => [...byPath.values()].map((e) => e.name),
     /** @param {string} name */
     find(name) {
@@ -84,7 +84,7 @@ export function normalize(name) {
   return name.replace(/\\/g, "/").replace(/^(\.\/)+/, "").replace(/^\/+/, "").toLowerCase();
 }
 
-/** Texto de un .wms o .js: UTF-16 (con o sin BOM), UTF-8 o Windows-1252. */
+/** Text of a .wms or .js: UTF-16 (with or without BOM), UTF-8 or Windows-1252. */
 export function decodeText(/** @type {Uint8Array} */ raw) {
   if (raw[0] === 0xff && raw[1] === 0xfe) return new TextDecoder("utf-16le").decode(raw.subarray(2));
   if (raw[0] === 0xfe && raw[1] === 0xff) return new TextDecoder("utf-16be").decode(raw.subarray(2));

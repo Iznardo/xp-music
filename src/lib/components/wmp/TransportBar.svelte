@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Controles del skin WMP 9 (FR-004-11/12): una píldora plateada que sobresale
-  // abajo a la izquierda con ▶ grande, ■, tiempo, ⏮⏭, silencio y volumen; y la
-  // barra inferior del cuerpo con la pantalla de estado, aleatorio y repetir.
+  // WMP 9 skin controls (FR-004-11/12): a silver pill that sticks out at the
+  // bottom left with a large ▶, ■, time, ⏮⏭, mute and volume; and the body's
+  // bottom bar with the status display, shuffle and repeat.
   import { commands, type RepeatMode } from "../../bindings";
   import { player } from "../../stores/player.svelte";
   import { ui } from "../../stores/ui.svelte";
@@ -29,7 +29,7 @@
   function addMenu(e: MouseEvent) {
     if (!track) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    // Hacia arriba: la barra está al borde inferior de la ventana.
+    // Upwards: the bar is at the bottom edge of the window.
     ui.openMenu({ x: r.left, y: r.top - 4 - 22 * (playlistChoices([track]).length + 1) }, playlistChoices([track]));
   }
 
@@ -51,14 +51,14 @@
     }
   });
 
-  // Pantalla LCD: avisos y estados; mientras suena, el álbum (o el artista).
+  // LCD display: notices and states; while playing, the album (or the artist).
   const lcdText = $derived.by(() => {
     if (ui.status || !st?.track || st.status !== "Playing") return statusText;
     const album = st.track.album?.name;
     return album ? `${t.transport.album}: ${album}` : artistNames(st.track);
   });
 
-  // Los avisos de la barra de estado desaparecen solos.
+  // Status bar notices disappear on their own.
   $effect(() => {
     if (!ui.status) return;
     const id = setTimeout(() => (ui.status = ""), 4000);
@@ -204,7 +204,7 @@
 </div>
 
 <style>
-  /* Píldora plateada que sobresale por debajo del cuerpo. */
+  /* Silver pill that sticks out below the body. */
   .pod {
     position: absolute;
     z-index: 30;
@@ -213,8 +213,8 @@
     box-shadow: inset 0 2px 1px rgb(255 255 255 / 0.9), inset 0 -3px 6px rgb(30 50 120 / 0.25), 0 2px 4px rgb(0 0 40 / 0.35);
     user-select: none;
   }
-  /* Unida a la lateral: sin borde ni fondo propios; la pinta la carcasa con el
-     mismo color que la lateral, así se leen como una sola pieza. */
+  /* Joined to the side panel: no border or background of its own; the shell paints it
+     with the same color as the side panel, so they read as a single piece. */
   .pod.joined {
     border: 0;
     background: none;
@@ -308,7 +308,7 @@
     flex: 1;
     height: 6px;
     border-radius: 3px;
-    /* Oscurece lo que haya debajo: se lee igual sobre azul, oliva o plata. */
+    /* Darkens whatever is underneath: reads the same over blue, olive or silver. */
     background: rgb(0 0 30 / 0.38);
     box-shadow: inset 0 1px 2px rgb(0 0 30 / 0.7), 0 1px rgb(255 255 255 / 0.7);
     cursor: pointer;
@@ -364,7 +364,7 @@
     flex: 1;
     min-width: 50px;
   }
-  /* Barra inferior del cuerpo, a la derecha de la píldora. */
+  /* Body's bottom bar, to the right of the pill. */
   .bar {
     position: absolute;
     z-index: 20;

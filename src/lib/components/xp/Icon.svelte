@@ -1,8 +1,8 @@
 <script lang="ts">
-  // Iconos de 16 px dibujados para la app (no son recursos de Microsoft).
+  // 16 px icons drawn for the app (not Microsoft assets).
   import type { IconName } from "./types";
   let { name, size = 16 }: { name: IconName; size?: number } = $props();
-  // Ids únicos por instancia: si se repiten, al desmontarse el primero los demás pierden el degradado.
+  // Unique ids per instance: if repeated, when the first one unmounts the others lose their gradient.
   const u = $props.id();
 </script>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Biblioteca: árbol a la izquierda y contenido a la derecha (FR-004-04/05).
+  // Library: tree on the left and content on the right (FR-004-04/05).
   import { router, type LibrarySection } from "../router.svelte";
   import { library } from "../stores/library.svelte";
   import { auth } from "../stores/auth.svelte";
@@ -25,7 +25,7 @@
           label: t.tree.playlists,
           icon: "folder",
           onselect: go("playlists"),
-          // "Música que me gusta" ya tiene su propio nodo.
+          // "Liked Music" already has its own node.
           children: library.playlists.filter((p) => p.id !== "VLLM").map((p) => ({
             id: `pl:${p.id}`,
             label: p.title,
