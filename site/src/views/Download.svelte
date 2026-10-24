@@ -1,17 +1,35 @@
 <script lang="ts">
   // Descargas de la última release (API de GitHub), con la forma de la Biblioteca.
+  // Una tarjeta por sistema con lo que traiga la release; la del visitante, la primera.
   import logo from "../../../src/assets/logo.webp";
-  import { RELEASES } from "../content";
+  import { RELEASES, REPO } from "../content";
   import { release, type Asset } from "../state.svelte";
+  import { OS_NAME, archName, detectOs, type Os } from "../builds";
 
-  const assets = $derived(release.data?.assets.filter((a) => !/\.(sig|json)$/.test(a.name)) ?? []);
-  const find = (re: RegExp) => assets.find((a) => re.test(a.name));
-  const exe = $derived(find(/\.exe$/i));
-  const deb = $derived(find(/\.deb$/i));
-  const appimage = $derived(find(/\.AppImage$/i));
-  // macOS (en preparación): la tarjeta sale sola cuando la release trae los .dmg.
-  const macArm = $derived(find(/(aarch64|arm64).*\.dmg$/i));
-  const macIntel = $derived(find(/(x64|x86_64|intel).*\.dmg$/i));
+  const mine = detectOs(navigator.userAgent);
+  const ALL: Os[] = ["windows", "macos", "linux"];
+  const order = mine ? [mine, ...ALL.filter((o) => o !== mine)] : ALL;
+
+  const INTRO: Record<Os, string> = {
+    windows: "Instalador para Windows 10/11. Se actualiza solo: al arrancar te avisa si hay una versión nueva.",
+    macos: "Imagen de disco: ábrela y arrastra XP Music a Aplicaciones.",
+    linux: "Experimental. Necesita una sesión con audio y un Secret Service (GNOME Keyring o KeePassXC).",
+  };
+
+  const assets = $derived(release.data?.assets ?? []);
+  const cards = $derived(
+    order
+      .map((os) => {
+        const own = assets.filter((a) => a.os === os);
+        // En macOS, Apple Silicon primero: es lo que llevan los Mac actuales.
+        const arches = (os === "macos" ? (["arm64", "x64"] as const) : (["x64", "arm64"] as const))
+          .map((arch) => ({ arch, files: own.filter((a) => a.arch === arch) }))
+          .filter((r) => r.files.length);
+        return { os, arches };
+      })
+      .filter((c) => c.arches.length),
+  );
+  const table = $derived(cards.flatMap((c) => c.arches.flatMap((r) => r.files)));
   const mb = (a: Asset) => `${(a.size / 1048576).toFixed(1)} MB`;
 </script>
 
@@ -28,61 +46,85 @@
     <a class="xp-btn" href={release.data?.url ?? RELEASES}>Notas de la versión</a>
   </header>
 
-  <div class="cards">
+  {#if cards.length}
+    <div class="cards">
+      {#each cards as c (c.os)}
+        <fieldset class:mine={c.os === mine}>
+          <legend>{OS_NAME[c.os]}{c.os === mine ? " · tu sistema" : ""}</legend>
+          <p>{INTRO[c.os]}</p>
+          {#each c.arches as r (r.arch)}
+            <div class="arch">
+              <span class="arch-name">{archName(c.os, r.arch)}</span>
+              <div class="row">
+                {#each r.files as a (a.name)}
+                  <a class="xp-btn big" href={a.url} title={a.name}>{a.kind} <span class="size">{mb(a)}</span></a>
+                {/each}
+              </div>
+            </div>
+          {/each}
+          <p class="hint">
+            {#if c.os === "windows"}Si SmartScreen avisa: «Más información» → «Ejecutar de todas formas».{/if}
+            <a href="#/docs/instalar">Instrucciones de instalación</a>
+          </p>
+        </fieldset>
+      {/each}
+    </div>
+  {:else if release.data || release.failed}
     <fieldset>
-      <legend>Windows 10/11</legend>
-      <p>Instalador para x64. Se actualiza solo: al arrancar te avisa si hay una versión nueva.</p>
-      <a class="xp-btn big" href={exe?.url ?? RELEASES}>Descargar instalador{exe ? ` (${mb(exe)})` : ""}</a>
-      <p class="hint">Si SmartScreen avisa: «Más información» → «Ejecutar de todas formas». <a href="#/docs/instalar">Más detalles</a></p>
+      <legend>Descargas</legend>
+      <p>No se pudo leer la lista de archivos. Están todos en la página de la última versión.</p>
+      <a class="xp-btn big" href={RELEASES}>Abrir la última versión en GitHub</a>
     </fieldset>
-    <fieldset>
-      <legend>Linux x86_64 (experimental)</legend>
-      <p>Compilado en Ubuntu 24.04. Necesita audio y un Secret Service (GNOME Keyring o KeePassXC).</p>
-      <div class="row">
-        <a class="xp-btn big" href={deb?.url ?? RELEASES}>.deb{deb ? ` (${mb(deb)})` : ""}</a>
-        <a class="xp-btn big" href={appimage?.url ?? RELEASES}>AppImage{appimage ? ` (${mb(appimage)})` : ""}</a>
-      </div>
-      <p class="hint"><a href="#/docs/instalar">Instrucciones para Linux</a></p>
-    </fieldset>
-    {#if macArm || macIntel}
-      <fieldset>
-        <legend>macOS</legend>
-        <p>Imagen de disco: ábrela y arrastra XP Music a Aplicaciones.</p>
-        <div class="row">
-          {#if macArm}<a class="xp-btn big" href={macArm.url}>Apple Silicon ({mb(macArm)})</a>{/if}
-          {#if macIntel}<a class="xp-btn big" href={macIntel.url}>Intel ({mb(macIntel)})</a>{/if}
-        </div>
-        <p class="hint"><a href="#/docs/instalar">Instrucciones para macOS</a></p>
-      </fieldset>
-    {/if}
-  </div>
-
-  {#if assets.length}
-    <h2>Todos los archivos</h2>
-    <table class="lv">
-      <thead><tr><th>Nombre</th><th class="num">Tamaño</th><th class="num">Descargas</th></tr></thead>
-      <tbody>
-        {#each assets as a (a.name)}
-          <tr><td><a href={a.url}>{a.name}</a></td><td class="num">{mb(a)}</td><td class="num">{a.downloads.toLocaleString("es-ES")}</td></tr>
-        {/each}
-      </tbody>
-    </table>
   {/if}
-  <p class="muted">Versiones anteriores y código fuente en <a href={RELEASES}>GitHub Releases</a>.</p>
+
+  {#if table.length}
+    <h2>Todos los archivos</h2>
+    <div class="scroll">
+      <table class="lv">
+        <thead><tr><th>Sistema</th><th>Archivo</th><th class="num">Tamaño</th><th>SHA-256</th></tr></thead>
+        <tbody>
+          {#each table as a (a.name)}
+            <tr>
+              <td>{OS_NAME[a.os]} {archName(a.os, a.arch)}</td>
+              <td><a href={a.url}>{a.name}</a></td>
+              <td class="num">{mb(a)}</td>
+              <td>{#if a.sha256}<code class="sha">{a.sha256}</code>{:else}<span class="muted">—</span>{/if}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
+  <p class="muted">Versiones anteriores y código fuente en <a href="{REPO}/releases">GitHub Releases</a>.</p>
 </div>
 
 <style>
   .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
     gap: 12px;
     margin-bottom: 14px;
   }
   fieldset {
     background: var(--surface-light);
   }
+  fieldset.mine {
+    border-color: var(--selection);
+    box-shadow: 0 0 0 1px var(--selection);
+  }
   fieldset p {
     margin: 4px 0 10px;
+  }
+  .arch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .arch-name {
+    width: 86px;
+    flex: none;
+    font-weight: bold;
   }
   .row {
     display: flex;
@@ -90,12 +132,31 @@
     gap: 6px;
   }
   .big {
-    display: inline-grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     height: 28px;
     font-weight: bold;
   }
+  .size {
+    color: var(--text-muted);
+    font-weight: normal;
+    font-size: 11px;
+  }
   .hint {
     color: var(--text-muted);
+  }
+  .scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .lv {
+    max-width: none;
+  }
+  /* Clic = seleccionar el hash entero, para copiarlo y compararlo. */
+  .sha {
+    font: 11px Consolas, "Lucida Console", monospace;
+    user-select: all;
+    -webkit-user-select: all;
   }
 </style>

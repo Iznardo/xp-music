@@ -1,7 +1,8 @@
 // Textos de la web que no son documentación (la documentación está en ../docs).
 
 export const REPO = "https://github.com/Iznardo/xp-music";
-export const RELEASES = `${REPO}/releases`;
+/** Siempre la última versión publicada (GitHub redirige a su etiqueta). */
+export const RELEASES = `${REPO}/releases/latest`;
 
 export const SECTIONS = [
   { id: "", label: "Inicio" },

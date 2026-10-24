@@ -18,7 +18,7 @@ Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media
 
 ## Instalar
 
-Descarga la última versión desde [Releases](https://github.com/Iznardo/xp-music/releases):
+Descarga la última versión desde [Releases](https://github.com/Iznardo/xp-music/releases/latest):
 el instalador `.exe` para Windows, o el `.deb` / `.AppImage` para Linux. En NixOS hay un flake.
 Los detalles (avisos de SmartScreen, requisitos en Linux, Nix, actualizaciones) están en [docs/instalar.md](docs/instalar.md).
 
