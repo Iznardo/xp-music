@@ -1,7 +1,8 @@
-//! Integración con Windows (specs/006): bandeja, ventana desechable, controles
+//! Integración con el sistema (specs/006): bandeja, ventana desechable, controles
 //! multimedia del sistema, notificaciones, autoarranque y atajos globales.
 
 pub mod media;
+#[cfg(windows)]
 pub mod taskbar;
 pub mod tray;
 
@@ -44,6 +45,7 @@ pub fn show_main(app: &AppHandle) {
         Ok(w) => {
             let _ = w.set_focus();
             // Botones de la miniatura: la ventana es nueva, hay que volver a engancharlos.
+            #[cfg(windows)]
             if let Ok(h) = w.hwnd() {
                 let raw = h.0 as isize;
                 let _ = app.run_on_main_thread(move || taskbar::attach(raw));

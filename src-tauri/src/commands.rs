@@ -248,8 +248,7 @@ pub async fn auth_select_account(
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_logout(yt: YtState<'_>) -> AppResult<()> {
-    yt.logout().await;
-    Ok(())
+    yt.logout().await
 }
 
 // ---------------------------------------------------------------- YouTube Music: lectura

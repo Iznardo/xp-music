@@ -5,7 +5,7 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,21 @@ use crate::audio::resolver::ToolPaths;
 use crate::error::{AppError, AppResult, ErrorCode};
 
 const RELEASES: &str = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
+#[cfg(windows)]
 const ASSET: &str = "yt-dlp_win.zip";
+#[cfg(not(windows))]
+const ASSET: &str = "yt-dlp_linux";
+pub const YT_DLP_EXE: &str = if cfg!(windows) {
+    "yt-dlp.exe"
+} else {
+    "yt-dlp_linux"
+};
+
+pub static RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+pub fn set_resource_dir(dir: PathBuf) {
+    let _ = RESOURCE_DIR.set(dir);
+}
 const SUMS: &str = "SHA2-256SUMS";
 /// Comprobación automática como mucho una vez al día (FR-007-08).
 const CHECK_EVERY: Duration = Duration::from_secs(24 * 3600);
@@ -40,7 +54,7 @@ pub fn bin_dir() -> Option<PathBuf> {
 
 /// yt-dlp actualizado por la app (puede no existir).
 pub fn updated_yt_dlp() -> Option<PathBuf> {
-    Some(bin_dir()?.join("yt-dlp").join("yt-dlp.exe"))
+    Some(bin_dir()?.join("yt-dlp").join(YT_DLP_EXE))
 }
 
 fn no_window(cmd: &mut Command) -> &mut Command {
@@ -56,6 +70,9 @@ fn version_of(exe: &Path) -> Option<String> {
     let out = no_window(Command::new(exe).arg("--version"))
         .output()
         .ok()?;
+    if !out.status.success() {
+        return None;
+    }
     let s = String::from_utf8_lossy(&out.stdout);
     let first = s.lines().next()?.trim();
     // "deno 2.9.7 (stable, …)" → "2.9.7"
@@ -184,42 +201,55 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
 
 /// Descomprime en `bin/yt-dlp.new`, comprueba que arranca y sustituye a la anterior.
 fn install(zip_bytes: &[u8]) -> AppResult<()> {
+    let bin = bin_dir().ok_or_else(|| AppError::internal("Sin carpeta de datos local."))?;
+    install_into(zip_bytes, &bin)
+}
+
+fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
     let io = |e: std::io::Error| {
         AppError::new(
             ErrorCode::Storage,
             format!("No se pudo instalar yt-dlp: {e}"),
         )
     };
-    let bin = bin_dir().ok_or_else(|| AppError::internal("Sin carpeta de datos local."))?;
     let staging = bin.join("yt-dlp.new");
     let target = bin.join("yt-dlp");
     let old = bin.join("yt-dlp.old");
     let _ = std::fs::remove_dir_all(&staging);
     std::fs::create_dir_all(&staging).map_err(io)?;
 
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes))
-        .map_err(|e| AppError::internal(format!("Paquete de yt-dlp no válido: {e}")))?;
-    for i in 0..archive.len() {
-        let mut f = archive
-            .by_index(i)
-            .map_err(|e| AppError::internal(e.to_string()))?;
-        // `enclosed_name` rechaza rutas que saldrían de la carpeta (../).
-        let Some(rel) = f.enclosed_name() else {
-            continue;
-        };
-        let out = staging.join(rel);
-        if f.is_dir() {
-            std::fs::create_dir_all(&out).map_err(io)?;
-            continue;
+    #[cfg(windows)]
+    {
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes))
+            .map_err(|e| AppError::internal(format!("Paquete de yt-dlp no válido: {e}")))?;
+        for i in 0..archive.len() {
+            let mut f = archive
+                .by_index(i)
+                .map_err(|e| AppError::internal(e.to_string()))?;
+            // `enclosed_name` rechaza rutas que saldrían de la carpeta (../).
+            let Some(rel) = f.enclosed_name() else {
+                continue;
+            };
+            let out = staging.join(rel);
+            if f.is_dir() {
+                std::fs::create_dir_all(&out).map_err(io)?;
+                continue;
+            }
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent).map_err(io)?;
+            }
+            let mut w = std::fs::File::create(&out).map_err(io)?;
+            std::io::copy(&mut f, &mut w).map_err(io)?;
         }
-        if let Some(parent) = out.parent() {
-            std::fs::create_dir_all(parent).map_err(io)?;
-        }
-        let mut w = std::fs::File::create(&out).map_err(io)?;
-        std::io::copy(&mut f, &mut w).map_err(io)?;
     }
-    // El zip trae `yt-dlp.exe` + `_internal/` en la raíz.
-    let exe = staging.join("yt-dlp.exe");
+    let exe = staging.join(YT_DLP_EXE);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // ponytail: onefile arranca algo más lento; evita bibliotecas Python incompatibles en AppImage.
+        std::fs::write(&exe, zip_bytes).map_err(io)?;
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).map_err(io)?;
+    }
     if version_of(&exe).is_none() {
         let _ = std::fs::remove_dir_all(&staging);
         return Err(AppError::internal(
@@ -302,7 +332,12 @@ pub async fn tools_update_now() -> AppResult<Option<String>> {
 #[specta::specta]
 pub fn tools_open_logs_dir() -> AppResult<()> {
     let dirs = crate::state::AppDirs::resolve().map_err(|e| AppError::internal(e.to_string()))?;
-    Command::new("explorer.exe")
+    let opener = if cfg!(windows) {
+        "explorer.exe"
+    } else {
+        "xdg-open"
+    };
+    Command::new(opener)
         .arg(&dirs.logs)
         .spawn()
         .map(|_| ())
@@ -324,11 +359,25 @@ mod tests {
     }
 
     #[test]
-    fn instalar_rechaza_zip_corrupto() {
+    fn instalar_rechaza_paquete_corrupto() {
         assert!(install(b"esto no es un zip").is_err());
     }
 
-    /// Descarga real (≈15 MB): `cargo test --lib -- --ignored --nocapture actualizar_yt_dlp_real`.
+    #[cfg(unix)]
+    #[test]
+    fn instalar_conserva_ejecutable_y_rechaza_version_rota() {
+        let bin =
+            std::env::temp_dir().join(format!("xp-music-tools-test-{}", rand::random::<u32>()));
+        let package = |script: &str| script.as_bytes().to_vec();
+        install_into(&package("#!/bin/sh\necho test-version\n"), &bin).unwrap();
+        let exe = bin.join("yt-dlp").join(YT_DLP_EXE);
+        assert_eq!(version_of(&exe).as_deref(), Some("test-version"));
+        assert!(install_into(&package("#!/missing/interpreter\n"), &bin).is_err());
+        assert_eq!(version_of(&exe).as_deref(), Some("test-version"));
+        std::fs::remove_dir_all(bin).unwrap();
+    }
+
+    /// Descarga real: `cargo test --lib -- --ignored --nocapture actualizar_yt_dlp_real`.
     #[test]
     #[ignore]
     fn actualizar_yt_dlp_real() {

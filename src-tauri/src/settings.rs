@@ -86,7 +86,8 @@ impl Default for Settings {
             normalize_volume: true,
             audio_quality: AudioQuality::Aac128,
             output_device: None,
-            close_to_tray: true,
+            // GNOME puede no mostrar AppIndicators; no dejar la app invisible.
+            close_to_tray: cfg!(windows),
             start_minimized: false,
             launch_at_login: false,
             report_history: true,

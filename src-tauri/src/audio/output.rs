@@ -298,6 +298,40 @@ pub fn list_devices() -> Vec<AudioDevice> {
 mod tests {
     use super::*;
 
+    /// Prueba de salida real: requiere un dispositivo ALSA/Pulse/PipeWire.
+    #[test]
+    #[ignore = "requiere un dispositivo de audio"]
+    fn salida_de_audio_real() {
+        let tap = Mutex::new(None);
+        let mut output = Output::open(None, &tap).unwrap();
+        output.shared.tap_enabled.store(true, Ordering::Relaxed);
+        output.shared.paused.store(false, Ordering::Relaxed);
+        let samples: Vec<f32> = (0..output.rate / 10)
+            .flat_map(|frame| {
+                let sample = (frame as f32 * 440.0 * std::f32::consts::TAU / output.rate as f32)
+                    .sin()
+                    * 0.01;
+                std::iter::repeat_n(sample, output.channels as usize)
+            })
+            .collect();
+        assert_eq!(output.push(&samples), samples.len());
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while output.played_frames() == 0 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(output.played_frames() > 0, "el callback debe consumir PCM");
+        assert!(
+            tap.lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .consumer
+                .occupied_len()
+                > 0
+        );
+        assert!(!output.shared.device_lost.load(Ordering::Relaxed));
+    }
+
     #[test]
     fn curva_de_volumen() {
         assert_eq!(perceptual_amplitude(1.0, false, 0.0), 1.0);
