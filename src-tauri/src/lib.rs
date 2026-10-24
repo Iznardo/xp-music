@@ -130,6 +130,22 @@ fn export_bindings(builder: &Builder<tauri::Wry>) {
         .expect("no se pudieron exportar los bindings TS");
 }
 
+/// Tamaño y posición se recuerdan; el estado «maximizada», solo en Windows. En Linux los
+/// gestores de ventanas con teselado (Hyprland, sway…) marcan como maximizada cualquier
+/// ventana teselada: guardarlo la dejaría para siempre con el aspecto maximizado (sin
+/// el contorno de WMP) aunque luego flote.
+fn window_state() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    use tauri_plugin_window_state::StateFlags;
+    let flags = if cfg!(windows) {
+        StateFlags::all()
+    } else {
+        StateFlags::all() - StateFlags::MAXIMIZED
+    };
+    tauri_plugin_window_state::Builder::default()
+        .with_state_flags(flags)
+        .build()
+}
+
 /// yt-dlp con caché; si faltan las herramientas, un resolvedor que lo explica.
 fn build_resolver(db: Arc<storage::Db>, yt: Arc<YtService>) -> Arc<dyn StreamResolver> {
     match ToolPaths::locate() {
@@ -173,7 +189,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             os::show_main(app)
         }))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(window_state())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,

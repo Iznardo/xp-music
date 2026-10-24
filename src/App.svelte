@@ -115,7 +115,12 @@
         else void ui.setCompact(false);
       }),
     );
-    const sync = async () => (maximized = await win.isMaximized());
+    // Los gestores con teselado (Hyprland, sway…) marcan como maximizada cualquier ventana
+    // teselada. En Linux solo se trata como maximizada (modo plano) si además ocupa toda la
+    // zona útil de la pantalla; una mitad de pantalla conserva el contorno de WMP.
+    const linux = /Linux/.test(navigator.userAgent);
+    const fillsScreen = () => innerWidth >= screen.availWidth - 2 && innerHeight >= screen.availHeight - 2;
+    const sync = async () => (maximized = (await win.isMaximized()) && (!linux || fillsScreen()));
     void sync();
     const unlisteners = [win.onResized(sync), win.onFocusChanged((e) => (active = e.payload))];
     return () => {
