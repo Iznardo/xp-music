@@ -108,9 +108,9 @@
   fieldset {
     background: var(--surface-light);
   }
+  /* Borde más grueso, no box-shadow: la sombra no deja hueco para la leyenda y la tacha. */
   fieldset.mine {
-    border-color: var(--selection);
-    box-shadow: 0 0 0 1px var(--selection);
+    border: 2px solid var(--selection);
   }
   fieldset p {
     margin: 4px 0 10px;
