@@ -12,7 +12,7 @@
 
   const INTRO: Record<Os, string> = {
     windows: "Instalador para Windows 10/11. Se actualiza solo: al arrancar te avisa si hay una versión nueva.",
-    macos: "Imagen de disco: ábrela y arrastra XP Music a Aplicaciones.",
+    macos: "Experimental. Imagen de disco: ábrela y arrastra XP Music a Aplicaciones. No se actualiza sola: para cambiar de versión, descarga el .dmg nuevo.",
     linux: "Experimental. Necesita una sesión con audio y un Secret Service (GNOME Keyring o KeePassXC).",
   };
 
@@ -63,7 +63,7 @@
             </div>
           {/each}
           <p class="hint">
-            {#if c.os === "windows"}Si SmartScreen avisa: «Más información» → «Ejecutar de todas formas».{/if}
+            {#if c.os === "windows"}Si SmartScreen avisa: «Más información» → «Ejecutar de todas formas».{:else if c.os === "macos"}La primera vez macOS la bloquea: Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente».{/if}
             <a href="#/docs/instalar">Instrucciones de instalación</a>
           </p>
         </fieldset>

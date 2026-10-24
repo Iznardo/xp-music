@@ -10,6 +10,7 @@ Abre **Ver → Selector de máscaras… → Abrir carpeta**. Es:
 | --- | --- |
 | Windows | `%APPDATA%\xp-music\skins` |
 | Linux | `~/.config/xp-music/skins` (o `$XDG_CONFIG_HOME/xp-music/skins`) |
+| macOS | `~/Library/Application Support/xp-music/skins` |
 
 Se pueden organizar en subcarpetas.
 
@@ -23,4 +24,4 @@ Se pueden organizar en subcarpetas.
 
 - Los scripts de cada máscara se ejecutan aislados, sin acceso a tu cuenta ni a tus archivos.
 - Las ventanas secundarias (ecualizador, lista aparte) todavía no se abren.
-- En Linux no funciona el clic a través de las zonas transparentes.
+- En Linux y macOS no funciona el clic a través de las zonas transparentes.
