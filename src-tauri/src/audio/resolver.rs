@@ -113,12 +113,15 @@ pub struct ToolPaths {
 }
 
 impl ToolPaths {
-    /// Busca yt-dlp.exe y deno.exe: `XP_MUSIC_TOOLS`, junto al ejecutable, o
-    /// `tools/` del repositorio en desarrollo. Los sidecars definitivos llegan en 007.
+    /// Busca en `XP_MUSIC_TOOLS`, los recursos del paquete, junto al ejecutable
+    /// o `tools/` del repositorio en desarrollo.
     pub fn locate() -> Option<Self> {
         let mut candidates: Vec<PathBuf> = Vec::new();
         if let Some(dir) = std::env::var_os("XP_MUSIC_TOOLS") {
             candidates.push(dir.into());
+        }
+        if let Some(dir) = crate::tools::RESOURCE_DIR.get() {
+            candidates.push(dir.join("tools"));
         }
         if let Some(dir) = std::env::current_exe()
             .ok()
@@ -132,7 +135,7 @@ impl ToolPaths {
 
         let deno = candidates
             .iter()
-            .map(|d| d.join("deno.exe"))
+            .map(|d| d.join(format!("deno{}", std::env::consts::EXE_SUFFIX)))
             .find(|p| p.is_file())?;
         // La copia que actualiza la propia app (007) tiene prioridad; si no, la incluida.
         // Se prefiere la versión "onedir" (`yt-dlp/yt-dlp.exe`): no se descomprime en cada
@@ -142,8 +145,8 @@ impl ToolPaths {
             .or_else(|| {
                 candidates.iter().find_map(|dir| {
                     [
-                        dir.join("yt-dlp").join("yt-dlp.exe"),
-                        dir.join("yt-dlp.exe"),
+                        dir.join("yt-dlp").join(crate::tools::YT_DLP_EXE),
+                        dir.join(crate::tools::YT_DLP_EXE),
                     ]
                     .into_iter()
                     .find(|p| p.is_file())
@@ -355,7 +358,23 @@ impl YtDlpResolver {
                     std::process::id(),
                     rand::random::<u32>()
                 ));
-                std::fs::write(&tmp, netscape).map_err(|e| AppError::internal(e.to_string()))?;
+                let mut options = std::fs::OpenOptions::new();
+                options.write(true).create_new(true);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    options.mode(0o600);
+                }
+                {
+                    use std::io::Write;
+                    let mut file = options
+                        .open(&tmp)
+                        .map_err(|e| AppError::internal(e.to_string()))?;
+                    if let Err(e) = file.write_all(netscape.as_bytes()) {
+                        let _ = std::fs::remove_file(&tmp);
+                        return Err(AppError::internal(e.to_string()));
+                    }
+                }
                 tracing::info!(track = %id.0, "reintentando yt-dlp con sesión");
                 let res = self.run(id, pref, Some(&tmp));
                 let _ = std::fs::remove_file(&tmp);
@@ -372,7 +391,7 @@ impl StreamResolver for MissingTools {
     fn resolve(&self, _: &TrackId, _: FormatPreference) -> AppResult<ResolvedStream> {
         Err(AppError::new(
             ErrorCode::ResolveFailed,
-            "No se encuentran yt-dlp.exe y deno.exe (carpeta tools/).",
+            "No se encuentran yt-dlp y deno (carpeta tools/).",
         ))
     }
 }

@@ -1,0 +1,17 @@
+{
+  "bundle": {
+    "targets": [
+      "deb",
+      "appimage"
+    ],
+    "resources": {
+      "../tools/deno": "tools/deno",
+      "../tools/yt-dlp/": "tools/yt-dlp/"
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    }
+  }
+}

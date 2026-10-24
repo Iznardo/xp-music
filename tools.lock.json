@@ -4,6 +4,18 @@
                   "asset":  "yt-dlp_win.zip",
                   "sha256":  "30b4c14aafab6082becff7881e41b76df46dc43ea7633479410a91e29da492bf"
               },
+    "linux": {
+        "ytDlp": {
+            "version": "2026.08.19",
+            "asset": "yt-dlp_linux",
+            "sha256": "58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a"
+        },
+        "deno": {
+            "version": "v2.9.7",
+            "asset": "deno-x86_64-unknown-linux-gnu.zip",
+            "sha256": "c6527f24f4b16031d3ae4fa9f658d5f11534c8d84ce7dc8502420280919c3490"
+        }
+    },
     "deno":  {
                  "version":  "v2.9.7",
                  "asset":  "deno-x86_64-pc-windows-msvc.zip",

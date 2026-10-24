@@ -16,7 +16,7 @@ const COMPACT: (f64, f64) = (460.0, 150.0);
 const MIN_FULL: (f64, f64) = (640.0, 420.0);
 
 /// Tamaño, posición y si estaba maximizada antes de pasar a una ventana pequeña.
-type Restore = (PhysicalSize<u32>, PhysicalPosition<i32>, bool);
+type Restore = (PhysicalSize<u32>, Option<PhysicalPosition<i32>>, bool);
 
 #[derive(Default)]
 pub struct UiState {
@@ -77,10 +77,23 @@ fn shrink(
         if maximized {
             window.unmaximize()?;
         }
-        *restore = Some((window.outer_size()?, window.outer_position()?, maximized));
+        *restore = Some((
+            window.outer_size()?,
+            window.outer_position().ok(),
+            maximized,
+        ));
     }
+    #[cfg(target_os = "linux")]
+    {
+        // GTK puede descartar el resize pendiente al desactivar resizable.
+        // Los límites iguales fijan el tamaño sin esa carrera.
+        window.set_min_size(Some(size))?;
+        window.set_max_size(Some(size))?;
+    }
+    #[cfg(not(target_os = "linux"))]
     window.set_min_size(None::<LogicalSize<f64>>)?;
     window.set_size(size)?;
+    #[cfg(not(target_os = "linux"))]
     window.set_resizable(false)?;
     window.set_always_on_top(on_top)?;
     Ok(())
@@ -90,10 +103,15 @@ fn shrink(
 fn restore_full(window: &WebviewWindow, ui: &UiState) -> tauri::Result<()> {
     window.set_always_on_top(false)?;
     window.set_resizable(true)?;
+    #[cfg(target_os = "linux")]
+    window.set_max_size(None::<LogicalSize<f64>>)?;
     window.set_min_size(Some(LogicalSize::new(MIN_FULL.0, MIN_FULL.1)))?;
     if let Some((size, pos, maximized)) = ui.restore.lock().unwrap().take() {
         window.set_size(size)?;
-        window.set_position(pos)?;
+        // Wayland no permite consultar ni fijar posiciones globales.
+        if let Some(pos) = pos {
+            let _ = window.set_position(pos);
+        }
         if maximized {
             window.maximize()?;
         }
@@ -104,7 +122,7 @@ fn restore_full(window: &WebviewWindow, ui: &UiState) -> tauri::Result<()> {
 /// Cambia entre modo completo y compacto (FR-004-13).
 #[tauri::command]
 #[specta::specta]
-pub fn window_set_compact(
+pub async fn window_set_compact(
     window: WebviewWindow,
     ui: State<'_, UiState>,
     enabled: bool,
@@ -127,11 +145,13 @@ pub fn window_set_compact(
 /// lógicos); `None` vuelve al modo completo.
 #[tauri::command]
 #[specta::specta]
-pub fn window_set_skin(
+pub async fn window_set_skin(
     window: WebviewWindow,
     ui: State<'_, UiState>,
     size: Option<(f64, f64)>,
 ) -> AppResult<()> {
+    // Mismo orden que window_set_compact: compacto antes de máscara.
+    let mut compact = ui.compact.lock().unwrap();
     let mut skin = ui.skin.lock().unwrap();
     match size {
         Some((w, h)) => {
@@ -140,7 +160,7 @@ pub fn window_set_skin(
             }
             let size = LogicalSize::new(w.clamp(16.0, 4096.0), h.clamp(16.0, 4096.0));
             shrink(&window, &ui, size, false).map_err(window_err)?;
-            *ui.compact.lock().unwrap() = false;
+            *compact = false;
             *skin = true;
         }
         None if *skin => {
