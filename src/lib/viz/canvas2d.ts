@@ -1,4 +1,4 @@
-// Presets en Canvas 2D: Barras y Ondas (inspirados en "Bars and Waves" de WMP, no copiados).
+// Canvas 2D presets: Bars and Waves (inspired by WMP's "Bars and Waves", not copied).
 
 import type { VizData as VizFrame, VizRenderer } from "./types";
 
@@ -22,7 +22,7 @@ abstract class Canvas2D implements VizRenderer {
   abstract draw(frame: VizFrame, t: number): void;
 }
 
-/// Barras con tope de pico que cae y reflejo en el "suelo".
+/// Bars with a falling peak cap and a reflection on the "floor".
 export class Bars extends Canvas2D {
   private grad: CanvasGradient | null = null;
   private gradH = 0;
@@ -41,7 +41,7 @@ export class Bars extends Canvas2D {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, w, h);
 
-    // 48 barras: se agrupan las 64 bandas recortando los agudos extremos.
+    // 48 bars: the 64 bands are grouped, trimming the extreme highs.
     const n = 48;
     const gap = Math.max(1, Math.round(w / n / 6));
     const bw = (w - gap * (n + 1)) / n;
@@ -51,7 +51,7 @@ export class Bars extends Canvas2D {
       const v = f.bands[i] ?? 0;
       const x = gap + i * (bw + gap);
       const bh = Math.max(1, v * maxH);
-      // Barras "segmentadas" como un ecualizador de los 2000.
+      // "Segmented" bars like a 2000s equalizer.
       ctx.fillRect(x, floor - bh, bw, bh);
     }
     ctx.fillStyle = "rgba(0,0,0,0.38)";
@@ -65,7 +65,7 @@ export class Bars extends Canvas2D {
       ctx.fillRect(x, floor - p * maxH - 3, bw, 2);
     }
 
-    // Reflejo.
+    // Reflection.
     ctx.save();
     ctx.globalAlpha = 0.22;
     ctx.translate(0, floor * 2 + 2);
@@ -80,14 +80,14 @@ export class Bars extends Canvas2D {
   }
 }
 
-/// Osciloscopio con brillo sobre un espectro tenue.
+/// Oscilloscope with a glow over a faint spectrum.
 export class Waves extends Canvas2D {
   draw(f: VizFrame) {
     const { ctx, w, h } = this;
     ctx.fillStyle = "rgba(0,4,16,0.55)";
     ctx.fillRect(0, 0, w, h);
 
-    // Espectro de fondo en puntos.
+    // Background spectrum as dots.
     const n = f.bands.length;
     for (let i = 0; i < n; i++) {
       const v = f.bands[i] ?? 0;

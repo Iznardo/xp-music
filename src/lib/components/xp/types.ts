@@ -1,15 +1,15 @@
-// Tipos compartidos de los componentes XP.
+// Types shared by the XP components.
 
 export type IconName = "library" | "folder" | "playlist" | "note" | "heart" | "disc" | "person" | "clock" | "home" | "search" | "radio";
 
 export type Column<T> = {
   key: string;
   label: string;
-  /// Fracción (`2fr`) o píxeles (`60px`).
+  /// Fraction (`2fr`) or pixels (`60px`).
   width: string;
   align?: "left" | "right" | "center";
   text: (row: T, index: number) => string;
-  /// Valor para ordenar (si falta, se ordena por `text`).
+  /// Sort value (if missing, sorts by `text`).
   sort?: (row: T) => string | number;
 };
 

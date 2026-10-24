@@ -1,5 +1,5 @@
-//! Botones en la miniatura de la barra de tareas, como WMP (FR-006-05).
-//! Anterior · Reproducir/Pausa · Siguiente, con iconos dibujados en código.
+//! Taskbar thumbnail buttons, like WMP (FR-006-05).
+//! Previous · Play/Pause · Next, with icons drawn in code.
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -26,7 +26,7 @@ pub const BTN_PREV: u32 = 1;
 pub const BTN_TOGGLE: u32 = 2;
 pub const BTN_NEXT: u32 = 3;
 
-/// Iconos como punteros crudos (HICON no es Send).
+/// Icons as raw pointers (HICON is not Send).
 struct Icons {
     prev: usize,
     play: usize,
@@ -39,16 +39,16 @@ static ON_CLICK: OnceLock<Box<dyn Fn(u32) + Send + Sync>> = OnceLock::new();
 static PLAYING: AtomicBool = AtomicBool::new(false);
 static CURRENT: std::sync::Mutex<usize> = std::sync::Mutex::new(0);
 
-/// Qué hacer al pulsar un botón (una sola vez al arrancar).
+/// What to do when a button is pressed (set once at startup).
 pub fn set_handler(f: impl Fn(u32) + Send + Sync + 'static) {
     let _ = ON_CLICK.set(Box::new(f));
 }
 
-/// Engancha la ventana principal (cada vez que se crea). Hilo de UI.
+/// Hooks the main window (every time it is created). UI thread.
 pub fn attach(hwnd_raw: isize) {
     let hwnd = HWND(hwnd_raw as *mut _);
     *CURRENT.lock().unwrap() = hwnd_raw as usize;
-    // SAFETY: hwnd es la ventana principal viva; el procedimiento es estático.
+    // SAFETY: hwnd is the live main window; the procedure is static.
     unsafe {
         let _ = SetWindowSubclass(hwnd, Some(subclass), SUBCLASS_ID, 0);
     }
@@ -63,7 +63,7 @@ pub fn relocalize() {
     }
 }
 
-/// Refleja reproducir/pausa en el botón central. Hilo de UI.
+/// Reflects play/pause on the central button. UI thread.
 pub fn set_playing(playing: bool) {
     if PLAYING.swap(playing, Ordering::AcqRel) == playing {
         return;
@@ -83,7 +83,7 @@ pub fn set_playing(playing: bool) {
             tr!("Play", "Reproducir")
         },
     );
-    // SAFETY: COM ya está inicializado en el hilo de UI (lo usa WebView2).
+    // SAFETY: COM is already initialized on the UI thread (WebView2 uses it).
     unsafe {
         if let Ok(tb) =
             CoCreateInstance::<_, ITaskbarList3>(&TaskbarList, None, CLSCTX_INPROC_SERVER)
@@ -103,7 +103,7 @@ unsafe extern "system" fn subclass(
     _data: usize,
 ) -> LRESULT {
     static TASKBAR_CREATED: OnceLock<u32> = OnceLock::new();
-    // SAFETY: cadena estática terminada en 0.
+    // SAFETY: static NUL-terminated string.
     let created = *TASKBAR_CREATED
         .get_or_init(|| unsafe { RegisterWindowMessageW(w!("TaskbarButtonCreated")) });
     if msg == created {
@@ -114,7 +114,7 @@ unsafe extern "system" fn subclass(
         }
         return LRESULT(0);
     }
-    // SAFETY: reenvío estándar de una subclase.
+    // SAFETY: standard forwarding of a subclass.
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }
 
@@ -134,8 +134,8 @@ fn add_buttons(hwnd: HWND) {
         ),
         button(BTN_NEXT, icons.next, &tr!("Next", "Siguiente")),
     ];
-    // SAFETY: COM inicializado en el hilo de UI; si la barra aún no está lista, falla sin más
-    // y se reintenta al llegar "TaskbarButtonCreated".
+    // SAFETY: COM initialized on the UI thread; if the taskbar is not ready yet, it simply
+    // fails and is retried when "TaskbarButtonCreated" arrives.
     unsafe {
         if let Ok(tb) =
             CoCreateInstance::<_, ITaskbarList3>(&TaskbarList, None, CLSCTX_INPROC_SERVER)
@@ -176,7 +176,7 @@ fn icons() -> Option<&'static Icons> {
     Some(ICONS.get_or_init(|| icons))
 }
 
-// ------------------------------------------------------------------ glifos 16×16
+// ------------------------------------------------------------------ 16×16 glyphs
 
 fn glyph_play(x: f32, y: f32) -> bool {
     x >= 4.5 && (y - 8.0).abs() <= (12.5 - x) * 0.62
@@ -196,7 +196,7 @@ fn glyph_next(x: f32, y: f32) -> bool {
     glyph_prev(16.0 - x, y)
 }
 
-/// Icono 16×16 de 32 bits: glifo blanco con contorno azul oscuro.
+/// 32-bit 16×16 icon: white glyph with a dark blue outline.
 fn make_icon(shape: fn(f32, f32) -> bool) -> Option<HICON> {
     const N: i32 = 16;
     let inside = |x: i32, y: i32| {
@@ -206,16 +206,16 @@ fn make_icon(shape: fn(f32, f32) -> bool) -> Option<HICON> {
     for y in 0..N {
         for x in 0..N {
             let v = if inside(x, y) {
-                0xFFF8_FAFF // ARGB blanco azulado
+                0xFFF8_FAFF // ARGB bluish white
             } else if (-1..=1).any(|dy| (-1..=1).any(|dx| inside(x + dx, y + dy))) {
-                0xE01A_2C55 // contorno
+                0xE01A_2C55 // outline
             } else {
                 0
             };
             px[(y * N + x) as usize] = v;
         }
     }
-    // SAFETY: llamadas GDI con estructuras válidas; los bitmaps se liberan tras crear el icono.
+    // SAFETY: GDI calls with valid structures; the bitmaps are freed after creating the icon.
     unsafe {
         let bmi = BITMAPINFO {
             bmiHeader: BITMAPINFOHEADER {
@@ -253,7 +253,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn glifos_razonables() {
+    fn reasonable_glyphs() {
         let count = |f: fn(f32, f32) -> bool| {
             (0..16)
                 .flat_map(|y| (0..16).map(move |x| (x, y)))
@@ -267,17 +267,17 @@ mod tests {
             ("next", glyph_next),
         ] {
             let n = count(f);
-            assert!((20..120).contains(&n), "{name}: {n} píxeles");
+            assert!((20..120).contains(&n), "{name}: {n} pixels");
         }
         assert_eq!(
             count(glyph_prev),
             count(glyph_next),
-            "siguiente es el espejo de anterior"
+            "next is the mirror of previous"
         );
     }
 
     #[test]
-    fn crea_iconos() {
+    fn creates_icons() {
         assert!(make_icon(glyph_play).is_some());
     }
 }

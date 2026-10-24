@@ -1,11 +1,11 @@
 <script lang="ts">
-  // Menú contextual / desplegable estilo XP, con submenús y teclado (FR-004-09, NFR-004-03).
+  // XP-style context / dropdown menu, with submenus and keyboard (FR-004-09, NFR-004-03).
   import { ui, type MenuItem } from "../../stores/ui.svelte";
   import Self from "./ContextMenu.svelte";
 
   let { items = null, x = 0, y = 0, onclose }: { items?: MenuItem[] | null; x?: number; y?: number; onclose?: () => void } = $props();
 
-  // Sin props: es el menú global de `ui.menu`.
+  // No props: it is the global menu from `ui.menu`.
   const root = $derived(items === null);
   const list = $derived(root ? (ui.menu?.items ?? []) : (items ?? []));
   const pos = $derived(root ? { x: ui.menu?.x ?? 0, y: ui.menu?.y ?? 0 } : { x, y });
@@ -21,7 +21,7 @@
     onclose?.();
   }
 
-  // Recolocar si se sale de la ventana.
+  // Reposition if it goes off the window.
   $effect(() => {
     if (!el || !list.length) return;
     const r = el.getBoundingClientRect();

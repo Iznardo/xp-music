@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos mínimos de la ventana principal: eventos y controles del marco XP.",
+  "description": "Minimal permissions for the main window: events and XP frame controls.",
   "windows": ["main"],
   "permissions": [
     "core:event:default",

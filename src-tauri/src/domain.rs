@@ -1,19 +1,19 @@
-//! Tipos de dominio compartidos entre backend y frontend (contrato de specs/001/plan.md).
+//! Domain types shared between backend and frontend (contract from specs/001/plan.md).
 //!
-//! Los tipos TS se generan desde aquí con tauri-specta; no se escriben a mano.
+//! The TS types are generated from here with tauri-specta; they are not written by hand.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// `videoId` de YouTube (11 caracteres).
+/// YouTube `videoId` (11 characters).
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TrackId(pub String);
 
-/// Id de playlist tal como lo devuelve la biblioteca (con prefijo `VL`).
+/// Playlist id as returned by the library (with the `VL` prefix).
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PlaylistId(pub String);
 
-/// `browseId` de álbum o artista.
+/// Album or artist `browseId`.
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BrowseId(pub String);
 
@@ -57,7 +57,7 @@ pub struct Track {
     pub thumbnails: Vec<Thumbnail>,
     pub explicit: bool,
     pub like_status: Option<LikeStatus>,
-    /// Necesario para editar playlists.
+    /// Needed to edit playlists.
     pub set_video_id: Option<String>,
 }
 
@@ -84,7 +84,7 @@ pub struct AlbumSummary {
     pub id: BrowseId,
     pub title: String,
     pub artists: Vec<ArtistRef>,
-    /// Año o tipo ("2002", "Single • 2019"), tal como lo da YouTube.
+    /// Year or type ("2002", "Single • 2019"), as given by YouTube.
     pub subtitle: Option<String>,
     pub thumbnails: Vec<Thumbnail>,
 }
@@ -98,7 +98,7 @@ pub struct ArtistSummary {
     pub thumbnails: Vec<Thumbnail>,
 }
 
-/// Elemento de una sección de Inicio, de artista o de búsqueda.
+/// Item of a Home, artist or search section.
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 pub enum MediaItem {
     Track(Track),
@@ -129,7 +129,7 @@ pub struct PlaylistDetail {
 #[serde(rename_all = "camelCase")]
 pub struct AlbumDetail {
     pub summary: AlbumSummary,
-    /// Playlist con las pistas del álbum (para reproducirlo entero).
+    /// Playlist with the album's tracks (to play it in full).
     pub playlist_id: Option<PlaylistId>,
     pub stats: Option<String>,
     pub description: Option<String>,
@@ -142,9 +142,9 @@ pub struct ArtistDetail {
     pub summary: ArtistSummary,
     pub description: Option<String>,
     pub top_songs: Vec<Track>,
-    /// Álbumes, singles, vídeos, artistas similares… en el orden de YouTube.
+    /// Albums, singles, videos, similar artists… in YouTube's order.
     pub sections: Vec<Section>,
-    /// Canción con la que empezar la radio del artista.
+    /// Song to start the artist's radio from.
     pub radio_seed: Option<TrackId>,
 }
 
@@ -170,7 +170,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn serializa_en_camel_case() {
+    fn serializes_as_camel_case() {
         let t = Track {
             id: TrackId("yQd4xQBlBa0".into()),
             title: "Obsesion".into(),

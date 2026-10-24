@@ -8,7 +8,7 @@
 #
 #   npm run release                 # patch: 0.1.0 → 0.1.1
 #   npm run release -- -Bump minor
-#   npm run release -- -Bump none -NoPublish   # solo compilar (prueba local)
+#   npm run release -- -Bump none -NoPublish   # build only (local test)
 #
 # Requisitos (una vez): scripts\setup-signing.ps1 (certificado), la clave del
 # updater en %USERPROFILE%\.xp-music\updater.key (+ .pub), creada con
@@ -32,21 +32,21 @@ $signingPath = Join-Path $root 'src-tauri\signing.local.json'
 $confPath = Join-Path $root 'src-tauri\tauri.conf.json'
 
 function Fail($msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
-# Get-Content sin -Encoding lee como ANSI en PowerShell 5.1 y estropea las tildes.
+# Get-Content without -Encoding reads as ANSI in PowerShell 5.1 and mangles accented characters.
 function Write-Utf8($path, $text) { [IO.File]::WriteAllText($path, $text, (New-Object Text.UTF8Encoding $false)) }
 
-# --- 1. Comprobaciones --------------------------------------------------------
+# --- 1. Checks --------------------------------------------------------
 if (-not $NoPublish) {
-    if (git status --porcelain) { Fail 'Hay cambios sin confirmar.' }
-    if ((git rev-parse --abbrev-ref HEAD) -ne 'main') { Fail 'Las releases se hacen desde main.' }
+    if (git status --porcelain) { Fail 'There are uncommitted changes.' }
+    if ((git rev-parse --abbrev-ref HEAD) -ne 'main') { Fail 'Releases are made from main.' }
     $origin = git remote get-url origin
     if ($LASTEXITCODE -ne 0 -or $origin -notmatch '^(git@github\.com:|https://github\.com/)Iznardo/xp-music(\.git)?/?$') {
-        Fail 'origin debe apuntar a Iznardo/xp-music; no se publica desde un fork.'
+        Fail 'origin must point to Iznardo/xp-music; releases are not published from a fork.'
     }
     gh auth status 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) { Fail 'gh no tiene sesión iniciada (gh auth login).' }
-    if (-not (Test-Path $signingPath)) { Fail 'Falta la firma: ejecuta scripts\setup-signing.ps1.' }
-    if (-not (Test-Path $keyPath)) { Fail "Falta la clave del updater en $keyPath." }
+    if ($LASTEXITCODE -ne 0) { Fail 'gh is not logged in (gh auth login).' }
+    if (-not (Test-Path $signingPath)) { Fail 'Signing is missing: run scripts\setup-signing.ps1.' }
+    if (-not (Test-Path $keyPath)) { Fail "The updater key is missing at $keyPath." }
 }
 if (-not (@(rustup target list --installed) -contains $armTarget)) {
     Fail "Falta el target de ARM64: rustup target add $armTarget (y «MSVC ARM64 build tools» de Visual Studio)."
@@ -56,7 +56,7 @@ if (-not (Test-Path (Join-Path $root 'tools\yt-dlp\yt-dlp.exe')) -or -not (Test-
     & (Join-Path $PSScriptRoot 'fetch-tools.ps1')
 }
 
-# --- 2. Versión ---------------------------------------------------------------
+# --- 2. Version ---------------------------------------------------------------
 $pkg = Get-Content package.json -Raw -Encoding UTF8 | ConvertFrom-Json
 $version = [version]$pkg.version
 $new = switch ($Bump) {
@@ -70,24 +70,24 @@ if ($Bump -ne 'none') {
     $from = '"version": "' + $pkg.version + '"'
     $to = '"version": "' + $v + '"'
     npm version $v --no-git-tag-version --ignore-scripts
-    if ($LASTEXITCODE -ne 0) { Fail 'No se pudo actualizar package.json/package-lock.json.' }
+    if ($LASTEXITCODE -ne 0) { Fail 'Could not update package.json/package-lock.json.' }
     Write-Utf8 $confPath ((Get-Content $confPath -Raw -Encoding UTF8).Replace($from, $to))
     $cargo = Get-Content src-tauri\Cargo.toml -Raw -Encoding UTF8
     $cargo = ([regex]'(?m)^version = "[^"]+"').Replace($cargo, "version = `"$v`"", 1)
     Write-Utf8 (Join-Path $root 'src-tauri\Cargo.toml') $cargo
-    Write-Host "Versión $($pkg.version) → $v"
+    Write-Host "Version $($pkg.version) → $v"
 }
 
-# --- 3. Config temporal: firma y artefactos del updater -----------------------
+# --- 3. Temporary config: signing and updater artifacts -----------------------
 $extra = @{ bundle = @{ windows = @{} } }
 if (Test-Path $signingPath) {
     $sig = Get-Content $signingPath -Raw | ConvertFrom-Json
-    # Tauri busca signtool en el registro del SDK, y con algunas instalaciones esa
-    # entrada apunta a una carpeta sin él (falla al comprobar deno/yt-dlp antes de
-    # firmarlos). Con TAURI_WINDOWS_SIGNTOOL_PATH usa el que se le indica.
+    # Tauri looks for signtool in the SDK registry entry, and on some installations
+    # that entry points to a folder without it (it fails when checking deno/yt-dlp
+    # before signing them). With TAURI_WINDOWS_SIGNTOOL_PATH it uses the given one.
     $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
         Sort-Object FullName | Select-Object -Last 1
-    if (-not $signtool) { Fail 'No se encuentra signtool.exe (instala el Windows SDK).' }
+    if (-not $signtool) { Fail 'signtool.exe not found (install the Windows SDK).' }
     $env:TAURI_WINDOWS_SIGNTOOL_PATH = $signtool.FullName
     $extra.bundle.windows = @{
         certificateThumbprint = $sig.certificateThumbprint
@@ -95,21 +95,21 @@ if (Test-Path $signingPath) {
         timestampUrl = 'http://timestamp.digicert.com'
     }
 } else {
-    Write-Warning 'Sin certificado: el instalador no irá firmado.'
+    Write-Warning 'No certificate: the installer will not be signed.'
 }
 if (Test-Path $keyPath) {
     $extra.bundle.createUpdaterArtifacts = $true
     $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content $keyPath -Raw).Trim()
     $env:XP_MUSIC_UPDATER_PUBKEY = (Get-Content "$keyPath.pub" -Raw).Trim()
-    # El bundler comprueba la firma de los artefactos con la clave de la config.
+    # The bundler verifies the artifact signature with the key from the config.
     $extra.plugins = @{ updater = @{ pubkey = $env:XP_MUSIC_UPDATER_PUBKEY } }
     if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-        $sec = Read-Host 'Contraseña de la clave del updater' -AsSecureString
+        $sec = Read-Host 'Updater key password' -AsSecureString
         $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
             [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
     }
 } else {
-    Write-Warning 'Sin clave del updater: esta compilación no podrá autoactualizarse.'
+    Write-Warning 'No updater key: this build will not be able to self-update.'
 }
 $tmpConf = Join-Path ([IO.Path]::GetTempPath()) "xp-music-release-$v.json"
 Write-Utf8 $tmpConf ($extra | ConvertTo-Json -Depth 5)
@@ -148,20 +148,20 @@ $installers = foreach ($build in @(
     $found
 }
 
-# --- 5. Verificar firma -------------------------------------------------------
+# --- 5. Verify signature -------------------------------------------------------
 if (Test-Path $signingPath) {
     # Solo los instaladores: Tauri firma el ejecutable al empaquetarlo y luego deja en
     # target\...\release la copia sin firmar (la de dentro del instalador sí lo está).
     foreach ($f in @($installers.FullName)) {
         $a = Get-AuthenticodeSignature $f
         if ($a.Status -ne 'Valid' -or $a.SignerCertificate.Subject -ne 'CN=iznardo') {
-            Fail "Firma no válida en $f ($($a.Status))."
+            Fail "Invalid signature on $f ($($a.Status))."
         }
-        if (-not $a.TimeStamperCertificate) { Write-Warning "Sin sello de tiempo en $f." }
+        if (-not $a.TimeStamperCertificate) { Write-Warning "No timestamp on $f." }
     }
-    Write-Host 'Firma Authenticode correcta (CN=iznardo).'
+    Write-Host 'Authenticode signature OK (CN=iznardo).'
 }
-if ($NoPublish) { Write-Host 'Compilado sin publicar.'; exit 0 }
+if ($NoPublish) { Write-Host 'Built without publishing.'; exit 0 }
 
 # --- 6. Preparar draft; el workflow compila el resto, lo verifica y publica -----
 $assets = foreach ($installer in $installers) {
@@ -173,14 +173,14 @@ $assets = foreach ($installer in $installers) {
 $tag = "v$v"
 if ($Bump -ne 'none') {
     git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
-    if ($LASTEXITCODE -ne 0) { Fail 'No se pudieron preparar los archivos de versión.' }
+    if ($LASTEXITCODE -ne 0) { Fail 'Could not stage the version files.' }
     git commit -m "release: $tag"
-    if ($LASTEXITCODE -ne 0) { Fail 'No se pudo confirmar la versión.' }
+    if ($LASTEXITCODE -ne 0) { Fail 'Could not commit the version.' }
 }
 git tag $tag
-if ($LASTEXITCODE -ne 0) { Fail 'No se pudo crear el tag (si ya existe el draft, reintenta el workflow).' }
+if ($LASTEXITCODE -ne 0) { Fail 'Could not create the tag (if the draft already exists, retry the workflow).' }
 git push origin main $tag
-if ($LASTEXITCODE -ne 0) { Fail 'No se pudo subir el tag.' }
+if ($LASTEXITCODE -ne 0) { Fail 'Could not push the tag.' }
 
 # Notas del mantenedor; el workflow antepone la tabla de descargas (SHA-256 y enlaces).
 if (-not $Notes) { $Notes = "XP Music $v" }

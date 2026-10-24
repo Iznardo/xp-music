@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Barra de tareas superior de WMP 10: pestañas grandes, búsqueda rápida y cuenta (FR-004-02).
+  // WMP 10 top task bar: large tabs, quick search and account (FR-004-02).
   import { router } from "../../router.svelte";
   import { auth } from "../../stores/auth.svelte";
   import { t } from "../../i18n.svelte";
@@ -16,7 +16,7 @@
     if (query.trim()) router.go({ name: "search", filter: "All", query: query.trim() });
   }
 
-  // Al llegar a una búsqueda por otra vía (menú, atajos), refleja el texto.
+  // When a search is reached another way (menu, shortcuts), mirror its text.
   $effect(() => {
     if (router.route.name === "search") query = router.route.query;
   });

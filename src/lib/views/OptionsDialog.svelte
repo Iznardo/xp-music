@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Opciones estilo hoja de propiedades de XP (FR-004-14).
+  // Options in the style of an XP property sheet (FR-004-14).
   import { commands, type AudioDevice, type Language, type Settings, type Theme, type ToolVersions, type VizPreset } from "../bindings";
   import { settings } from "../stores/settings.svelte";
   import { auth } from "../stores/auth.svelte";
@@ -14,7 +14,7 @@
   type HotkeyName = keyof Settings["hotkeys"];
   const hotkeyNames: HotkeyName[] = ["playPause", "next", "previous", "show"];
 
-  /// Convierte la pulsación en un acelerador ("Ctrl+Alt+P"). Supr/Retroceso lo quitan.
+  /// Turns the key press into an accelerator ("Ctrl+Alt+P"). Delete/Backspace clear it.
   function captureHotkey(name: HotkeyName, e: KeyboardEvent) {
     e.preventDefault();
     if (!draft) return;
@@ -25,7 +25,7 @@
     if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return;
     const key = e.code.startsWith("Key") ? e.code.slice(3) : e.code.startsWith("Digit") ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key;
     const mods = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super"].filter(Boolean);
-    // Sin modificador solo se aceptan teclas F (si no, cualquier letra quedaría secuestrada).
+    // Without a modifier only F keys are accepted (otherwise any letter would be hijacked).
     if (!mods.length && !/^F\d+$/.test(key)) return;
     draft.hotkeys[name] = [...mods, key].join("+");
   }

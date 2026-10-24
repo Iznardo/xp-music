@@ -1,7 +1,7 @@
 fn main() {
-    // El manifiesto (Common Controls v6) se incrusta con el enlazador para todos
-    // los binarios, incluidos los de test: sin él, `cargo test` falla en Windows
-    // con STATUS_ENTRYPOINT_NOT_FOUND.
+    // The manifest (Common Controls v6) is embedded via the linker for all
+    // binaries, including test ones: without it, `cargo test` fails on Windows
+    // with STATUS_ENTRYPOINT_NOT_FOUND.
     let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let manifest = std::env::current_dir()
@@ -12,8 +12,8 @@ fn main() {
         println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
         println!("cargo:rustc-link-arg=/WX");
     }
-    // Los iconos van incrustados en el ejecutable: si cambian, hay que recompilar.
+    // Icons are embedded in the executable: if they change, it must be rebuilt.
     println!("cargo:rerun-if-changed=icons");
     tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
-        .expect("error en tauri-build");
+        .expect("tauri-build error");
 }

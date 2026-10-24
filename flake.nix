@@ -1,5 +1,5 @@
 {
-  description = "XP Music: reproductor de YouTube Music con aspecto de Windows Media Player";
+  description = "XP Music: a YouTube Music player that looks like Windows Media Player";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

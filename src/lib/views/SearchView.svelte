@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Buscar: pestañas por filtro; canciones en lista y el resto como iconos (FR-004-06).
+  // Search: tabs per filter; songs as a list and the rest as icons (FR-004-06).
   import { onMount } from "svelte";
   import { commands, type MediaItem, type Page, type SearchFilter, type Track } from "../bindings";
   import { Resource } from "../resource.svelte";
@@ -69,7 +69,7 @@
     padding: 8px;
     background: #f5f6fa;
   }
-  /* Pestañas de XP: la activa se une al panel y tiene el borde naranja arriba. */
+  /* XP tabs: the active one merges with the panel and has the orange border on top. */
   .tabs {
     display: flex;
     gap: 1px;

@@ -1,9 +1,9 @@
-//! Parser tolerante de respuestas de Innertube → tipos de `domain.rs`.
+//! Tolerant parser for Innertube responses → `domain.rs` types.
 //!
-//! En vez de seguir rutas fijas (que YouTube cambia a menudo), se buscan los
-//! *renderers* conocidos en cualquier parte del JSON y cada elemento se
-//! interpreta por separado: uno que no se entienda se salta con un `debug!`,
-//! nunca rompe la lista entera (spike/FINDINGS.md §5).
+//! Instead of following fixed paths (which YouTube changes often), the known
+//! *renderers* are searched for anywhere in the JSON and each element is
+//! interpreted separately: one that isn't understood is skipped with a `debug!`
+//! and never breaks the whole list (spike/FINDINGS.md §5).
 
 use serde_json::Value;
 
@@ -13,9 +13,9 @@ use crate::domain::{
     Track, TrackId,
 };
 
-// ------------------------------------------------------------------ utilidades
+// ------------------------------------------------------------------ utilities
 
-/// Sigue una ruta tipo `a.b.0.c`.
+/// Follows a path like `a.b.0.c`.
 pub fn at<'a>(v: &'a Value, path: &str) -> Option<&'a Value> {
     path.split('.')
         .try_fold(v, |cur, key| match key.parse::<usize>() {
@@ -28,7 +28,7 @@ fn str_at<'a>(v: &'a Value, path: &str) -> Option<&'a str> {
     at(v, path).and_then(Value::as_str)
 }
 
-/// Texto de un objeto `{runs: [...]}` o `{simpleText}`.
+/// Text of a `{runs: [...]}` or `{simpleText}` object.
 pub fn text(v: Option<&Value>) -> Option<String> {
     let v = v?;
     if let Some(s) = v.get("simpleText").and_then(Value::as_str) {
@@ -48,8 +48,8 @@ fn runs(v: Option<&Value>) -> &[Value] {
         .map_or(&[], Vec::as_slice)
 }
 
-/// Todos los valores bajo la clave `key`, en orden de documento. No entra
-/// dentro de un valor ya encontrado.
+/// All values under the key `key`, in document order. Does not descend
+/// into a value that was already found.
 pub fn find_all<'a>(v: &'a Value, key: &str) -> Vec<&'a Value> {
     fn walk<'a>(v: &'a Value, key: &str, out: &mut Vec<&'a Value>) {
         match v {
@@ -81,7 +81,7 @@ pub fn find_first<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
     }
 }
 
-/// Primera lista `thumbnails` dentro de `v`, ordenada de menor a mayor.
+/// First `thumbnails` list inside `v`, sorted from smallest to largest.
 pub fn thumbnails(v: Option<&Value>) -> Vec<Thumbnail> {
     let Some(list) = v
         .and_then(|v| find_first(v, "thumbnails"))
@@ -111,7 +111,7 @@ fn browse_id(endpoint: &Value) -> Option<&str> {
     str_at(endpoint, "browseEndpoint.browseId")
 }
 
-/// "3:07" o "1:02:03" → milisegundos.
+/// "3:07" or "1:02:03" → milliseconds.
 pub fn parse_duration(s: &str) -> Option<u32> {
     let parts: Vec<&str> = s.trim().split(':').collect();
     if !(2..=3).contains(&parts.len())
@@ -127,7 +127,8 @@ pub fn parse_duration(s: &str) -> Option<u32> {
     Some(secs * 1000)
 }
 
-/// Palabras de tipo que YouTube pone en la línea secundaria y no son artistas.
+/// Type words YouTube puts in the secondary line that are not artists (English
+/// and Spanish UI labels; the Spanish ones are matched on purpose).
 fn is_type_word(s: &str) -> bool {
     matches!(
         s,
@@ -152,6 +153,7 @@ fn is_type_word(s: &str) -> bool {
     )
 }
 
+/// Metric labels such as "1B plays" (English and Spanish UI labels, matched on purpose).
 fn is_metric(s: &str) -> bool {
     let l = s.to_ascii_lowercase();
     [
@@ -173,6 +175,7 @@ fn is_year(s: &str) -> bool {
     s.len() == 4 && s.chars().all(|c| c.is_ascii_digit())
 }
 
+/// Separators between runs ("y" is the Spanish "and", matched on purpose).
 fn is_separator(s: &str) -> bool {
     matches!(s.trim(), "•" | "&" | "," | "" | "y" | "and")
 }
@@ -194,7 +197,7 @@ fn like_status(r: &Value) -> Option<LikeStatus> {
     }
 }
 
-/// Artistas, álbum y duración a partir de runs (línea secundaria de una fila).
+/// Artists, album and duration from runs (secondary line of a row).
 #[derive(Default)]
 struct Byline {
     artists: Vec<ArtistRef>,
@@ -238,7 +241,7 @@ fn parse_byline(all_runs: &[&Value]) -> Byline {
             unlinked.push(t.to_owned());
         }
     }
-    // Sin artistas enlazados, el primer texto suelto es el artista (p. ej. vídeos).
+    // With no linked artists, the first loose text is the artist (e.g. videos).
     if b.artists.is_empty()
         && let Some(first) = unlinked.into_iter().next()
     {
@@ -250,9 +253,9 @@ fn parse_byline(all_runs: &[&Value]) -> Byline {
     b
 }
 
-// ------------------------------------------------------------------ elementos
+// ------------------------------------------------------------------ items
 
-/// `musicResponsiveListItemRenderer` → canción, o tarjeta si enlaza a una página.
+/// `musicResponsiveListItemRenderer` → track, or card if it links to a page.
 pub fn list_item(r: &Value) -> Option<MediaItem> {
     let flex: Vec<&Value> = r
         .get("flexColumns")
@@ -279,7 +282,7 @@ pub fn list_item(r: &Value) -> Option<MediaItem> {
         if str_at(r, "musicItemRendererDisplayPolicy")
             == Some("MUSIC_ITEM_RENDERER_DISPLAY_POLICY_GREY_OUT")
         {
-            return None; // No disponible.
+            return None; // Unavailable.
         }
         let mut all: Vec<&Value> = flex
             .iter()
@@ -379,13 +382,13 @@ fn card_from(
             }))
         }
         other => {
-            tracing::debug!(page = ?other, "tarjeta de tipo desconocido; se omite");
+            tracing::debug!(page = ?other, "card of unknown type; skipped");
             None
         }
     }
 }
 
-/// "41 tracks", "10 songs", "1,234 canciones" → número.
+/// "41 tracks", "10 songs", "1,234 canciones" → number.
 fn count_tracks(s: &str) -> Option<u32> {
     s.split('•').map(str::trim).find_map(|part| {
         let (num, word) = part.split_once(' ')?;
@@ -401,7 +404,7 @@ fn count_tracks(s: &str) -> Option<u32> {
     })
 }
 
-/// `musicTwoRowItemRenderer` → tarjeta (o canción si enlaza a un vídeo).
+/// `musicTwoRowItemRenderer` → card (or track if it links to a video).
 pub fn two_row_item(r: &Value) -> Option<MediaItem> {
     let title = text(r.get("title"))?;
     let thumbs = thumbnails(r.get("thumbnailRenderer"));
@@ -427,7 +430,7 @@ pub fn two_row_item(r: &Value) -> Option<MediaItem> {
     card_from(page_type(ep), id, title, subtitle, sub_runs, thumbs)
 }
 
-/// `playlistPanelVideoRenderer` (cola de radio / "a continuación").
+/// `playlistPanelVideoRenderer` (radio queue / "up next").
 pub fn panel_item(r: &Value) -> Option<Track> {
     let video_id = r.get("videoId").and_then(Value::as_str)?;
     if r.get("unplayableText").is_some() {
@@ -451,7 +454,7 @@ pub fn panel_item(r: &Value) -> Option<Track> {
 }
 
 fn items_in(v: &Value) -> Vec<MediaItem> {
-    // Recorrido en orden de documento por los dos tipos de fila.
+    // Walk in document order over the two row types.
     fn walk(v: &Value, out: &mut Vec<MediaItem>) {
         match v {
             Value::Object(m) => {
@@ -482,10 +485,10 @@ fn tracks_only(items: Vec<MediaItem>) -> Vec<Track> {
         .collect()
 }
 
-// ------------------------------------------------------------------ continuaciones
+// ------------------------------------------------------------------ continuations
 
-/// Token de la página siguiente de la *lista* (no de chips ni menús).
-/// Prefijo `c:` = token moderno (cuerpo `continuation`), `n:` = antiguo (`ctoken`).
+/// Next-page token of the *list* (not of chips or menus).
+/// Prefix `c:` = modern token (`continuation` body), `n:` = legacy (`ctoken`).
 pub fn list_continuation(v: &Value) -> Option<String> {
     if let Some(t) = find_all(v, "continuationItemRenderer")
         .into_iter()
@@ -509,7 +512,7 @@ pub fn list_continuation(v: &Value) -> Option<String> {
     None
 }
 
-/// Página siguiente de secciones (Inicio).
+/// Next page of sections (Home).
 pub fn sections_continuation(v: &Value) -> Option<String> {
     find_all(v, "sectionListRenderer")
         .into_iter()
@@ -518,9 +521,9 @@ pub fn sections_continuation(v: &Value) -> Option<String> {
         .map(|t| format!("n:{t}"))
 }
 
-// ------------------------------------------------------------------ páginas
+// ------------------------------------------------------------------ pages
 
-/// Lista de canciones de una playlist (o su continuación).
+/// Track list of a playlist (or its continuation).
 pub fn track_page(v: &Value) -> Page<Track> {
     Page {
         items: tracks_only(items_in_list_shelves(v)),
@@ -528,7 +531,7 @@ pub fn track_page(v: &Value) -> Page<Track> {
     }
 }
 
-/// Elementos de las estanterías de lista (no de carruseles de sugerencias).
+/// Items of list shelves (not of suggestion carousels).
 fn items_in_list_shelves(v: &Value) -> Vec<MediaItem> {
     let mut out = Vec::new();
     let shelves: Vec<&Value> = [
@@ -566,7 +569,7 @@ pub fn playlist_page(v: &Value, id: &PlaylistId) -> PlaylistDetail {
         .and_then(|h| find_first(h, "musicDescriptionShelfRenderer"))
         .and_then(|d| text(d.get("description")))
         .or_else(|| header.and_then(|h| text(h.get("description"))));
-    // Solo las playlists propias tienen el botón de editar.
+    // Only the user's own playlists have the edit button.
     let owned = header.is_some_and(|h| find_first(h, "playlistEditorEndpoint").is_some());
     PlaylistDetail {
         summary: PlaylistSummary {
@@ -599,7 +602,7 @@ pub fn album_page(v: &Value, id: &BrowseId) -> AlbumDetail {
         name: title.clone(),
     };
     let mut tracks = tracks_only(items_in_list_shelves(v));
-    // Las filas del álbum no traen álbum ni portada (y a veces tampoco artista).
+    // Album rows carry neither album nor cover art (and sometimes no artist either).
     for t in &mut tracks {
         t.album.get_or_insert_with(|| album_ref.clone());
         if t.thumbnails.is_empty() {
@@ -669,7 +672,7 @@ pub fn artist_page(v: &Value, id: &BrowseId) -> ArtistDetail {
     }
 }
 
-/// Carruseles con título (Inicio, artista…).
+/// Carousels with a title (Home, artist…).
 pub fn carousels(v: &Value) -> Vec<Section> {
     find_all(v, "musicCarouselShelfRenderer")
         .into_iter()
@@ -689,7 +692,7 @@ pub fn home_page(v: &Value) -> Page<Section> {
     }
 }
 
-/// Historial agrupado por periodos ("Today", "June 2025"…).
+/// History grouped by period ("Today", "June 2025"…).
 pub fn history_page(v: &Value) -> Vec<Section> {
     find_all(v, "musicShelfRenderer")
         .into_iter()
@@ -703,7 +706,7 @@ pub fn history_page(v: &Value) -> Vec<Section> {
         .collect()
 }
 
-/// Cuadrícula (playlists o álbumes de la biblioteca).
+/// Grid (library playlists or albums).
 pub fn grid_items(v: &Value) -> Vec<MediaItem> {
     find_all(v, "gridRenderer")
         .into_iter()
@@ -711,7 +714,7 @@ pub fn grid_items(v: &Value) -> Vec<MediaItem> {
         .collect()
 }
 
-/// Resultados de búsqueda: el destacado primero y luego el resto, sin repetir.
+/// Search results: the top result first and then the rest, without duplicates.
 pub fn search_page(v: &Value) -> Page<MediaItem> {
     let mut items: Vec<MediaItem> = Vec::new();
     for card in find_all(v, "musicCardShelfRenderer") {
@@ -744,7 +747,7 @@ fn same_item(a: &MediaItem, b: &MediaItem) -> bool {
     }
 }
 
-/// Resultado destacado de una búsqueda.
+/// Top result of a search.
 fn card_shelf_top(card: &Value) -> Option<MediaItem> {
     let title_run = at(card, "title.runs.0")?;
     let title = title_run.get("text")?.as_str()?.to_owned();
@@ -776,7 +779,7 @@ fn card_shelf_top(card: &Value) -> Option<MediaItem> {
     )
 }
 
-/// Cola de radio de `next` (y su continuación).
+/// Radio queue from `next` (and its continuation).
 pub fn radio_page(v: &Value) -> Page<Track> {
     let mut tracks = Vec::new();
     for r in find_all(v, "playlistPanelVideoRenderer") {
@@ -801,7 +804,7 @@ pub fn suggestions(v: &Value) -> Vec<String> {
         .collect()
 }
 
-/// Nombre, handle y foto de la cuenta activa (`account/account_menu`).
+/// Name, handle and photo of the active account (`account/account_menu`).
 pub fn account_info(v: &Value) -> Option<(String, Option<String>, Vec<Thumbnail>)> {
     let h = find_first(v, "activeAccountHeaderRenderer")?;
     Some((
@@ -811,7 +814,7 @@ pub fn account_info(v: &Value) -> Option<(String, Option<String>, Vec<Thumbnail>
     ))
 }
 
-/// Datos del endpoint `player`: URL de seguimiento (historial) y sonoridad.
+/// Data from the `player` endpoint: tracking URL (history) and loudness.
 pub struct PlayerInfo {
     pub tracking_url: Option<String>,
     pub loudness_db: Option<f32>,
@@ -842,7 +845,7 @@ mod tests {
             "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_ALBUM" } } } } })
     }
 
-    /// Fila de playlist con la forma real de YouTube Music (octubre 2026).
+    /// Playlist row with the real YouTube Music shape (October 2026).
     fn playlist_row(video: &str, title: &str) -> Value {
         json!({ "musicResponsiveListItemRenderer": {
             "thumbnail": { "musicThumbnailRenderer": { "thumbnail": { "thumbnails": [ { "url": "https://lh3.googleusercontent.com/x=w60-h60", "width": 60, "height": 60 } ] } } },
@@ -859,12 +862,12 @@ mod tests {
     }
 
     #[test]
-    fn fila_de_playlist_completa() {
+    fn complete_playlist_row() {
         let MediaItem::Track(t) =
             list_item(&playlist_row("yQd4xQBlBa0", "Obsesion")["musicResponsiveListItemRenderer"])
                 .unwrap()
         else {
-            panic!("debería ser canción")
+            panic!("should be a track")
         };
         assert_eq!(t.id.0, "yQd4xQBlBa0");
         assert_eq!(t.title, "Obsesion");
@@ -882,8 +885,8 @@ mod tests {
     }
 
     #[test]
-    fn fila_de_busqueda_con_tipo_y_metricas() {
-        // "Song • Aventura" | "1.2B plays": sin enlaces, el texto suelto es el artista.
+    fn search_row_with_type_and_metrics() {
+        // "Song • Aventura" | "1.2B plays": with no links, the loose text is the artist.
         let row = json!({
             "flexColumns": [
                 { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [ { "text": "El Perdedor", "navigationEndpoint": { "watchEndpoint": { "videoId": "abcdefghijk" } } } ] } } },
@@ -900,33 +903,33 @@ mod tests {
     }
 
     #[test]
-    fn fila_no_disponible_se_omite_y_la_lista_sigue() {
-        let mut bad = playlist_row("zzzzzzzzzzz", "Borrada");
+    fn unavailable_row_is_skipped_and_list_continues() {
+        let mut bad = playlist_row("zzzzzzzzzzz", "Deleted");
         bad["musicResponsiveListItemRenderer"]["musicItemRendererDisplayPolicy"] =
             json!("MUSIC_ITEM_RENDERER_DISPLAY_POLICY_GREY_OUT");
         let broken =
-            json!({ "musicResponsiveListItemRenderer": { "flexColumns": "esto no es una lista" } });
+            json!({ "musicResponsiveListItemRenderer": { "flexColumns": "this is not a list" } });
         let page = json!({ "contents": { "musicPlaylistShelfRenderer": { "contents": [
-            playlist_row("aaaaaaaaaaa", "Uno"), bad, broken, playlist_row("bbbbbbbbbbb", "Dos"),
+            playlist_row("aaaaaaaaaaa", "One"), bad, broken, playlist_row("bbbbbbbbbbb", "Two"),
             { "continuationItemRenderer": { "continuationEndpoint": { "continuationCommand": { "token": "TOKEN" } } } }
         ] } } });
         let p = track_page(&page);
         assert_eq!(
             p.items.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
-            ["Uno", "Dos"]
+            ["One", "Two"]
         );
         assert_eq!(p.continuation.as_deref(), Some("c:TOKEN"));
     }
 
     #[test]
-    fn continuacion_antigua_de_estanteria() {
+    fn legacy_shelf_continuation() {
         let page = json!({ "musicShelfRenderer": { "contents": [], "continuations": [ { "nextContinuationData": { "continuation": "OLD" } } ] },
-                           "header": { "chipCloudRenderer": { "continuation": "NO-ES-ESTA" } } });
+                           "header": { "chipCloudRenderer": { "continuation": "NOT-THIS-ONE" } } });
         assert_eq!(list_continuation(&page).as_deref(), Some("n:OLD"));
     }
 
     #[test]
-    fn tarjetas_de_dos_filas() {
+    fn two_row_cards() {
         let album = json!({
             "title": { "runs": [ { "text": "The Last" } ] },
             "subtitle": { "runs": [ { "text": "Album" }, { "text": " • " }, artist_run("Aventura", "UC1"), { "text": " • " }, { "text": "2009" } ] },
@@ -963,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn panel_de_radio() {
+    fn radio_panel() {
         let r = json!({ "videoId": "yQd4xQBlBa0", "title": { "runs": [ { "text": "Obsesion" } ] }, "lengthText": { "runs": [ { "text": "4:15" } ] },
                         "longBylineText": { "runs": [ artist_run("Aventura", "UC1"), { "text": " • " }, album_run("We Broke The Rules", "MPREb_1"), { "text": " • " }, { "text": "2002" } ] } });
         let t = panel_item(&r).unwrap();
@@ -973,7 +976,7 @@ mod tests {
     }
 
     #[test]
-    fn duraciones_y_conteos() {
+    fn durations_and_counts() {
         assert_eq!(parse_duration("1:02:03"), Some(3_723_000));
         assert_eq!(parse_duration("2002"), None);
         assert_eq!(parse_duration("a:bc"), None);
@@ -982,10 +985,10 @@ mod tests {
         assert_eq!(count_tracks("Playlist • 2023"), None);
     }
 
-    /// Contra respuestas reales volcadas en local (no están en el repo).
+    /// Against real responses dumped locally (they are not in the repo).
     #[test]
     #[ignore]
-    fn parsea_volcados_reales() {
+    fn parses_real_dumps() {
         let dir = dirs::home_dir().unwrap().join(".xp-music").join("dumps");
         let load = |n: &str| -> Value {
             serde_json::from_str(&std::fs::read_to_string(dir.join(format!("{n}.json"))).unwrap())
@@ -997,7 +1000,7 @@ mod tests {
             &PlaylistId("VLPLEcMXldRXRhKU8AfZOALMpD6Fz9G_oE9p".into()),
         );
         println!(
-            "playlist: {} · {:?} · {} pistas · propia={}",
+            "playlist: {} · {:?} · {} tracks · owned={}",
             pl.summary.title,
             pl.summary.author,
             pl.tracks.items.len(),
@@ -1012,12 +1015,12 @@ mod tests {
         );
 
         let liked = track_page(&load("liked_songs"));
-        println!("me gusta: {}", liked.items.len());
+        println!("liked: {}", liked.items.len());
         assert!(!liked.items.is_empty());
 
         let album = album_page(&load("album"), &BrowseId("MPREb_WixYTw0z5H2".into()));
         println!(
-            "álbum: {} · {:?} · {} pistas · playlist {:?}",
+            "album: {} · {:?} · {} tracks · playlist {:?}",
             album.summary.title,
             album.summary.artists.first().map(|a| &a.name),
             album.tracks.len(),
@@ -1036,7 +1039,7 @@ mod tests {
             &BrowseId("UCDaQK4nrsvz27YzufrhJfgg".into()),
         );
         println!(
-            "artista: {} · top {} · secciones {:?} · radio {:?}",
+            "artist: {} · top {} · sections {:?} · radio {:?}",
             artist.summary.name,
             artist.top_songs.len(),
             artist
@@ -1050,7 +1053,7 @@ mod tests {
 
         let home = home_page(&load("home"));
         println!(
-            "inicio: {:?} · más: {}",
+            "home: {:?} · more: {}",
             home.items
                 .iter()
                 .map(|s| format!("{} ({})", s.title, s.items.len()))
@@ -1061,7 +1064,7 @@ mod tests {
 
         let hist = history_page(&load("history"));
         println!(
-            "historial: {:?}",
+            "history: {:?}",
             hist.iter()
                 .map(|s| format!("{} ({})", s.title, s.items.len()))
                 .collect::<Vec<_>>()
@@ -1069,15 +1072,15 @@ mod tests {
         assert!(hist.iter().map(|s| s.items.len()).sum::<usize>() > 100);
 
         let lib = grid_items(&load("library_playlists"));
-        println!("playlists biblioteca: {}", lib.len());
+        println!("library playlists: {}", lib.len());
         assert!(lib.len() >= 6);
 
         let artists: Vec<_> = items_in(&load("library_artists"));
-        println!("artistas biblioteca: {}", artists.len());
+        println!("library artists: {}", artists.len());
 
         let search = search_page(&load("search"));
         println!(
-            "búsqueda: {} resultados, primero {:?}",
+            "search: {} results, first {:?}",
             search.items.len(),
             search.items.first().map(|i| match i {
                 MediaItem::Track(t) => t.title.clone(),
@@ -1089,23 +1092,23 @@ mod tests {
         assert!(search.items.len() > 10);
         let songs = search_page(&load("search_songs"));
         println!(
-            "búsqueda canciones: {} · más: {}",
+            "song search: {} · more: {}",
             songs.items.len(),
             songs.continuation.is_some()
         );
 
         let radio = radio_page(&load("radio"));
         println!(
-            "radio: {} pistas · más: {}",
+            "radio: {} tracks · more: {}",
             radio.items.len(),
             radio.continuation.is_some()
         );
         assert!(radio.items.len() >= 40);
 
-        println!("sugerencias: {:?}", suggestions(&load("suggestions")));
+        println!("suggestions: {:?}", suggestions(&load("suggestions")));
         let acc = account_info(&load("account_menu"));
         println!(
-            "cuenta: {:?}",
+            "account: {:?}",
             acc.as_ref().map(|a| (&a.0, &a.1, a.2.len()))
         );
         let p = player_info(&load("player"));

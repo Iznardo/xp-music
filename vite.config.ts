@@ -7,16 +7,16 @@ import path from "node:path";
 const host = process.env.TAURI_DEV_HOST;
 
 /**
- * Misma política que pone el backend al marco de los skins (src-tauri/src/skins.rs).
- * El marco no tiene origen propio (sandbox), así que 'self' no basta: se nombra.
+ * Same policy the backend applies to the skin frame (src-tauri/src/skins.rs).
+ * The frame has no origin of its own (sandbox), so 'self' is not enough: it is named explicitly.
  */
 const skinCsp = (origin: string) =>
   `default-src 'none'; script-src ${origin} 'unsafe-eval'; style-src 'unsafe-inline'; img-src blob: data: http://thumb.localhost https:; connect-src ${origin}`;
 
 /**
- * Solo en la vista previa (`dev:mock`): sirve el marco de los skins, el banco de
- * pruebas y los .wmz de la carpeta `XP_SKINS_DIR` bajo `/skin/`, como hace el
- * protocolo `skin` de la app.
+ * Only in the preview (`dev:mock`): serves the skin frame, the test bench and the
+ * .wmz files from the `XP_SKINS_DIR` folder under `/skin/`, like the app's `skin`
+ * protocol does.
  */
 function skinDev(): Plugin {
   const frame = fileURLToPath(new URL("./src/skin-frame/", import.meta.url));
@@ -61,8 +61,8 @@ function skinDev(): Plugin {
   };
 }
 
-// Opciones pensadas para Tauri: puerto fijo, sin limpiar pantalla (errores de Rust visibles)
-// y sin vigilar src-tauri. Con `--mode mock` la UI usa datos simulados en vez del backend.
+// Options tailored for Tauri: fixed port, no screen clearing (Rust errors stay visible)
+// and no watching of src-tauri. With `--mode mock` the UI uses simulated data instead of the backend.
 export default defineConfig(({ mode }) => ({
   plugins: [svelte(), ...(mode === "mock" ? [skinDev()] : [])],
   clearScreen: false,
@@ -81,8 +81,8 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: "es2022",
-    // Imágenes siempre como archivo aparte (no en base64 dentro del JS): el logo
-    // solo se descarga al abrir "Acerca de".
+    // Images always as a separate file (not base64 inside the JS): the logo
+    // is only downloaded when opening "About".
     assetsInlineLimit: 0,
     outDir: "dist",
     emptyOutDir: true,

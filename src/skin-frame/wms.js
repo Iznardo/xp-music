@@ -1,7 +1,7 @@
-// Parser tolerante de .wms. Es "casi XML": WMP no distingue mayúsculas, acepta
-// atributos sin comillas, '&' sueltos y etiquetas sin cerrar, así que no sirve
-// DOMParser. Devuelve nodos { tag, attrs, children, text } con tag y nombres de
-// atributo en minúsculas.
+// Lenient .wms parser. It is "almost XML": WMP is case-insensitive, accepts
+// unquoted attributes, stray '&' and unclosed tags, so DOMParser is no use.
+// Returns nodes { tag, attrs, children, text } with the tag and attribute
+// names in lowercase.
 
 /** @typedef {{ tag: string, attrs: Record<string, string>, children: WmsNode[], text: string }} WmsNode */
 
@@ -51,7 +51,7 @@ export function parseWms(src) {
       const end = src.indexOf(">", i);
       const name = src.slice(i + 2, end < 0 ? n : end).trim().toLowerCase();
       i = end < 0 ? n : end + 1;
-      // Cierra hasta la etiqueta que coincide; un cierre suelto se ignora.
+      // Closes up to the matching tag; a stray closing tag is ignored.
       for (let k = stack.length - 1; k > 0; k--) {
         if (stack[k].tag === name) {
           stack.length = k;
@@ -70,7 +70,7 @@ export function parseWms(src) {
     const node = { tag: m[1].toLowerCase(), attrs: {}, children: [], text: "" };
     i += m[0].length;
     let selfClose = false;
-    // Atributos.
+    // Attributes.
     while (i < n) {
       while (i < n && /\s/.test(src[i])) i++;
       if (src[i] === ">") {
@@ -82,7 +82,7 @@ export function parseWms(src) {
         i += 2;
         break;
       }
-      if (src[i] === "<") break; // etiqueta sin cerrar: se deja para la siguiente vuelta
+      if (src[i] === "<") break; // unclosed tag: left for the next iteration
       const nm = /^[^\s=/>]+/.exec(src.slice(i, i + 128));
       if (!nm) {
         i++;
@@ -112,7 +112,7 @@ export function parseWms(src) {
     top().children.push(node);
     if (selfClose) continue;
     if (node.tag === "script") {
-      // Contenido literal hasta </script>.
+      // Literal content up to </script>.
       const end = src.toLowerCase().indexOf("</script", i);
       node.text = src.slice(i, end < 0 ? n : end);
       const close = end < 0 ? n : src.indexOf(">", end);
@@ -124,7 +124,7 @@ export function parseWms(src) {
   return root;
 }
 
-/** Primer nodo con esa etiqueta (en profundidad). @param {WmsNode} node @param {string} tag @returns {WmsNode | null} */
+/** First node with that tag (depth-first). @param {WmsNode} node @param {string} tag @returns {WmsNode | null} */
 export function findTag(node, tag) {
   for (const c of node.children) {
     if (c.tag === tag) return c;

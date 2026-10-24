@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Deslizador horizontal estilo XP (pista hundida + "pulgar" en forma de punta).
+  // XP-style horizontal slider (sunken track + pointed "thumb").
   let {
     value,
     min = 0,

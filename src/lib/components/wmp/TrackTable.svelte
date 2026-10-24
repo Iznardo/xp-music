@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Lista de canciones (columnas WMP) con reproducción, menú contextual y "cargar más".
+  // Song list (WMP columns) with playback, context menu and "load more".
   import type { QueueSource, Track } from "../../bindings";
   import { artistNames, fmtTime, hintTrack, playTracks, trackMenu } from "../../actions";
   import { player } from "../../stores/player.svelte";
@@ -34,7 +34,7 @@
     { key: "dur", label: t.columns.duration, width: "64px", align: "right", text: (r) => fmtTime(r.durationMs), sort: (r) => r.durationMs ?? 0 },
   ]);
 
-  // Fila que suena: la primera con el mismo id.
+  // Playing row: the first one with the same id.
   const current = $derived.by(() => {
     const id = player.state?.track?.id;
     if (!id) return null;

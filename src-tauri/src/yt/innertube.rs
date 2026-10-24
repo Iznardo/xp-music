@@ -1,9 +1,9 @@
-//! Transporte a la API interna de YouTube Music (Innertube).
+//! Transport to YouTube Music's internal API (Innertube).
 //!
-//! ytmapi-rs se usa solo para lo que hace bien: autenticación con cookies,
-//! `SAPISIDHASH`, versión de cliente y `X-Goog-AuthUser` (parche en vendor/).
-//! Las respuestas se devuelven como JSON crudo y las interpreta `parse.rs`
-//! con un parser tolerante (spike/FINDINGS.md §5).
+//! ytmapi-rs is used only for what it does well: cookie authentication,
+//! `SAPISIDHASH`, client version and `X-Goog-AuthUser` (patched in vendor/).
+//! Responses are returned as raw JSON and interpreted by `parse.rs`
+//! with a tolerant parser (spike/FINDINGS.md §5).
 
 use std::borrow::Cow;
 
@@ -16,8 +16,8 @@ use crate::error::{AppError, AppResult, ErrorCode};
 
 pub type Yt = ytmapi_rs::YtMusic<BrowserToken>;
 
-/// Consulta POST genérica: `path` (p. ej. `browse`) + cuerpo JSON (sin `context`,
-/// que añade ytmapi-rs).
+/// Generic POST query: `path` (e.g. `browse`) + JSON body (without `context`,
+/// which ytmapi-rs adds).
 pub struct Raw {
     path: &'static str,
     body: Map<String, Value>,
@@ -41,8 +41,8 @@ impl Raw {
         Self::new("browse", serde_json::json!({ "browseId": browse_id }))
     }
 
-    /// Página siguiente. Los tokens llevan el prefijo de `parse::list_continuation`:
-    /// `c:` va en el cuerpo (formato moderno) y `n:` como parámetros `ctoken` (antiguo).
+    /// Next page. Tokens carry the prefix from `parse::list_continuation`:
+    /// `c:` goes in the body (modern format) and `n:` as `ctoken` params (legacy).
     pub fn continuation(path: &'static str, token: &str) -> Self {
         match token.split_once(':') {
             Some(("n", t)) => Self {
@@ -60,7 +60,7 @@ impl Raw {
     }
 }
 
-/// Salida: el JSON tal cual.
+/// Output: the JSON as-is.
 #[derive(Debug)]
 pub struct RawJson(pub Value);
 
@@ -94,7 +94,7 @@ impl PostQuery for Raw {
     }
 }
 
-/// Ejecuta una consulta cruda y traduce los errores al contrato de la app.
+/// Runs a raw query and maps errors to the app's contract.
 pub async fn run(yt: &Yt, q: Raw) -> AppResult<Value> {
     let path = q.path;
     match yt.query(q).await {
@@ -103,10 +103,10 @@ pub async fn run(yt: &Yt, q: Raw) -> AppResult<Value> {
     }
 }
 
-/// Clasifica un error de ytmapi-rs sin filtrar detalles (pueden incluir cabeceras).
+/// Classifies a ytmapi-rs error without leaking details (they may include headers).
 pub fn map_error(what: &str, e: &ytmapi_rs::Error) -> AppError {
     let text = e.to_string();
-    tracing::warn!(endpoint = what, error = %crate::logging::redact(&text), "error de YouTube Music");
+    tracing::warn!(endpoint = what, error = %crate::logging::redact(&text), "YouTube Music error");
     let code = |c: &str| {
         text.contains(&format!("code {c}"))
             || text.contains(&format!("{c} recieved"))

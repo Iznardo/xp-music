@@ -1,5 +1,5 @@
-//! Estado de la interfaz que debe sobrevivir a la WebView (principio II) y
-//! operaciones de ventana: sonidos, última vista y modo compacto (004).
+//! UI state that must survive the WebView (principle II) and window
+//! operations: sounds, last view and compact mode (004).
 
 use std::sync::{Arc, Mutex};
 
@@ -11,20 +11,20 @@ use crate::player::service::PlayerService;
 use crate::settings::Settings;
 use crate::state::AppState;
 
-/// Tamaño del modo compacto (píxeles lógicos).
+/// Compact mode size (logical pixels).
 const COMPACT: (f64, f64) = (460.0, 150.0);
 const MIN_FULL: (f64, f64) = (640.0, 420.0);
 
-/// Tamaño, posición y si estaba maximizada antes de pasar a una ventana pequeña.
+/// Size, position and whether it was maximized before switching to a small window.
 type Restore = (PhysicalSize<u32>, Option<PhysicalPosition<i32>>, bool);
 
 #[derive(Default)]
 pub struct UiState {
     last_route: Mutex<Option<String>>,
-    /// Tamaño y posición en modo completo, para volver a ellos.
+    /// Size and position in full mode, to return to them.
     restore: Mutex<Option<Restore>>,
     compact: Mutex<bool>,
-    /// Modo máscara (skin de WMP).
+    /// Skin mode (WMP skin).
     skin: Mutex<bool>,
 }
 
@@ -59,15 +59,15 @@ pub fn window_is_compact(ui: State<'_, UiState>) -> bool {
 }
 
 fn window_err(e: tauri::Error) -> AppError {
-    tracing::warn!(error = %e, "no se pudo cambiar el modo de ventana");
+    tracing::warn!(error = %e, "could not change the window mode");
     AppError::internal(tr!(
         "Could not resize the window.",
         "No se pudo cambiar el tamaño de la ventana."
     ))
 }
 
-/// Ventana pequeña de tamaño fijo (modo compacto o máscara). Guarda el tamaño y
-/// la posición del modo completo la primera vez, para volver a ellos.
+/// Small fixed-size window (compact or skin mode). Saves the full-mode size and
+/// position the first time, to return to them.
 fn shrink(
     window: &WebviewWindow,
     ui: &UiState,
@@ -88,8 +88,8 @@ fn shrink(
     }
     #[cfg(target_os = "linux")]
     {
-        // GTK puede descartar el resize pendiente al desactivar resizable.
-        // Los límites iguales fijan el tamaño sin esa carrera.
+        // GTK may discard the pending resize when resizable is turned off.
+        // Equal limits fix the size without that race.
         window.set_min_size(Some(size))?;
         window.set_max_size(Some(size))?;
     }
@@ -102,7 +102,7 @@ fn shrink(
     Ok(())
 }
 
-/// Vuelve al tamaño y la posición del modo completo.
+/// Returns to the full-mode size and position.
 fn restore_full(window: &WebviewWindow, ui: &UiState) -> tauri::Result<()> {
     window.set_always_on_top(false)?;
     window.set_resizable(true)?;
@@ -111,7 +111,7 @@ fn restore_full(window: &WebviewWindow, ui: &UiState) -> tauri::Result<()> {
     window.set_min_size(Some(LogicalSize::new(MIN_FULL.0, MIN_FULL.1)))?;
     if let Some((size, pos, maximized)) = ui.restore.lock().unwrap().take() {
         window.set_size(size)?;
-        // Wayland no permite consultar ni fijar posiciones globales.
+        // Wayland does not allow querying or setting global positions.
         if let Some(pos) = pos {
             let _ = window.set_position(pos);
         }
@@ -122,7 +122,7 @@ fn restore_full(window: &WebviewWindow, ui: &UiState) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Cambia entre modo completo y compacto (FR-004-13).
+/// Switches between full and compact mode (FR-004-13).
 #[tauri::command]
 #[specta::specta]
 pub async fn window_set_compact(
@@ -144,8 +144,8 @@ pub async fn window_set_compact(
     Ok(())
 }
 
-/// Modo máscara: la ventana toma el tamaño de la vista del skin (píxeles
-/// lógicos); `None` vuelve al modo completo.
+/// Skin mode: the window takes the size of the skin view (logical
+/// pixels); `None` returns to full mode.
 #[tauri::command]
 #[specta::specta]
 pub async fn window_set_skin(
@@ -153,7 +153,7 @@ pub async fn window_set_skin(
     ui: State<'_, UiState>,
     size: Option<(f64, f64)>,
 ) -> AppResult<()> {
-    // Mismo orden que window_set_compact: compacto antes de máscara.
+    // Same order as window_set_compact: compact before skin.
     let mut compact = ui.compact.lock().unwrap();
     let mut skin = ui.skin.lock().unwrap();
     match size {
@@ -178,7 +178,7 @@ pub async fn window_set_skin(
     Ok(())
 }
 
-/// Errores y avisos del frontend al log de la app (la WebView no tiene consola visible).
+/// Frontend errors and warnings into the app log (the WebView has no visible console).
 #[tauri::command]
 #[specta::specta]
 pub fn ui_log(level: String, message: String) {
@@ -190,26 +190,25 @@ pub fn ui_log(level: String, message: String) {
     }
 }
 
-/// Activa el analizador solo mientras la visualización está a la vista (FR-005-03).
+/// Enables the analyzer only while the visualization is in view (FR-005-03).
 #[tauri::command]
 #[specta::specta]
 pub fn viz_set_active(viz: State<'_, crate::viz::VizService>, active: bool) {
     viz.set_active(active);
 }
 
-/// Forma del skin para los clics (specs/008): la unión de los polígonos de sus
-/// piezas, en píxeles físicos relativos al área de cliente; `None` = ventana
-/// rectangular (maximizada, modo compacto).
+/// Skin shape for clicks (specs/008): the union of the polygons of its
+/// pieces, in physical pixels relative to the client area; `None` = rectangular
+/// window (maximized, compact mode).
 ///
-/// No se recorta la ventana con `SetWindowRgn`: con región, Windows deja de
-/// componer bien la transparencia por píxel y los bordes curvos salen en escalera
-/// (y con píxeles blancos). La ventana es transparente y los bordes suavizados los
-/// pinta la interfaz; para que los clics en lo transparente lleguen a lo que hay
-/// detrás, un hilo mira dónde está el ratón y activa o desactiva
-/// `set_ignore_cursor_events`.
+/// The window is not clipped with `SetWindowRgn`: with a region, Windows stops
+/// compositing per-pixel transparency properly and curved edges come out stair-stepped
+/// (and with white pixels). The window is transparent and the UI paints the smoothed
+/// edges; for clicks on transparent areas to reach whatever is behind, a thread
+/// watches where the mouse is and toggles `set_ignore_cursor_events`.
 ///
-/// Es asíncrono a propósito: no corre en el hilo principal, que es el que atiende
-/// a la ventana (antes podía quedarse esperando al hilo de sondeo y colgarse).
+/// It is async on purpose: it does not run on the main thread, which is the one
+/// serving the window (it used to be able to wait on the polling thread and hang).
 #[tauri::command]
 #[specta::specta]
 pub async fn window_set_shape(
@@ -240,20 +239,20 @@ mod shape {
 
     struct Shape {
         window: WebviewWindow,
-        /// Se guarda al fijar la forma: pedírselo a la ventana desde el hilo de
-        /// sondeo pasa por el hilo principal y, con el cerrojo cogido, podía colgar
-        /// la app (AppHang).
+        /// Stored when the shape is set: asking the window for it from the polling
+        /// thread goes through the main thread and, with the lock held, could hang
+        /// the app (AppHang).
         hwnd: isize,
         rgn: HRGN,
         ignoring: bool,
     }
-    // La región solo se usa desde el hilo de sondeo y bajo el mutex.
+    // The region is only used from the polling thread and under the mutex.
     unsafe impl Send for Shape {}
 
     static SHAPE: Mutex<Option<Shape>> = Mutex::new(None);
     static POLLER: OnceLock<()> = OnceLock::new();
 
-    /// Nunca se llama a la ventana con el cerrojo cogido.
+    /// The window is never called while the lock is held.
     pub fn set(window: WebviewWindow, polygons: Option<Vec<Vec<(i32, i32)>>>) {
         let rgn = polygons.and_then(|p| unsafe { union(p) });
         let hwnd = window.hwnd().map(|h| h.0 as isize).ok();
@@ -261,7 +260,7 @@ mod shape {
         if let Some(old) = old {
             unsafe { DeleteObject(old.rgn) };
         }
-        // Al cambiar de forma, la ventana vuelve a recibir los clics.
+        // When the shape changes, the window receives clicks again.
         let _ = window.set_ignore_cursor_events(false);
         match (rgn, hwnd) {
             (Some(rgn), Some(hwnd)) => {
@@ -305,18 +304,18 @@ mod shape {
         (!total.is_null()).then_some(total)
     }
 
-    /// ~25 veces por segundo: ¿está el ratón sobre una parte transparente?
+    /// ~25 times per second: is the mouse over a transparent part?
     fn poll() {
         loop {
             std::thread::sleep(Duration::from_millis(40));
-            // Se decide con el cerrojo puesto y se aplica sin él: el cambio pasa por
-            // el hilo principal, que también puede estar esperando este cerrojo.
+            // Decided with the lock held and applied without it: the change goes through
+            // the main thread, which may also be waiting on this lock.
             let change = {
                 let mut guard = SHAPE.lock().unwrap();
                 let Some(shape) = guard.as_mut() else {
                     continue;
                 };
-                // El HWND guardado: nada de pedírselo a la ventana con el cerrojo cogido.
+                // The stored HWND: never ask the window for it while holding the lock.
                 let hwnd = shape.hwnd as HWND;
                 let mut pt = POINT { x: 0, y: 0 };
                 let mut rc = RECT {
@@ -333,7 +332,7 @@ mod shape {
                     GetClientRect(hwnd, &mut rc);
                     let in_client =
                         pt.x >= rc.left && pt.x < rc.right && pt.y >= rc.top && pt.y < rc.bottom;
-                    // Solo importa dentro del rectángulo de la ventana.
+                    // Only matters inside the window rectangle.
                     if !in_client {
                         continue;
                     }

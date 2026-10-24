@@ -1,8 +1,8 @@
-//! Arranque rápido (specs/008): la API interna de YouTube con el cliente de
-//! Android devuelve en ~0,3 s una URL directa del audio, pero sin "PO token"
-//! YouTube solo sirve con ella el primer ~1 MB (≈ 65 s a 128 kbps). Basta para
-//! empezar a sonar mientras yt-dlp consigue la URL completa (~2 s), que la fuente
-//! usa a partir del segundo bloque (ver `Upgrade` y `source.rs`).
+//! Fast start (specs/008): YouTube's internal API with the Android client
+//! returns a direct audio URL in ~0.3 s, but without a "PO token" YouTube only
+//! serves the first ~1 MB through it (≈ 65 s at 128 kbps). That is enough to
+//! start playing while yt-dlp obtains the full URL (~2 s), which the source
+//! uses from the second block on (see `Upgrade` and `source.rs`).
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -15,7 +15,7 @@ use crate::error::{AppError, AppResult, ErrorCode};
 const ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 const CLIENT_VERSION: &str = "20.10.38";
 const UA: &str = "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip";
-/// Bytes que YouTube sirve sin PO token (medido: hasta ~1,06 MB).
+/// Bytes that YouTube serves without a PO token (measured: up to ~1.06 MB).
 pub const HEAD_LIMIT: u64 = 1 << 20;
 
 fn client() -> &'static reqwest::blocking::Client {
@@ -24,12 +24,12 @@ fn client() -> &'static reqwest::blocking::Client {
         reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(4))
             .build()
-            .expect("cliente HTTP")
+            .expect("HTTP client")
     })
 }
 
 fn fail(why: &str) -> AppError {
-    tracing::debug!(why, "arranque rápido no disponible");
+    tracing::debug!(why, "fast start not available");
     AppError::new(
         ErrorCode::ResolveFailed,
         tr!(
@@ -39,7 +39,7 @@ fn fail(why: &str) -> AppError {
     )
 }
 
-/// URL del principio del audio. Cualquier fallo = usar solo yt-dlp.
+/// URL of the start of the audio. Any failure = use yt-dlp only.
 pub fn resolve_head(id: &TrackId, pref: FormatPreference) -> AppResult<ResolvedStream> {
     let body = json!({
         "videoId": id.0,
@@ -60,18 +60,18 @@ pub fn resolve_head(id: &TrackId, pref: FormatPreference) -> AppResult<ResolvedS
         .send()
         .and_then(|r| r.error_for_status())
         .and_then(|r| r.json())
-        .map_err(|_| fail("red"))?;
+        .map_err(|_| fail("network"))?;
     parse(id, pref, &v)
 }
 
 fn parse(id: &TrackId, pref: FormatPreference, v: &Value) -> AppResult<ResolvedStream> {
     if v["playabilityStatus"]["status"] != "OK" {
-        return Err(fail("no reproducible con este cliente"));
+        return Err(fail("not playable with this client"));
     }
     let itag = pref.itag();
     let f = v["streamingData"]["adaptiveFormats"]
         .as_array()
-        // La variante con compresión dinámica (DRC) es otro archivo: no vale.
+        // The dynamic range compression (DRC) variant is a different file: not usable.
         .and_then(|a| {
             a.iter().find(|f| {
                 f["itag"].as_u64() == Some(itag as u64)
@@ -79,11 +79,11 @@ fn parse(id: &TrackId, pref: FormatPreference, v: &Value) -> AppResult<ResolvedS
                     && f["xtags"].is_null()
             })
         })
-        .ok_or_else(|| fail("sin el formato"))?;
-    // Con firma cifrada (`signatureCipher`) no sirve: eso es trabajo de yt-dlp.
+        .ok_or_else(|| fail("format not found"))?;
+    // An encrypted signature (`signatureCipher`) is no good: that is yt-dlp's job.
     let url = f["url"]
         .as_str()
-        .ok_or_else(|| fail("URL cifrada"))?
+        .ok_or_else(|| fail("encrypted URL"))?
         .to_owned();
     let num = |x: &Value| x.as_str().and_then(|s| s.parse::<u64>().ok());
     let expires_at = url
@@ -114,7 +114,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn interpreta_respuesta_con_url_directa() {
+    fn parses_response_with_direct_url() {
         let v = json!({
             "playabilityStatus": { "status": "OK" },
             "streamingData": { "adaptiveFormats": [
@@ -130,20 +130,20 @@ mod tests {
     }
 
     #[test]
-    fn rechaza_firma_cifrada_y_no_reproducible() {
-        let cifrada = json!({
+    fn rejects_encrypted_signature_and_unplayable() {
+        let encrypted = json!({
             "playabilityStatus": { "status": "OK" },
             "streamingData": { "adaptiveFormats": [{ "itag": 140, "signatureCipher": "s=..." }] }
         });
-        assert!(parse(&TrackId("a".into()), FormatPreference::Aac128, &cifrada).is_err());
+        assert!(parse(&TrackId("a".into()), FormatPreference::Aac128, &encrypted).is_err());
         let bot = json!({ "playabilityStatus": { "status": "LOGIN_REQUIRED" } });
         assert!(parse(&TrackId("a".into()), FormatPreference::Aac128, &bot).is_err());
     }
 
-    /// Red real: `cargo test --lib -- --ignored --nocapture arranque_rapido_real`.
+    /// Real network: `cargo test --lib -- --ignored --nocapture fast_start_real`.
     #[test]
     #[ignore]
-    fn arranque_rapido_real() {
+    fn fast_start_real() {
         let t = std::time::Instant::now();
         let s = resolve_head(&TrackId("kJQP7kiw5Fk".into()), FormatPreference::Aac128).unwrap();
         println!(
@@ -153,11 +153,11 @@ mod tests {
         );
     }
 
-    /// Extremo a extremo con YouTube real: principio con la URL rápida y el resto
-    /// con la de yt-dlp. `cargo test --lib -- --ignored --nocapture arranque_rapido_completo`.
+    /// End to end with real YouTube: the start with the fast URL and the rest
+    /// with yt-dlp's. `cargo test --lib -- --ignored --nocapture fast_start_full`.
     #[test]
     #[ignore]
-    fn arranque_rapido_completo() {
+    fn fast_start_full() {
         use crate::audio::resolver::{StreamResolver, ToolPaths, Upgrade, YtDlpResolver};
         use crate::audio::source::HttpRangeSource;
         use std::io::Read;
@@ -181,11 +181,11 @@ mod tests {
         .unwrap();
         let mut first = [0u8; 4096];
         src.read_exact(&mut first).unwrap();
-        println!("primeros bytes en {} ms", t.elapsed().as_millis());
+        println!("first bytes in {} ms", t.elapsed().as_millis());
         let mut rest = Vec::new();
         src.read_to_end(&mut rest).unwrap();
         println!(
-            "canción completa ({} bytes) en {} ms",
+            "full song ({} bytes) in {} ms",
             rest.len() + 4096,
             t.elapsed().as_millis()
         );

@@ -1,7 +1,7 @@
-//! Visualizaciones (specs/005): analizador sobre la derivación de PCM del motor.
+//! Visualizations (specs/005): analyzer over the engine's PCM tap.
 //!
-//! Solo funciona mientras la UI lo pide (`viz_set_active`): con la vista oculta
-//! no se copia audio ni se calcula nada (NFR-005-02).
+//! It only runs while the UI asks for it (`viz_set_active`): with the view hidden
+//! no audio is copied and nothing is computed (NFR-005-02).
 
 pub mod bands;
 
@@ -26,17 +26,17 @@ const FRAME: Duration = Duration::from_millis(33);
 #[serde(rename_all = "camelCase")]
 #[tauri_specta(event_name = "viz://frame")]
 pub struct VizFrame {
-    /// 64 valores 0..255 (0..1 cuantizado), de graves a agudos. Un byte basta para
-    /// dibujar y el JSON que viaja 30 veces por segundo ocupa ~3 veces menos.
+    /// 64 values 0..255 (0..1 quantized), from bass to treble. One byte is enough to
+    /// draw, and the JSON sent 30 times per second takes ~3 times less.
     pub bands: Vec<u8>,
     pub peaks: Vec<u8>,
-    /// 256 muestras -127..127 (-1..1 cuantizado).
+    /// 256 samples -127..127 (-1..1 quantized).
     pub wave: Vec<i8>,
-    /// Nivel RMS suavizado 0..1.
+    /// Smoothed RMS level 0..1.
     pub level: f32,
-    /// Pulso de ritmo 0..1 (1 en cada golpe de graves, cae en ~0,2 s).
+    /// Rhythm pulse 0..1 (1 on every bass beat, falls in ~0.2 s).
     pub beat: f32,
-    /// Graves normalizados a la canción 0..1.
+    /// Bass normalized to the song 0..1.
     pub bass: f32,
 }
 
@@ -45,9 +45,9 @@ pub struct VizService {
     player: Arc<PlayerService>,
     active: Arc<AtomicBool>,
     worker: Mutex<Option<thread::JoinHandle<()>>>,
-    /// La derivación de PCM solo se entrega una vez por salida abierta: se guarda
-    /// aquí entre activaciones (cambiar de preset, salir y volver a Reproducción
-    /// actual). Sin esto, la segunda vez el analizador se quedaba sin audio.
+    /// The PCM tap is only delivered once per opened output: it is kept
+    /// here between activations (switching preset, leaving and returning to Now
+    /// Playing). Without this, the second time the analyzer ran out of audio.
     tap: Arc<Mutex<Option<PcmTap>>>,
 }
 
@@ -111,24 +111,24 @@ fn run(
 ) {
     let mut tap = player.take_tap().or_else(|| stored.lock().unwrap().take());
     let mut analyzer = Analyzer::new(tap.as_ref().map_or(48_000, |t| t.sample_rate));
-    // Ventana deslizante mono de FFT_SIZE muestras (ring + copia lineal).
+    // Mono sliding window of FFT_SIZE samples (ring + linear copy).
     let mut ring = vec![0.0f32; FFT_SIZE];
     let mut write = 0usize;
     let mut linear = vec![0.0f32; FFT_SIZE];
     let mut chunk = vec![0.0f32; 8192];
     let mut was_silent = false;
-    // Diagnóstico: una línea a los 5 s de activarse (¿llega audio? ¿hay golpes?).
+    // Diagnostics: one line 5 s after activation (does audio arrive? are there beats?).
     let activated = Instant::now();
     let (mut reported, mut samples_seen, mut beats) = (false, 0usize, 0u32);
 
-    // Lo viejo del tap no interesa.
+    // Old tap data is of no interest.
     if let Some(t) = tap.as_mut() {
         t.consumer.clear();
     }
 
     while active.load(Ordering::Acquire) {
         let started = Instant::now();
-        // El dispositivo puede cambiar: entonces hay derivación nueva.
+        // The device may change: then there is a new tap.
         if let Some(new) = player.take_tap() {
             analyzer = Analyzer::new(new.sample_rate);
             tap = Some(new);
@@ -166,14 +166,14 @@ fn run(
         if !reported && activated.elapsed() >= Duration::from_secs(5) {
             reported = true;
             tracing::info!(
-                con_audio = tap.is_some(),
-                muestras = samples_seen,
-                golpes = beats,
-                "visualización activa"
+                with_audio = tap.is_some(),
+                samples = samples_seen,
+                beats = beats,
+                "visualization active"
             );
         }
 
-        // En silencio sostenido no se emite nada (ahorro de IPC).
+        // During sustained silence nothing is emitted (saves IPC).
         let silent = analyzer.is_silent();
         if !(silent && was_silent) {
             let _ = frame_of(&analyzer).emit(&app);
@@ -184,7 +184,7 @@ fn run(
             thread::sleep(left);
         }
     }
-    // Se devuelve para la próxima activación.
+    // Handed back for the next activation.
     *stored.lock().unwrap() = tap;
 }
 
@@ -192,9 +192,9 @@ fn run(
 mod size_tests {
     use super::*;
 
-    /// Tamaño de un fotograma tal y como viaja a la interfaz (30 por segundo).
+    /// Size of a frame as it travels to the interface (30 per second).
     #[test]
-    fn tamano_de_un_fotograma() {
+    fn frame_size() {
         let mut a = bands::Analyzer::new(48_000);
         let x: Vec<f32> = (0..bands::FFT_SIZE)
             .map(|i| (i as f32 * 0.07).sin() * 0.6 + (i as f32 * 0.31).sin() * 0.2)
@@ -205,7 +205,7 @@ mod size_tests {
         let f = frame_of(&a);
         let json = serde_json::to_string(&f).unwrap();
         println!(
-            "fotograma: {} bytes ({} KB/s a 30 fps)",
+            "frame: {} bytes ({} KB/s at 30 fps)",
             json.len(),
             json.len() * 30 / 1024
         );

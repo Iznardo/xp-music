@@ -22,8 +22,8 @@
 let
   fs = lib.fileset;
 
-  # La app busca `deno` y `yt-dlp_linux` en XP_MUSIC_TOOLS. En Nix los pone nixpkgs
-  # (mismas versiones que tools.lock.json) en lugar de descargarlos con fetch-tools.
+  # The app looks for `deno` and `yt-dlp_linux` in XP_MUSIC_TOOLS. On Nix, nixpkgs
+  # provides them (same versions as tools.lock.json) instead of downloading them with fetch-tools.
   tools = runCommand "xp-music-tools" { } ''
     mkdir -p $out
     ln -s ${lib.getExe deno} $out/deno
@@ -38,7 +38,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     root = ../.;
     fileset = fs.unions [
       ../src
-      # Sin target/ si se compila fuera de un flake desde un árbol ya usado.
+      # Without target/ when building outside a flake from an already used tree.
       (fs.difference ../src-tauri (fs.maybeMissing ../src-tauri/target))
       ../vendor
       ../index.html
@@ -56,7 +56,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
   cargoRoot = "src-tauri";
   buildAndTestSubdir = finalAttrs.cargoRoot;
 
-  # Sin hash que mantener: se resuelve desde package-lock.json.
+  # No hash to maintain: resolved from package-lock.json.
   npmDeps = importNpmLock.buildNodeModules {
     npmRoot = finalAttrs.src;
     inherit nodejs;
@@ -79,14 +79,14 @@ rustPlatform.buildRustPackage (finalAttrs: {
     libayatana-appindicator
   ];
 
-  # Los tests construyen clientes reqwest, que necesitan certificados del sistema.
+  # The tests build reqwest clients, which need system certificates.
   nativeCheckInputs = [ cacert ];
   preCheck = ''
     export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
   '';
 
-  # tauri.linux.conf.json empaqueta tools/ como recurso. Aquí lo aportan nixpkgs, así que
-  # se usan marcadores vacíos para el empaquetado y se retiran al instalar.
+  # tauri.linux.conf.json bundles tools/ as a resource. Here nixpkgs provides them, so
+  # empty placeholders are used for packaging and removed on install.
   preBuild = ''
     mkdir -p tools/yt-dlp
     touch tools/deno
@@ -100,7 +100,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     gappsWrapperArgs+=(
       --set XP_MUSIC_TOOLS ${tools}
       --prefix PATH : ${lib.makeBinPath [ xdg-utils ]}
-      # El icono de bandeja carga libayatana-appindicator con dlopen.
+      # The tray icon loads libayatana-appindicator with dlopen.
       --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ libayatana-appindicator ]}
     )
   '';
@@ -108,7 +108,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
   passthru = { inherit tools; };
 
   meta = {
-    description = "Reproductor de YouTube Music con estética Windows Media Player / XP";
+    description = "YouTube Music player with a Windows Media Player / XP look";
     homepage = "https://github.com/Iznardo/xp-music";
     license = lib.licenses.mit;
     mainProgram = "xp-music";

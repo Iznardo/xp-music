@@ -1,5 +1,5 @@
-// Sustituto de `bindings.ts` para previsualizar la UI en un navegador normal
-// (`npm run dev:mock`). Datos inventados y un reproductor simulado; no habla con Rust.
+// Stand-in for `bindings.ts` to preview the UI in a regular browser
+// (`npm run dev:mock`). Made-up data and a simulated player; it doesn't talk to Rust.
 
 import type {
   AlbumDetail,
@@ -31,7 +31,7 @@ import type {
 type Result<T> = { status: "ok"; data: T } | { status: "error"; error: AppError };
 const ok = <T>(data: T): Promise<Result<T>> => new Promise((r) => setTimeout(() => r({ status: "ok", data }), 120));
 
-// ------------------------------------------------------------------ eventos
+// ------------------------------------------------------------------ events
 
 type Cb<T> = (e: { event: string; id: number; payload: T }) => void;
 function makeEvent<T>(name: string) {
@@ -68,11 +68,11 @@ export const events = {
   updateAvailable: makeEvent<{ version: string; notes: string | null; date: string | null }>("update://available"),
 };
 
-// ------------------------------------------------------------------ datos
+// ------------------------------------------------------------------ data
 
 const palette = ["#3a6ea5", "#a54a3a", "#3aa56b", "#8a3aa5", "#a5893a", "#3a9aa5", "#a53a7c", "#5b5b5b"];
-/** Portada de verdad para "Ruta 2004" (la canción de las capturas y el vídeo de promoción). */
-const RUTA_2004 = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'>
+/** A real cover for "Ruta 2004" (the song in the screenshots and the promo video). */
+const ROUTE_2004_COVER = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'>
 <defs>
 <linearGradient id='sky' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#1d1b5e'/><stop offset='.45' stop-color='#b2338f'/><stop offset='.62' stop-color='#ff7a3d'/></linearGradient>
 <linearGradient id='sun' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#ffe66b'/><stop offset='1' stop-color='#ff4f6d'/></linearGradient>
@@ -94,7 +94,7 @@ const RUTA_2004 = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='6
 </svg>`;
 
 function cover(seed: number, label: string): Thumbnail[] {
-  if (label === "Ruta") return [{ url: `data:image/svg+xml;utf8,${encodeURIComponent(RUTA_2004)}`, width: 600, height: 600 }];
+  if (label === "Ruta") return [{ url: `data:image/svg+xml;utf8,${encodeURIComponent(ROUTE_2004_COVER)}`, width: 600, height: 600 }];
   const c = palette[seed % palette.length];
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='226' height='226'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${c}'/><stop offset='1' stop-color='#111'/></linearGradient></defs><rect width='226' height='226' fill='url(#g)'/><text x='16' y='206' font-family='Tahoma' font-size='26' fill='#fff' opacity='.85'>${label}</text></svg>`;
   return [{ url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, width: 226, height: 226 }];
@@ -153,7 +153,7 @@ const artistSummaries: ArtistSummary[] = artists.map((n, i) => ({
   thumbnails: cover(i + 3, n.split(" ")[0]!),
 }));
 
-/** Datos de otra biblioteca para capturas (el vídeo de promoción): JSON en localStorage "xpm.mock.data". */
+/** Data from another library for screenshots (the promo video): JSON in localStorage "xpm.mock.data". */
 try {
   const raw = localStorage.getItem("xpm.mock.data");
   if (raw) {
@@ -163,10 +163,10 @@ try {
     artistSummaries.splice(0, artistSummaries.length, ...d.artists);
   }
 } catch {
-  // Sin datos alternativos: se quedan los de ejemplo.
+  // No alternative data: the sample data stays.
 }
 
-// ------------------------------------------------------------------ reproductor simulado
+// ------------------------------------------------------------------ simulated player
 
 let settings: Settings = {
   theme: "Blue",
@@ -232,7 +232,7 @@ setInterval(() => {
   events.playerPosition.emit({ positionMs: state.positionMs, bufferedMs: 30_000 });
 }, 250);
 
-// Fotogramas de visualización inventados: bombo a 120 BPM, voces en medios y charles.
+// Made-up visualization frames: kick drum at 120 BPM, vocals in the mids and hi-hats.
 let vizTimer: ReturnType<typeof setInterval> | undefined;
 const peaks = new Array(64).fill(0);
 function fakeViz() {
@@ -261,7 +261,7 @@ let auth: AuthStatus = { SignedIn: { name: "Alex Rivera", handle: "@alexrivera",
 
 const v = <T>(x: T) => Promise.resolve(x);
 
-// ------------------------------------------------------------------ comandos
+// ------------------------------------------------------------------ commands
 
 export const commands = {
   settingsGet: () => ok(settings),
@@ -460,7 +460,7 @@ export const commands = {
   windowSetCompact: (_e: boolean) => ok(null),
   windowSetShape: (_p: [number, number][][] | null) => ok(null),
   windowSetSkin: (_s: [number | null, number | null] | null) => ok(null),
-  // Con XP_SKINS_DIR, Vite sirve la carpeta de máscaras (vite.config.ts).
+  // With XP_SKINS_DIR, Vite serves the skins folder (vite.config.ts).
   skinsList: async () => ({ status: "ok" as const, data: (await (await fetch("/skin/list")).json()) as { id: string; name: string; bytes: number }[] }),
   skinsOpenDir: () => ok(null),
   vizSetActive: (on: boolean) => {
@@ -482,8 +482,8 @@ export const commands = {
 
 void seq;
 
-// Solo en la vista de pruebas: acceso desde la consola para medir y depurar, y
-// registro de las llamadas al "backend" (para contar peticiones repetidas).
+// Only in the preview: console access for measuring and debugging, and a log of
+// the calls to the "backend" (to count repeated requests).
 const calls: string[] = [];
 for (const [name, fn] of Object.entries(commands)) {
   (commands as Record<string, unknown>)[name] = (...args: unknown[]) => {

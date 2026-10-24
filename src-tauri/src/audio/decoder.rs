@@ -1,4 +1,4 @@
-//! Symphonia → rubato → mapeo de canciones a la salida (FR-002-01/03).
+//! Symphonia → rubato → mapping of songs to the output (FR-002-01/03).
 
 use std::time::Duration;
 
@@ -16,7 +16,7 @@ use symphonia::core::units::Time;
 use super::resolver::ResolvedStream;
 use super::source::{HttpRangeSource, SourceError, SourceProbe};
 
-/// Por qué falló la decodificación.
+/// Why decoding failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecodeFailure {
     Expired,
@@ -37,7 +37,7 @@ fn classify(e: SymError) -> DecodeFailure {
     match e {
         SymError::IoError(io) => SourceError::from_io(&io).into(),
         other => {
-            tracing::warn!(error = %other, "error de decodificación");
+            tracing::warn!(error = %other, "decoding error");
             DecodeFailure::Format
         }
     }
@@ -55,13 +55,13 @@ pub struct Decoding {
     decoded: Vec<f32>,
     resampled: Vec<f32>,
     probe: SourceProbe,
-    /// Bytes por milisegundo, para estimar cuánto hay en el búfer.
+    /// Bytes per millisecond, to estimate how much is in the buffer.
     bytes_per_ms: f64,
     pub duration_ms: Option<u32>,
 }
 
 impl Decoding {
-    /// Bloqueante (red): abrir desde un hilo auxiliar, no desde el motor.
+    /// Blocking (network): open from a helper thread, not from the engine.
     pub fn open(
         client: Client,
         stream: &ResolvedStream,
@@ -128,7 +128,7 @@ impl Decoding {
         Ok(dec)
     }
 
-    /// Bloqueante si la zona no está descargada.
+    /// Blocking if the region has not been downloaded.
     pub fn seek(&mut self, ms: u32) -> Result<(), DecodeFailure> {
         self.format
             .seek(
@@ -147,14 +147,14 @@ impl Decoding {
         Ok(())
     }
 
-    /// Estimación de lo descargado por delante, en ms.
+    /// Estimate of how much is downloaded ahead, in ms.
     pub fn buffered_ms(&self) -> u32 {
         (self.probe.buffered_ahead() as f64 / self.bytes_per_ms).min(u32::MAX as f64) as u32
     }
 
-    /// Decodifica el siguiente paquete y añade a `out` las muestras ya
-    /// remuestreadas y adaptadas a los canales de salida. Devuelve `false` al
-    /// final del stream.
+    /// Decodes the next packet and appends to `out` the samples already
+    /// resampled and adapted to the output channels. Returns `false` at the
+    /// end of the stream.
     pub fn next_chunk(&mut self, out: &mut Vec<f32>) -> Result<bool, DecodeFailure> {
         let packet = loop {
             match self.format.next_packet() {
@@ -170,7 +170,7 @@ impl Decoding {
         let buf = match self.decoder.decode(&packet) {
             Ok(b) => b,
             Err(SymError::DecodeError(e)) => {
-                tracing::debug!(error = %e, "paquete corrupto, se salta");
+                tracing::debug!(error = %e, "corrupt packet, skipping");
                 return Ok(true);
             }
             Err(e) => return Err(classify(e)),
@@ -193,12 +193,12 @@ impl Decoding {
                 FixedSync::Input,
             )
             .map_err(|e| {
-                tracing::error!(error = %e, "no se pudo crear el remuestreador");
+                tracing::error!(error = %e, "could not create the resampler");
                 DecodeFailure::Format
             })?;
             self.resampler = Some(r);
         }
-        let rs = self.resampler.as_mut().expect("remuestreador");
+        let rs = self.resampler.as_mut().expect("resampler");
         self.pending.extend_from_slice(&self.decoded);
         loop {
             let need = rs.input_frames_next();
@@ -215,7 +215,7 @@ impl Decoding {
             let (used, produced) =
                 rs.process_into_buffer(&input, &mut output, None)
                     .map_err(|e| {
-                        tracing::error!(error = %e, "fallo remuestreando");
+                        tracing::error!(error = %e, "resampling failed");
                         DecodeFailure::Format
                     })?;
             self.pending.drain(..used * self.src_ch);
@@ -229,7 +229,7 @@ impl Decoding {
         Ok(true)
     }
 
-    /// Restos sin remuestrear al final (< 25 ms, inaudible).
+    /// Leftovers not resampled at the end (< 25 ms, inaudible).
     fn flush_pending(&mut self, out: &mut Vec<f32>) {
         if self.src_ch > 0 && !self.pending.is_empty() {
             map_channels(&self.pending, self.src_ch, self.out_ch, out);
@@ -238,7 +238,7 @@ impl Decoding {
     }
 }
 
-/// Mono → todos los canales; estéreo → primeros dos, el resto en silencio.
+/// Mono → all channels; stereo → first two, the rest silent.
 fn map_channels(src: &[f32], src_ch: usize, out_ch: usize, out: &mut Vec<f32>) {
     if src_ch == out_ch {
         out.extend_from_slice(src);
@@ -257,13 +257,13 @@ fn map_channels(src: &[f32], src_ch: usize, out_ch: usize, out: &mut Vec<f32>) {
     }
 }
 
-/// Cliente HTTP compartido por todas las fuentes (keep-alive).
+/// HTTP client shared by all sources (keep-alive).
 pub fn http_client() -> Client {
     Client::builder()
         .timeout(Duration::from_secs(20))
         .connect_timeout(Duration::from_secs(8))
         .build()
-        .expect("cliente HTTP")
+        .expect("HTTP client")
 }
 
 #[cfg(test)]
@@ -271,7 +271,7 @@ mod tests {
     use super::map_channels;
 
     #[test]
-    fn mapeo_de_canales() {
+    fn channel_mapping() {
         let mut out = Vec::new();
         map_channels(&[0.1, 0.2], 1, 2, &mut out);
         assert_eq!(out, [0.1, 0.1, 0.2, 0.2]);

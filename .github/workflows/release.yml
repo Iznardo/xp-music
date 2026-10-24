@@ -75,7 +75,7 @@ jobs:
           node -e '
             const assert = require("node:assert/strict");
             const release = require(process.env.RUNNER_TEMP + "/release.json");
-            assert.equal(release.draft, true, "La release debe estar en draft");
+            assert.equal(release.draft, true, "The release must be a draft");
             assert.equal(release.prerelease, false);
           '
       - name: Reunir los instaladores Windows firmados en local

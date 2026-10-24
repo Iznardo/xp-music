@@ -1,14 +1,13 @@
-//! Máscaras (skins) de Windows Media Player: los `.wmz` originales que el usuario
-//! pone en su carpeta de máscaras. Aquí solo se listan y se sirven; el motor que
-//! los interpreta corre en la WebView, dentro de un iframe aislado
-//! (`src/skin-frame/`), servido por el protocolo `skin`
-//! (`http://skin.localhost/…` en Windows):
+//! Windows Media Player skins: the original `.wmz` files the user puts in their
+//! skins folder. Here they are only listed and served; the engine that interprets
+//! them runs in the WebView, inside an isolated iframe (`src/skin-frame/`),
+//! served by the `skin` protocol (`http://skin.localhost/…` on Windows):
 //!
-//! - `/frame/<archivo>`: el motor, embebido en el ejecutable.
-//! - `/wmz/<id>`: el `.wmz` tal cual (id = ruta relativa dentro de la carpeta).
+//! - `/frame/<file>`: the engine, embedded in the executable.
+//! - `/wmz/<id>`: the `.wmz` as is (id = relative path inside the folder).
 //!
-//! El marco no tiene acceso a la app (sandbox sin mismo origen) y su CSP solo le
-//! deja cargar el motor, leer el `.wmz` y mostrar portadas.
+//! The frame has no access to the app (sandbox without same origin) and its CSP only
+//! lets it load the engine, read the `.wmz` and show thumbnails.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -18,15 +17,15 @@ use tauri::http::{Request, Response, StatusCode};
 
 use crate::error::{AppError, AppResult};
 
-/// Tope de tamaño de un `.wmz` (los más grandes de la colección rondan 10 MB).
+/// Size cap for a `.wmz` (the largest in the collection are around 10 MB).
 const MAX_WMZ: u64 = 64 * 1024 * 1024;
-/// Profundidad máxima de subcarpetas al buscar máscaras.
+/// Maximum subfolder depth when searching for skins.
 const MAX_DEPTH: usize = 4;
 
 const CSP: &str = "default-src 'none'; script-src skin: http://skin.localhost 'unsafe-eval'; \
 style-src 'unsafe-inline'; img-src blob: data: thumb: http://thumb.localhost; connect-src skin: http://skin.localhost";
 
-/// El motor del marco, embebido en el ejecutable.
+/// The frame engine, embedded in the executable.
 const FRAME: &[(&str, &str)] = &[
     (
         "index.html",
@@ -54,14 +53,14 @@ const FRAME: &[(&str, &str)] = &[
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SkinInfo {
-    /// Ruta relativa dentro de la carpeta de máscaras, con `/`.
+    /// Relative path inside the skins folder, with `/`.
     pub id: String,
-    /// Nombre del archivo sin `.wmz`.
+    /// File name without `.wmz`.
     pub name: String,
     pub bytes: u32,
 }
 
-/// Carpeta de máscaras del usuario.
+/// The user's skins folder.
 pub fn dir() -> AppResult<PathBuf> {
     let dirs = crate::state::AppDirs::resolve().map_err(|e| AppError::internal(e.to_string()))?;
     let dir = dirs.data.join("skins");
@@ -110,7 +109,7 @@ fn walk(base: &Path, dir: &Path, depth: usize, out: &mut Vec<SkinInfo>) {
     }
 }
 
-/// Las máscaras de una carpeta (y sus subcarpetas), por nombre.
+/// The skins in a folder (and its subfolders), by name.
 pub fn list_in(base: &Path) -> Vec<SkinInfo> {
     let mut out = Vec::new();
     walk(base, base, 0, &mut out);
@@ -118,7 +117,7 @@ pub fn list_in(base: &Path) -> Vec<SkinInfo> {
     out
 }
 
-/// Ruta de una máscara a partir de su id, sin salir de la carpeta.
+/// Path of a skin from its id, without leaving the folder.
 fn resolve(base: &Path, id: &str) -> Option<PathBuf> {
     let rel = Path::new(id);
     if !rel.components().all(|c| matches!(c, Component::Normal(_))) {
@@ -141,7 +140,7 @@ fn resolve(base: &Path, id: &str) -> Option<PathBuf> {
 pub fn skins_list() -> AppResult<Vec<SkinInfo>> {
     let dir = dir()?;
     let list = list_in(&dir);
-    tracing::info!(dir = %dir.display(), count = list.len(), "máscaras encontradas");
+    tracing::info!(dir = %dir.display(), count = list.len(), "skins found");
     Ok(list)
 }
 
@@ -151,7 +150,7 @@ pub fn skins_open_dir() -> AppResult<()> {
     crate::os::open_dir(&dir()?)
 }
 
-/// Atiende el protocolo `skin` (bloqueante: llamar fuera del hilo de la UI).
+/// Serves the `skin` protocol (blocking: call off the UI thread).
 pub fn handle(req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let path = req.uri().path();
     if let Some(name) = path.strip_prefix("/frame/") {
@@ -187,7 +186,7 @@ fn ok(mime: &str, body: Vec<u8>) -> Response<Vec<u8>> {
     Response::builder()
         .header("Content-Type", mime)
         .header("Content-Security-Policy", CSP)
-        // El marco no tiene origen (sandbox): sin esto no podría cargar sus módulos.
+        // The frame has no origin (sandbox): without this it could not load its modules.
         .header("Access-Control-Allow-Origin", "*")
         .header("Cache-Control", "no-store")
         .body(body)
@@ -198,7 +197,7 @@ fn status(code: StatusCode) -> Response<Vec<u8>> {
     Response::builder()
         .status(code)
         .body(Vec::new())
-        .expect("respuesta vacía")
+        .expect("empty response")
 }
 
 #[cfg(test)]
@@ -213,35 +212,35 @@ mod tests {
     }
 
     #[test]
-    fn lista_wmz_en_subcarpetas() {
-        let d = temp_dir("lista");
-        std::fs::write(d.join("Azul.wmz"), b"x").unwrap();
-        std::fs::write(d.join("pack").join("verde.WMZ"), b"xy").unwrap();
-        std::fs::write(d.join("nota.txt"), b"x").unwrap();
+    fn lists_wmz_in_subfolders() {
+        let d = temp_dir("list");
+        std::fs::write(d.join("Blue.wmz"), b"x").unwrap();
+        std::fs::write(d.join("pack").join("green.WMZ"), b"xy").unwrap();
+        std::fs::write(d.join("note.txt"), b"x").unwrap();
         let l = list_in(&d);
         let ids: Vec<_> = l.iter().map(|s| s.id.as_str()).collect();
-        assert_eq!(ids, ["Azul.wmz", "pack/verde.WMZ"]);
-        assert_eq!(l[1].name, "verde");
+        assert_eq!(ids, ["Blue.wmz", "pack/green.WMZ"]);
+        assert_eq!(l[1].name, "green");
         assert_eq!(l[1].bytes, 2);
         let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
-    fn no_sale_de_la_carpeta() {
-        let d = temp_dir("ruta");
+    fn does_not_leave_the_folder() {
+        let d = temp_dir("path");
         std::fs::write(d.join("pack").join("a.wmz"), b"x").unwrap();
-        std::fs::write(d.join("secreto.txt"), b"x").unwrap();
+        std::fs::write(d.join("secret.txt"), b"x").unwrap();
         assert!(resolve(&d, "pack/a.wmz").is_some());
         assert!(resolve(&d, "../a.wmz").is_none());
-        assert!(resolve(&d, "pack/../secreto.txt").is_none());
-        assert!(resolve(&d, "secreto.txt").is_none());
+        assert!(resolve(&d, "pack/../secret.txt").is_none());
+        assert!(resolve(&d, "secret.txt").is_none());
         assert!(resolve(&d, "C:/Windows/win.ini").is_none());
         assert!(resolve(&d, "/etc/x.wmz").is_none());
         let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
-    fn csp_aislada_en_linux_y_windows() {
+    fn isolated_csp_on_linux_and_windows() {
         for base in ["skin://localhost", "http://skin.localhost"] {
             let req = Request::builder()
                 .uri(format!("{base}/frame/index.html"))
@@ -265,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn el_marco_va_embebido_con_su_csp() {
+    fn frame_is_embedded_with_its_csp() {
         let req = Request::builder()
             .uri("http://skin.localhost/frame/main.js")
             .body(Vec::new())

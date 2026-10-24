@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Conectar con YouTube Music: ventana de Google propia (principal) o importar
-  // la sesión de un navegador Firefox/Zen / pegar la cookie (FR-004-17, FR-003-01).
+  // Connect to YouTube Music: own Google window (primary) or import the session
+  // from a Firefox/Zen browser / paste the cookie (FR-004-17, FR-003-01).
   import { commands, type BrowserProfile, type SessionAccount } from "../bindings";
   import { auth } from "../stores/auth.svelte";
   import { library } from "../stores/library.svelte";
@@ -30,7 +30,7 @@
 
   let waiting = $state(false);
 
-  /// Con una sola cuenta no hay nada que elegir.
+  /// With a single account there is nothing to choose.
   async function offer(found: SessionAccount[] | null) {
     accounts = found ?? [];
     if (accounts.length === 1) await choose(accounts[0]!);

@@ -1,4 +1,4 @@
-// Orden de las visualizaciones (◀ ▶ en Reproducción actual, clic en el escenario y Opciones).
+// Order of the visualizations (◀ ▶ in Now Playing, click on the stage, and Options).
 
 import type { VizPreset } from "../bindings";
 

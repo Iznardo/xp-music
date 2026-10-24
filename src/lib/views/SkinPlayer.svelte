@@ -1,6 +1,7 @@
 <script lang="ts">
-  // Modo máscara: un skin .wmz de WMP en un iframe aislado (src/skin-frame/). El
-  // marco no ve la app; pide cosas por postMessage y aquí se decide qué se hace.
+  // Skin mode: a WMP .wmz skin in an isolated iframe (src/skin-frame/). The
+  // frame can't see the app; it asks for things via postMessage and here we
+  // decide what gets done.
   import { onMount } from "svelte";
   import { commands, events, type RepeatMode } from "../bindings";
   import { player } from "../stores/player.svelte";
@@ -19,7 +20,7 @@
   let size = $state<{ w: number; h: number } | null>(null);
   let logs = 0;
 
-  /** Lo que el marco necesita saber del reproductor. */
+  /** What the frame needs to know about the player. */
   function skinState() {
     const s = player.state;
     const tr = s?.track ?? null;
@@ -57,7 +58,7 @@
     if (size) post({ t: "queue", q });
   });
 
-  /** Lo que pide el marco, validado: nunca se ejecuta nada que venga de él. */
+  /** What the frame requests, validated: nothing coming from it is ever executed. */
   function command(c: unknown, v: unknown) {
     const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : null);
     switch (c) {
@@ -101,7 +102,7 @@
       try {
         return await nativeMenu();
       } catch (e) {
-        void commands.uiLog("error", `máscara: el menú nativo falló: ${String(e)}`);
+        void commands.uiLog("error", `skin: native menu failed: ${String(e)}`);
       }
     }
     const items: MenuItem[] = [
@@ -135,13 +136,13 @@
     await m.popup();
   }
 
-  /// El selector no cabe en la ventana de una máscara: se vuelve al modo completo.
+  /// The picker doesn't fit in a skin's window: go back to full mode.
   async function openPicker() {
     await skins.exit();
     skins.pickerOpen = true;
   }
 
-  /** Rectángulos del marco (px CSS) → polígonos en píxeles físicos. */
+  /** Frame rectangles (CSS px) → polygons in physical pixels. */
   function shape(rects: unknown) {
     if (!Array.isArray(rects) || rects.length > 5000) return void commands.windowSetShape(null);
     const d = devicePixelRatio || 1;
@@ -206,8 +207,8 @@
         return;
       }
       case "log":
-        // Los avisos de la máscara van al log (con tope: hay skins muy ruidosos).
-        if (logs++ < 30) void commands.uiLog("info", `[máscara ${id}] ${String(m.msg ?? "").slice(0, 300)}`);
+        // The skin's messages go to the log (capped: some skins are very noisy).
+        if (logs++ < 30) void commands.uiLog("info", `[skin ${id}] ${String(m.msg ?? "").slice(0, 300)}`);
         return;
       case "error":
         ui.error(t.skins.failed(String(m.msg ?? "")));
@@ -230,7 +231,7 @@
   });
 </script>
 
-<!-- La vista previa del navegador bloquea los marcos sin origen; en la app va aislado del todo. -->
+<!-- The browser preview blocks origin-less frames; in the app it is fully isolated. -->
 <iframe
   bind:this={frame}
   title={t.menuBar.skinMode}

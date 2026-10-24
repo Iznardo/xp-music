@@ -1,7 +1,7 @@
-// Varias visualizaciones pueden convivir un instante (al cambiar de preset se
-// monta la nueva antes de desmontar la vieja, y una máscara puede tener la suya):
-// el analizador del backend se enciende con la primera visible y se apaga cuando
-// no queda ninguna.
+// Several visualizations can coexist for a moment (when changing preset the new
+// one is mounted before the old one is unmounted, and a skin can have its own):
+// the backend analyzer turns on with the first visible one and off when none
+// is left.
 
 import { commands } from "../bindings";
 

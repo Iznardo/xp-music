@@ -1,27 +1,27 @@
-// Banco de pruebas de skins (solo vista previa: `XP_SKINS_DIR=… npm run dev:mock`
-// y abrir /skin/bench/bench.html). Carga cada .wmz en el marco real y cuenta
-// cuántos arrancan, con qué errores y qué les falta. Con ?skin=<id> muestra uno.
+// Skin test bench (preview only: `XP_SKINS_DIR=… npm run dev:mock`
+// and open /skin/bench/bench.html). Loads each .wmz in the real frame and counts
+// how many start, with which errors and what they are missing. With ?skin=<id> it shows one.
 
 const out = document.getElementById("out");
 const stage = document.getElementById("stage");
 const params = new URLSearchParams(location.search);
 
 const STATE = {
-  status: "Playing", title: "Canción de prueba", artist: "Artista", album: "Álbum",
+  status: "Playing", title: "Test song", artist: "Artist", album: "Album",
   durationMs: 215000, positionMs: 64000, volume: 0.7, muted: false, shuffle: false, repeat: "Off", cover: null, hasTrack: true,
 };
 const QUEUE = {
-  items: Array.from({ length: 12 }, (_, i) => ({ title: `Canción ${i + 1}`, artist: "Artista", album: "Álbum", durationMs: 180000 + i * 7000 })),
+  items: Array.from({ length: 12 }, (_, i) => ({ title: `Song ${i + 1}`, artist: "Artist", album: "Album", durationMs: 180000 + i * 7000 })),
   current: 2,
-  name: "Mi lista",
+  name: "My list",
 };
 
-/** Carga un skin en un marco y devuelve lo que informa. */
+/** Loads a skin in a frame and returns what it reports. */
 function run(id, { keep = false, timeout = 10000 } = {}) {
   return new Promise((resolve) => {
     const f = document.createElement("iframe");
-    // El navegador de la vista previa bloquea los marcos con origen opaco; en la
-    // app el marco va aislado del todo (sin allow-same-origin).
+    // The preview browser blocks frames with an opaque origin; in the
+    // app the frame is fully isolated (no allow-same-origin).
     f.sandbox = "allow-scripts allow-same-origin";
     f.src = "/skin/frame/index.html";
     f.style.cssText = "border:0;background:transparent;width:1px;height:1px";
@@ -98,12 +98,12 @@ async function all() {
     partial: count("partial"),
     fatal: count("fatal"),
     timeout: count("timeout"),
-    sinErroresDeScript: results.filter((r) => r.result !== "fatal" && r.result !== "timeout" && !r.errors).length,
-    conForma: results.filter((r) => r.shaped).length,
-    noSoportados: tally("unsupported"),
+    withoutScriptErrors: results.filter((r) => r.result !== "fatal" && r.result !== "timeout" && !r.errors).length,
+    shaped: results.filter((r) => r.shaped).length,
+    unsupported: tally("unsupported"),
     stubs: tally("stubbed"),
-    errores: Object.entries(errs).sort((a, b) => b[1] - a[1]).slice(0, 30),
-    fatales: results.filter((r) => r.result === "fatal").slice(0, 30).map((r) => `${r.id}: ${r.error}`),
+    errors: Object.entries(errs).sort((a, b) => b[1] - a[1]).slice(0, 30),
+    fatal_skins: results.filter((r) => r.result === "fatal").slice(0, 30).map((r) => `${r.id}: ${r.error}`),
   };
   window.__bench = { summary, results };
   out.textContent = JSON.stringify(summary, null, 1);

@@ -1,4 +1,4 @@
-//! Comandos Tauri expuestos al frontend. Convención: `area_accion`.
+//! Tauri commands exposed to the frontend. Convention: `area_action`.
 
 use std::sync::Arc;
 
@@ -22,7 +22,7 @@ use crate::yt::session::BrowserProfile;
 
 type Player<'a> = State<'a, Arc<PlayerService>>;
 
-// ---------------------------------------------------------------- ajustes
+// ---------------------------------------------------------------- settings
 
 #[tauri::command]
 #[specta::specta]
@@ -30,7 +30,7 @@ pub fn settings_get(state: State<'_, AppState>) -> AppResult<Settings> {
     Settings::load(&state.db)
 }
 
-/// Sustituye los ajustes completos y avisa a todas las ventanas.
+/// Replaces the whole settings and notifies all windows.
 #[tauri::command]
 #[specta::specta]
 pub fn settings_set(
@@ -41,12 +41,12 @@ pub fn settings_set(
     let saved = settings.save(&state.db)?;
     crate::os::apply_settings(&app, &saved);
     if let Err(e) = saved.clone().emit(&app) {
-        tracing::warn!(error = %e, "no se pudo emitir settings://changed");
+        tracing::warn!(error = %e, "could not emit settings://changed");
     }
     Ok(saved)
 }
 
-// ---------------------------------------------------------------- reproductor
+// ---------------------------------------------------------------- player
 
 #[tauri::command]
 #[specta::specta]
@@ -96,7 +96,7 @@ pub fn player_seek(player: Player<'_>, position_ms: u32) {
     player.seek(position_ms);
 }
 
-/// `volume` entre 0 y 1.
+/// `volume` between 0 and 1.
 #[tauri::command]
 #[specta::specta]
 pub fn player_set_volume(player: Player<'_>, volume: f32) {
@@ -127,14 +127,14 @@ pub fn player_list_devices() -> Vec<AudioDevice> {
     list_devices()
 }
 
-/// `None` = dispositivo predeterminado.
+/// `None` = default device.
 #[tauri::command]
 #[specta::specta]
 pub fn player_set_device(player: Player<'_>, id: Option<String>) -> AppResult<()> {
     player.set_device(id)
 }
 
-// ---------------------------------------------------------------- cola
+// ---------------------------------------------------------------- queue
 
 #[tauri::command]
 #[specta::specta]
@@ -142,7 +142,7 @@ pub fn queue_get(player: Player<'_>) -> QueueSnapshot {
     player.queue_snapshot()
 }
 
-/// Sustituye la cola y empieza a sonar `start_index` (índice en `tracks`).
+/// Replaces the queue and starts playing `start_index` (index into `tracks`).
 #[tauri::command]
 #[specta::specta]
 pub fn queue_set(
@@ -154,8 +154,8 @@ pub fn queue_set(
     player.queue_set(tracks, start_index, source)
 }
 
-/// La UI avisa de las pistas que probablemente se van a pedir (ratón encima,
-/// selección) para resolverlas antes del doble clic.
+/// The UI reports tracks that are likely to be requested (mouse hover,
+/// selection) so they can be resolved before the double click.
 #[tauri::command]
 #[specta::specta]
 pub fn player_hint(player: Player<'_>, ids: Vec<TrackId>) {
@@ -198,7 +198,7 @@ pub fn queue_set_autoplay(player: Player<'_>, enabled: bool) {
     player.queue_set_autoplay(enabled);
 }
 
-// ---------------------------------------------------------------- sesión de YouTube Music
+// ---------------------------------------------------------------- YouTube Music session
 
 type YtState<'a> = State<'a, Arc<YtService>>;
 
@@ -208,28 +208,28 @@ pub fn auth_status(yt: YtState<'_>) -> AuthStatus {
     yt.status()
 }
 
-/// Abre la ventana de inicio de sesión de Google y devuelve las cuentas de esa sesión.
+/// Opens the Google sign-in window and returns the accounts of that session.
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_sign_in(yt: YtState<'_>) -> AppResult<Vec<SessionAccount>> {
     yt.sign_in_app().await
 }
 
-/// Perfiles de navegadores basados en Firefox (Zen, Firefox, LibreWolf…).
+/// Firefox-based browser profiles (Zen, Firefox, LibreWolf…).
 #[tauri::command]
 #[specta::specta]
 pub fn auth_detect_browsers(yt: YtState<'_>) -> Vec<BrowserProfile> {
     yt.detect_browsers()
 }
 
-/// Cuentas de YouTube con sesión en ese perfil (todas sus sesiones/contenedores).
+/// YouTube accounts signed in on that profile (all its sessions/containers).
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_scan_browser(yt: YtState<'_>, profile: String) -> AppResult<Vec<SessionAccount>> {
     yt.scan_browser(profile).await
 }
 
-/// Cuentas en una cabecera `Cookie` pegada a mano.
+/// Accounts in a `Cookie` header pasted by hand.
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_scan_cookie(yt: YtState<'_>, cookie: String) -> AppResult<Vec<SessionAccount>> {
@@ -251,7 +251,7 @@ pub async fn auth_logout(yt: YtState<'_>) -> AppResult<()> {
     yt.logout().await
 }
 
-// ---------------------------------------------------------------- YouTube Music: lectura
+// ---------------------------------------------------------------- YouTube Music: read
 
 #[tauri::command]
 #[specta::specta]
@@ -295,7 +295,7 @@ pub async fn yt_history(yt: YtState<'_>) -> AppResult<Vec<Section>> {
     yt.inner().history().await
 }
 
-/// Siguiente página de canciones (playlist, me gusta, canciones de la biblioteca).
+/// Next page of songs (playlist, liked songs, library songs).
 #[tauri::command]
 #[specta::specta]
 pub async fn yt_more_tracks(yt: YtState<'_>, continuation: String) -> AppResult<Page<Track>> {
@@ -346,14 +346,14 @@ pub async fn yt_search_suggestions(yt: YtState<'_>, query: String) -> AppResult<
     yt.suggestions(query).await
 }
 
-/// Canciones de la radio de `seed` (la semilla primero).
+/// Songs of the radio for `seed` (the seed first).
 #[tauri::command]
 #[specta::specta]
 pub async fn yt_radio(yt: YtState<'_>, seed: TrackId) -> AppResult<Vec<Track>> {
     yt.radio(seed).await
 }
 
-// ---------------------------------------------------------------- YouTube Music: escritura
+// ---------------------------------------------------------------- YouTube Music: write
 
 #[tauri::command]
 #[specta::specta]

@@ -1,6 +1,6 @@
 <script lang="ts" generics="T">
-  // ListView "Detalles" de XP, virtualizada (NFR-004-01): columnas ordenables,
-  // selección múltiple (Ctrl/Mayús), teclado, menú contextual y arrastrar para reordenar.
+  // XP "Details" ListView, virtualized (NFR-004-01): sortable columns,
+  // multi-select (Ctrl/Shift), keyboard, context menu and drag to reorder.
   import type { Column } from "./types";
 
   let {
@@ -18,18 +18,18 @@
   }: {
     rows: T[];
     columns: Column<T>[];
-    /// Índice (original) de la fila que suena: se pinta en negrita.
+    /// (Original) index of the row that is playing: drawn in bold.
     current?: number | null;
     rowKey: (row: T, index: number) => string;
     onactivate?: (index: number) => void;
-    /// Fila que el usuario probablemente va a activar (ratón encima un momento, clic).
+    /// Row the user is likely to activate (mouse over it for a moment, click).
     onhint?: (index: number) => void;
     onmenu?: (indices: number[], e: MouseEvent | { x: number; y: number }) => void;
     ondelete?: (indices: number[]) => void;
-    /// Si se da, se pueden arrastrar filas (solo sin ordenar).
+    /// If given, rows can be dragged (only when unsorted).
     onmove?: (from: number, to: number) => void;
     empty?: string;
-    /// Estilo de la lista de reproducción de WMP 9: fondo negro y texto claro.
+    /// WMP 9 playlist style: black background and light text.
     dark?: boolean;
   } = $props();
 
@@ -46,7 +46,7 @@
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
 
-  // Orden visible → índice original.
+  // Visible order → original index.
   const order = $derived.by(() => {
     const idx = rows.map((_, i) => i);
     const col = columns.find((c) => c.key === sortKey);
@@ -59,7 +59,7 @@
     });
   });
 
-  // Al cambiar las filas, la selección deja de tener sentido.
+  // When the rows change, the selection no longer makes sense.
   $effect(() => {
     void rows;
     selected = new Set();
@@ -74,7 +74,7 @@
   function sortBy(key: string) {
     if (sortKey === key) {
       if (sortDir === 1) sortDir = -1;
-      else sortKey = null; // tercer clic: orden original
+      else sortKey = null; // third click: original order
     } else {
       sortKey = key;
       sortDir = 1;
@@ -184,7 +184,7 @@
     ensureVisible(pos);
   }
 
-  // Arrastrar para reordenar (solo en orden original).
+  // Drag to reorder (only in original order).
   const canDrag = $derived(!!onmove && sortKey === null);
   function dragStart(pos: number, e: DragEvent) {
     if (!canDrag) return;
@@ -230,7 +230,7 @@
     <div class="spacer" style:height="{order.length * ROW}px">
       {#each order.slice(first, last) as i, k (rowKey(rows[i]!, i))}
         {@const pos = first + k}
-        <!-- El teclado lo gestiona la rejilla entera (onkeydown en .listview). -->
+        <!-- Keyboard is handled by the whole grid (onkeydown on .listview). -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
           class="row"

@@ -1,11 +1,11 @@
-//! Contrato de errores: todo comando devuelve `Result<T, AppError>`.
+//! Error contract: every command returns `Result<T, AppError>`.
 //!
-//! `message` está en español, es apto para mostrar al usuario y nunca contiene secretos.
+//! `message` is localized (see `tr!`), fit to show to the user, and never contains secrets.
 
 use serde::Serialize;
 use specta::Type;
 
-#[allow(dead_code)] // Contrato completo; varios códigos se usan a partir de 002/003.
+#[allow(dead_code)] // Full contract; several codes are used from 002/003 onwards.
 #[derive(Serialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorCode {
     NotAuthenticated,
@@ -54,7 +54,7 @@ impl AppError {
 
 impl From<rusqlite::Error> for AppError {
     fn from(e: rusqlite::Error) -> Self {
-        tracing::error!(error = %e, "error de base de datos");
+        tracing::error!(error = %e, "database error");
         Self::new(
             ErrorCode::Storage,
             tr!(
@@ -67,7 +67,7 @@ impl From<rusqlite::Error> for AppError {
 
 impl From<serde_json::Error> for AppError {
     fn from(e: serde_json::Error) -> Self {
-        tracing::error!(error = %e, "error de serialización");
+        tracing::error!(error = %e, "serialization error");
         Self::internal(tr!(
             "Local data has an invalid format.",
             "Datos locales con formato no válido."

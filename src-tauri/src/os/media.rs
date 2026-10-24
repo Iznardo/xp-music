@@ -35,7 +35,7 @@ use crate::player::types::{PlaybackStatus, PlayerState};
 #[cfg(windows)]
 const WTS_SESSION_LOCK: usize = 0x7;
 
-/// Qué hacer al bloquearse la sesión (lo fija `start`).
+/// What to do when the session locks (set by `start`).
 #[cfg(windows)]
 static ON_LOCK: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
@@ -47,7 +47,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         return 0;
     }
-    // SAFETY: reenvío estándar al procedimiento por defecto.
+    // SAFETY: standard forwarding to the default procedure.
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
@@ -56,11 +56,11 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Ventana oculta (sin mostrar nunca) para SMTC y avisos de sesión.
+/// Hidden window (never shown) for SMTC and session notifications.
 #[cfg(windows)]
 fn create_hidden_window() -> Option<HWND> {
     let class = wide("XpMusicHidden");
-    // SAFETY: estructuras inicializadas y cadenas terminadas en 0 que viven durante las llamadas.
+    // SAFETY: initialized structures and NUL-terminated strings that live through the calls.
     unsafe {
         let hinstance = GetModuleHandleW(std::ptr::null());
         let wc = WNDCLASSW {
@@ -89,12 +89,12 @@ fn create_hidden_window() -> Option<HWND> {
     }
 }
 
-/// Lo que el reproductor manda al hilo de controles multimedia.
+/// What the player sends to the media controls thread.
 pub enum MediaMsg {
     State(Box<PlayerState>),
 }
 
-/// Arranca el hilo. En Windows, `pause_on_lock` se consulta en cada bloqueo.
+/// Starts the thread. On Windows, `pause_on_lock` is queried on every lock.
 pub fn start(
     player: Arc<PlayerService>,
     pause_on_lock: impl Fn() -> bool + Send + Sync + 'static,
@@ -105,7 +105,7 @@ pub fn start(
         let lock_player = Arc::clone(&player);
         let _ = ON_LOCK.set(Box::new(move || {
             if pause_on_lock() {
-                tracing::info!("sesión bloqueada: pausa");
+                tracing::info!("session locked: pausing");
                 lock_player.pause();
             }
         }));
@@ -113,14 +113,12 @@ pub fn start(
     #[cfg(not(windows))]
     {
         let _ = pause_on_lock;
-        tracing::info!(
-            "pausa al bloquear la sesión no soportada en esta plataforma (solo Windows)"
-        );
+        tracing::info!("pause on session lock is not supported on this platform (Windows only)");
     }
     thread::Builder::new()
         .name("os-media".into())
         .spawn(move || run(player, rx))
-        .expect("hilo de controles multimedia");
+        .expect("media controls thread");
     tx
 }
 
@@ -128,10 +126,10 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
     #[cfg(windows)]
     let hwnd = {
         let Some(hwnd) = create_hidden_window() else {
-            tracing::error!("no se pudo crear la ventana oculta; sin teclas multimedia");
+            tracing::error!("could not create the hidden window; no media keys");
             return;
         };
-        // SAFETY: hwnd válido, creado en este hilo.
+        // SAFETY: valid hwnd, created on this thread.
         unsafe { WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION) };
         Some(hwnd as *mut _)
     };
@@ -146,7 +144,7 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
     let mut controls = match MediaControls::new(config) {
         Ok(c) => Some(c),
         Err(e) => {
-            tracing::warn!(error = ?e, "controles multimedia del sistema no disponibles");
+            tracing::warn!(error = ?e, "system media controls not available");
             None
         }
     };
@@ -165,15 +163,15 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
             _ => {}
         });
         if let Err(e) = res {
-            tracing::warn!(error = ?e, "no se pudieron enganchar los controles multimedia");
+            tracing::warn!(error = ?e, "could not hook up the media controls");
         }
     }
 
     let mut last_track: Option<String> = None;
     let mut last_status: Option<PlaybackStatus> = None;
     loop {
-        // Mensajes de la ventana oculta (bloqueo de sesión).
-        // SAFETY: bucle de mensajes estándar del hilo dueño de la ventana.
+        // Messages for the hidden window (session lock).
+        // SAFETY: standard message loop of the thread that owns the window.
         #[cfg(windows)]
         unsafe {
             let mut msg: MSG = std::mem::zeroed();
@@ -195,7 +193,7 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
                             .map(|a| a.name.as_str())
                             .collect::<Vec<_>>()
                             .join(", ");
-                        // La portada mayor, directamente de YouTube.
+                        // The largest cover, straight from YouTube.
                         let cover = t
                             .thumbnails
                             .iter()

@@ -1,10 +1,10 @@
-//! Hilo del motor de audio (specs/002/plan.md, "Contrato: motor").
+//! Audio engine thread (specs/002/plan.md, "Contract: engine").
 //!
-//! Recibe `EngineCmd`, decodifica hacia el ring de la salida y emite
-//! `EngineEvent`. Abrir una pista (red) se hace en hilos auxiliares para no
-//! bloquear las órdenes. Un registro de *segmentos* (frame de inicio → pista)
-//! permite saber qué suena realmente aunque el ring ya contenga la siguiente
-//! canción (transición sin hueco).
+//! Receives `EngineCmd`, decodes into the output ring and emits
+//! `EngineEvent`. Opening a track (network) is done in helper threads so as not
+//! to block commands. A registry of *segments* (start frame → track)
+//! tells what is really playing even when the ring already contains the next
+//! song (gapless transition).
 
 use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
@@ -22,7 +22,7 @@ use crate::domain::TrackId;
 use crate::error::AppError;
 
 const POSITION_INTERVAL: Duration = Duration::from_millis(250);
-/// Muestras mínimas libres en el ring para decodificar otro paquete.
+/// Minimum free samples in the ring to decode another packet.
 const MIN_FREE_SAMPLES: usize = 4096;
 
 #[derive(Debug)]
@@ -64,7 +64,7 @@ pub enum EngineState {
 #[derive(Debug, Clone, PartialEq)]
 pub enum EngineEvent {
     State(EngineState),
-    /// Empieza a *sonar* una pista. `gapless` = entró sola desde la precarga.
+    /// A track starts *playing*. `gapless` = it came in on its own from the preload.
     TrackStarted {
         track_id: TrackId,
         duration_ms: Option<u32>,
@@ -75,11 +75,11 @@ pub enum EngineEvent {
         position_ms: u32,
         buffered_ms: u32,
     },
-    /// Terminó de sonar y no había precarga para continuar.
+    /// It finished playing and there was no preload to continue with.
     Ended {
         track_id: TrackId,
     },
-    /// La descarga falló a mitad; `expired` = URL caducada (re-resolver).
+    /// The download failed midway; `expired` = expired URL (re-resolve).
     StreamFailed {
         track_id: TrackId,
         position_ms: u32,
@@ -91,15 +91,15 @@ pub enum EngineEvent {
     Error(AppError),
 }
 
-/// Pista que se está decodificando.
+/// Track being decoded.
 struct Active {
     track_id: TrackId,
     dec: Decoding,
     eof: bool,
 }
 
-/// Desde el frame `start_frame` (contador de la salida) suena `track_id`
-/// empezando en `start_ms`.
+/// From frame `start_frame` (output counter) on, `track_id` plays
+/// starting at `start_ms`.
 #[derive(Debug, Clone)]
 struct Segment {
     start_frame: u64,
@@ -136,7 +136,7 @@ impl EngineHandle {
         let thread = thread::Builder::new()
             .name("audio-engine".into())
             .spawn(move || Engine::new(rx, events, tap_slot).run())
-            .expect("hilo del motor de audio");
+            .expect("audio engine thread");
         Self {
             tx,
             tap,
@@ -146,11 +146,11 @@ impl EngineHandle {
 
     pub fn send(&self, cmd: EngineCmd) {
         if self.tx.send(cmd).is_err() {
-            tracing::error!("el motor de audio no está activo");
+            tracing::error!("the audio engine is not running");
         }
     }
 
-    /// Toma la derivación de PCM (005). Cambia si cambia el dispositivo.
+    /// Takes the PCM tap (005). It changes if the device changes.
     pub fn take_tap(&self) -> Option<PcmTap> {
         self.tap.lock().unwrap().take()
     }
@@ -239,7 +239,7 @@ impl Engine {
 
     fn run(mut self) {
         loop {
-            // Con trabajo pendiente no se espera; si no, se duerme hasta una orden.
+            // With pending work there is no waiting; otherwise sleep until a command.
             let busy = self.can_decode();
             let timeout = if busy {
                 Duration::ZERO
@@ -260,10 +260,10 @@ impl Engine {
             }
             self.track_playback();
         }
-        tracing::info!("motor de audio detenido");
+        tracing::info!("audio engine stopped");
     }
 
-    // ------------------------------------------------------------ órdenes
+    // ------------------------------------------------------------ commands
 
     fn handle(&mut self, cmd: EngineCmd) {
         match cmd {
@@ -366,20 +366,20 @@ impl Engine {
             self.set_state(EngineState::Idle);
             return;
         }
-        // ¿Ya está precargada? (botón Siguiente justo tras la precarga)
+        // Already preloaded? (Next button right after the preload)
         if start_ms == 0
             && self
                 .next
                 .as_ref()
                 .is_some_and(|n| n.track_id == stream.track_id)
         {
-            let next = self.next.take().expect("precarga");
+            let next = self.next.take().expect("preload");
             self.start_active(next, 0, false);
             return;
         }
         self.set_state(EngineState::Loading);
         let (out_rate, out_ch) = {
-            let o = self.output.as_ref().expect("salida");
+            let o = self.output.as_ref().expect("output");
             (o.rate, o.channels)
         };
         let tx = self.opened_tx.clone();
@@ -401,7 +401,7 @@ impl Engine {
             return;
         }
         let (out_rate, out_ch) = {
-            let o = self.output.as_ref().expect("salida");
+            let o = self.output.as_ref().expect("output");
             (o.rate, o.channels)
         };
         let tx = self.opened_tx.clone();
@@ -424,11 +424,11 @@ impl Engine {
                 result,
             } => {
                 if generation != self.generation {
-                    return; // Llegó tarde: el usuario ya pidió otra cosa.
+                    return; // Arrived late: the user already asked for something else.
                 }
                 match result {
                     Ok(dec) => {
-                        // `want_playing` lo fijó `load` (o una pausa posterior): no se pisa aquí.
+                        // `want_playing` was set by `load` (or a later pause): don't override it.
                         self.start_active(
                             Active {
                                 track_id,
@@ -451,7 +451,7 @@ impl Engine {
             }
             Opened::Preload { track_id, result } => match result {
                 Ok(dec) => {
-                    tracing::debug!(track = %track_id.0, "pista precargada");
+                    tracing::debug!(track = %track_id.0, "track preloaded");
                     self.next = Some(Active {
                         track_id,
                         dec,
@@ -463,7 +463,7 @@ impl Engine {
         }
     }
 
-    /// Sustituye lo que suene por `active` (vacía el ring).
+    /// Replaces whatever is playing with `active` (empties the ring).
     fn start_active(&mut self, active: Active, start_ms: u32, gapless: bool) {
         self.clear_output();
         let start_frame = self.output.as_ref().map_or(0, |o| o.pushed_frames());
@@ -497,7 +497,7 @@ impl Engine {
 
     fn seek(&mut self, ms: u32) {
         let Some(active) = &mut self.active else {
-            // La pista ya terminó de decodificarse: se recarga desde el principio del segmento.
+            // The track has already finished decoding: reload from the start of the segment.
             return;
         };
         let track_id = active.track_id.clone();
@@ -514,7 +514,7 @@ impl Engine {
                     duration_ms,
                     gapless: false,
                 });
-                // El segmento nuevo es el mismo tema: no se anuncia como cambio de pista.
+                // The new segment is the same song: it is not announced as a track change.
                 self.reported_segment =
                     Some((start_frame, self.segments.back().unwrap().track_id.clone()));
                 if self.want_playing {
@@ -539,7 +539,7 @@ impl Engine {
         if !self.ensure_output() {
             return;
         }
-        // La frecuencia puede haber cambiado: se reabre la pista en la misma posición.
+        // The sample rate may have changed: reopen the track at the same position.
         if let (Some(active), Some((track_id, ms))) = (&self.active, position)
             && active.track_id == track_id
         {
@@ -554,13 +554,13 @@ impl Engine {
             .as_ref()
             .is_some_and(|o| o.shared.device_lost.load(Ordering::Acquire))
         {
-            tracing::warn!("dispositivo de audio perdido; se pasa al predeterminado");
+            tracing::warn!("audio device lost; switching to the default one");
             self.device_id = None;
             self.reopen_output();
         }
     }
 
-    // ------------------------------------------------------------ decodificación
+    // ------------------------------------------------------------ decoding
 
     fn can_decode(&self) -> bool {
         self.output
@@ -595,7 +595,7 @@ impl Engine {
             Ok(false) => {
                 active.eof = true;
                 if let Some(next) = self.next.take() {
-                    // Sin hueco: la siguiente empieza justo detrás en el ring.
+                    // Gapless: the next one starts right behind it in the ring.
                     let start_frame = output.pushed_frames();
                     self.segments.push_back(Segment {
                         start_frame,
@@ -611,7 +611,7 @@ impl Engine {
                 let track_id = active.track_id.clone();
                 let position_ms = self.current_position().map_or(0, |(_, ms)| ms);
                 self.active = None;
-                // El servicio recarga en esta posición: no debe llegar también un `Ended`.
+                // The service reloads at this position: an `Ended` must not arrive as well.
                 self.ended_reported = true;
                 self.emit(EngineEvent::StreamFailed {
                     track_id,
@@ -622,9 +622,9 @@ impl Engine {
         }
     }
 
-    // ------------------------------------------------------------ seguimiento
+    // ------------------------------------------------------------ tracking
 
-    /// Segmento que suena ahora y posición dentro de él.
+    /// Segment playing now and the position within it.
     fn current_position(&self) -> Option<(TrackId, u32)> {
         let o = self.output.as_ref()?;
         let played = o.played_frames();
@@ -648,12 +648,12 @@ impl Engine {
             o.channels.max(1) as u64,
         );
 
-        // Descartar segmentos antiguos (deja el actual).
+        // Discard old segments (keeps the current one).
         while self.segments.len() > 1 && self.segments[1].start_frame <= played {
             self.segments.pop_front();
         }
 
-        // ¿Ha empezado a sonar un segmento nuevo?
+        // Has a new segment started playing?
         if let Some(seg) = self
             .segments
             .front()
@@ -673,7 +673,7 @@ impl Engine {
             }
         }
 
-        // Estado: Buffering ↔ Playing según haya audio en el ring.
+        // State: Buffering ↔ Playing depending on whether there is audio in the ring.
         if self.want_playing && matches!(self.state, EngineState::Buffering | EngineState::Playing)
         {
             let starving = queued == 0 && self.active.as_ref().is_some_and(|a| !a.eof);
@@ -684,7 +684,7 @@ impl Engine {
             });
         }
 
-        // Fin: ya no se decodifica nada y el ring está vacío.
+        // End: nothing is being decoded anymore and the ring is empty.
         let drained = queued == 0 && self.carry.is_empty();
         if drained
             && self.active.as_ref().is_none_or(|a| a.eof)
@@ -729,7 +729,7 @@ impl Engine {
 mod tests {
     use super::*;
 
-    /// Las pruebas con audio real suenan en silencio salvo `XP_MUSIC_TEST_AUDIBLE=1`.
+    /// Tests with real audio play silently unless `XP_MUSIC_TEST_AUDIBLE=1`.
     fn test_muted() -> bool {
         std::env::var_os("XP_MUSIC_TEST_AUDIBLE").is_none()
     }
@@ -749,7 +749,7 @@ mod tests {
                     }
                     assert!(
                         !matches!(ev, EngineEvent::StreamFailed { .. } | EngineEvent::Error(_)),
-                        "evento inesperado: {ev:?}"
+                        "unexpected event: {ev:?}"
                     );
                 }
                 Err(_) => break,
@@ -758,12 +758,12 @@ mod tests {
         None
     }
 
-    /// Visualización con música real (silenciada): llega audio a la derivación
-    /// aunque el volumen esté a 0 y se detectan golpes, también tras soltar y
-    /// recuperar la derivación. `cargo test --lib -- --ignored --nocapture viz_real`.
+    /// Visualization with real music (muted): audio reaches the tap even with
+    /// the volume at 0 and beats are detected, also after releasing and
+    /// retaking the tap. `cargo test --lib -- --ignored --nocapture viz_real`.
     #[test]
     #[ignore]
-    fn viz_real_detecta_golpes() {
+    fn viz_real_detects_beats() {
         use crate::viz::bands::{Analyzer, FFT_SIZE};
         use ringbuf::traits::{Consumer, Observer};
         let resolver = YtDlpResolver::new(ToolPaths::locate().expect("tools/"), None);
@@ -785,7 +785,7 @@ mod tests {
         wait_for(&rx, Duration::from_secs(15), |e| {
             matches!(e, EngineEvent::TrackStarted { .. })
         })
-        .expect("no empezó a sonar");
+        .expect("did not start playing");
         let mut tap = None;
         for _ in 0..50 {
             tap = engine.take_tap();
@@ -794,7 +794,7 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(50));
         }
-        let mut tap = tap.expect("sin derivación de PCM");
+        let mut tap = tap.expect("no PCM tap");
         let ch = tap.channels as usize;
         let mut a = Analyzer::new(tap.sample_rate);
         let mut ring = vec![0.0f32; FFT_SIZE];
@@ -815,20 +815,20 @@ mod tests {
                 beats += 1;
             }
         }
-        println!("8 s silenciado: nivel máx {max_level:.2}, golpes {beats}");
+        println!("8 s muted: max level {max_level:.2}, beats {beats}");
         engine.shutdown();
         assert!(
             max_level > 0.1,
-            "no llega audio a la visualización con volumen 0"
+            "no audio reaches the visualization with volume 0"
         );
-        assert!(beats >= 6, "pocos golpes detectados: {beats}");
+        assert!(beats >= 6, "too few beats detected: {beats}");
     }
 
-    /// Audio real por los altavoces (volumen 30 %):
-    /// `cargo test --lib -- --ignored --nocapture motor_real`.
+    /// Real audio through the speakers (30 % volume):
+    /// `cargo test --lib -- --ignored --nocapture engine_real`.
     #[test]
     #[ignore]
-    fn motor_real_arranca_salta_y_encadena_sin_hueco() {
+    fn engine_real_starts_seeks_and_chains_without_gap() {
         let resolver = YtDlpResolver::new(ToolPaths::locate().expect("tools/"), None);
         let a = resolver
             .resolve(&TrackId("yQd4xQBlBa0".into()), FormatPreference::Aac128)
@@ -836,16 +836,16 @@ mod tests {
         let b = resolver
             .resolve(&TrackId("IoNOzOaWgTE".into()), FormatPreference::Aac128)
             .unwrap();
-        let dur = a.duration_ms.expect("duración");
+        let dur = a.duration_ms.expect("duration");
 
         let (tx, rx) = unbounded();
         let engine = EngineHandle::spawn(tx);
         engine.send(EngineCmd::SetVolume {
             volume: 0.67,
             muted: test_muted(),
-        }); // ≈ 30 % de amplitud
+        }); // ≈ 30 % amplitude
 
-        // 1) Primer sonido con la URL ya resuelta (equivale a caché): objetivo < 1 s.
+        // 1) First sound with the URL already resolved (same as cached): target < 1 s.
         let t0 = Instant::now();
         engine.send(EngineCmd::Load {
             stream: a.clone(),
@@ -855,34 +855,31 @@ mod tests {
         wait_for(&rx, Duration::from_secs(10), |e| {
             matches!(e, EngineEvent::TrackStarted { .. })
         })
-        .expect("no empezó a sonar");
-        println!(
-            "primer sonido (URL en caché): {} ms",
-            t0.elapsed().as_millis()
-        );
+        .expect("did not start playing");
+        println!("first sound (cached URL): {} ms", t0.elapsed().as_millis());
 
         wait_for(
             &rx,
             Duration::from_secs(10),
             |e| matches!(e, EngineEvent::Position { position_ms, .. } if *position_ms >= 1500),
         )
-        .expect("la posición no avanza");
+        .expect("the position does not advance");
 
-        // 2) Seek a 8 s del final.
+        // 2) Seek to 8 s before the end.
         let target = dur - 8_000;
         let t1 = Instant::now();
         engine.send(EngineCmd::Seek(target));
         wait_for(&rx, Duration::from_secs(10), |e| {
             matches!(e, EngineEvent::Position { position_ms, .. } if *position_ms >= target + 200)
         })
-        .expect("el seek no suena");
+        .expect("the seek does not play");
         println!(
-            "seek al {} %: {} ms",
+            "seek to {} %: {} ms",
             target * 100 / dur,
             t1.elapsed().as_millis()
         );
 
-        // 3) Precarga y transición sin hueco: no debe llegar `Ended` de la primera.
+        // 3) Preload and gapless transition: the first track must not send `Ended`.
         engine.send(EngineCmd::Preload { stream: b.clone() });
         let mut ended_a = false;
         let started_b = wait_for(&rx, Duration::from_secs(20), |e| {
@@ -891,29 +888,35 @@ mod tests {
             }
             matches!(e, EngineEvent::TrackStarted { track_id, gapless: true, .. } if *track_id == b.track_id)
         });
-        assert!(started_b.is_some(), "la segunda pista no entró sola");
-        assert!(!ended_a, "hubo `Ended` antes de la transición: hubo hueco");
-        println!("transición sin hueco a {}", b.track_id.0);
+        assert!(
+            started_b.is_some(),
+            "the second track did not start on its own"
+        );
+        assert!(
+            !ended_a,
+            "`Ended` arrived before the transition: there was a gap"
+        );
+        println!("gapless transition to {}", b.track_id.0);
 
         wait_for(&rx, Duration::from_secs(5), |e| {
             matches!(e, EngineEvent::Position { track_id, position_ms, .. } if *track_id == b.track_id && *position_ms >= 1000)
         })
-        .expect("la segunda pista no avanza");
+        .expect("the second track does not advance");
         engine.shutdown();
     }
 
-    /// AC-002-03: la URL "caduca" (403) y se recupera recargando en la misma posición.
-    /// `cargo test --lib -- --ignored --nocapture motor_real_url`.
+    /// AC-002-03: the URL "expires" (403) and playback recovers by reloading at the same position.
+    /// `cargo test --lib -- --ignored --nocapture engine_real_url`.
     #[test]
     #[ignore]
-    fn motor_real_url_caducada_se_recupera() {
+    fn engine_real_expired_url_recovers() {
         use crate::audio::source::test_server;
 
         let resolver = YtDlpResolver::new(ToolPaths::locate().expect("tools/"), None);
         let real = resolver
             .resolve(&TrackId("yQd4xQBlBa0".into()), FormatPreference::Aac128)
             .unwrap();
-        // Descarga completa por rangos (sin Range, YouTube limita la velocidad).
+        // Full download by ranges (without Range, YouTube throttles the speed).
         let mut bytes = Vec::new();
         let mut src = crate::audio::source::HttpRangeSource::open(
             http_client(),
@@ -927,7 +930,7 @@ mod tests {
         let data = Arc::new(bytes);
         let dur = real.duration_ms.unwrap();
 
-        // Petición 0 = longitud, 1 = primer bloque; después todo 403.
+        // Request 0 = length, 1 = first block; then everything is 403.
         let failing = ResolvedStream {
             url: test_server::serve(Arc::clone(&data), Some(2)),
             content_length: None,
@@ -953,16 +956,16 @@ mod tests {
         wait_for(&rx, Duration::from_secs(10), |e| {
             matches!(e, EngineEvent::TrackStarted { .. })
         })
-        .expect("no suena");
+        .expect("not playing");
         thread::sleep(Duration::from_secs(2));
 
-        // Saltar a una zona no descargada obliga a pedir un bloque: 403.
+        // Seeking to a region that is not downloaded forces a block request: 403.
         let target = dur / 2;
         engine.send(EngineCmd::Seek(target));
         let failed = loop {
             let e = rx
                 .recv_timeout(Duration::from_secs(10))
-                .expect("no llegó el fallo");
+                .expect("the failure did not arrive");
             if matches!(e, EngineEvent::StreamFailed { .. }) {
                 break e;
             }
@@ -975,10 +978,10 @@ mod tests {
         else {
             unreachable!()
         };
-        assert!(expired, "un 403 debe marcarse como caducado");
+        assert!(expired, "a 403 must be flagged as expired");
         let t0 = Instant::now();
 
-        // Lo que haría el servicio: re-resolver y cargar en la misma posición.
+        // What the service would do: re-resolve and load at the same position.
         engine.send(EngineCmd::Load {
             stream: healthy,
             start_ms: position_ms,
@@ -987,17 +990,14 @@ mod tests {
         wait_for(&rx, Duration::from_secs(10), |e| {
             matches!(e, EngineEvent::TrackStarted { .. })
         })
-        .expect("no se recuperó");
+        .expect("did not recover");
         let gap = t0.elapsed();
         println!(
-            "recuperado en {} ms (posición {} s)",
+            "recovered in {} ms (position {} s)",
             gap.as_millis(),
             position_ms / 1000
         );
-        assert!(
-            gap < Duration::from_secs(2),
-            "hueco demasiado largo: {gap:?}"
-        );
+        assert!(gap < Duration::from_secs(2), "gap too long: {gap:?}");
         engine.shutdown();
     }
 }

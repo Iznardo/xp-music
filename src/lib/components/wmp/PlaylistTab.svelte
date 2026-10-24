@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Pestaña que sobresale arriba a la derecha (skin WMP 9): selector de la lista
-  // actual y los botones de ventana, pequeños y desplazados como en el original.
+  // Tab that sticks out at the top right (WMP 9 skin): current list selector and
+  // the window buttons, small and offset as in the original.
   import { commands } from "../../bindings";
   import { appWindow } from "../../platform";
   import { player } from "../../stores/player.svelte";
@@ -14,7 +14,7 @@
   const win = appWindow();
   const q = $derived(player.queue);
   const count = $derived(q?.tracks.length ?? 0);
-  // Si la cola salió de una de tus listas, se muestra su nombre (como en WMP).
+  // If the queue came from one of your lists, its name is shown (as in WMP).
   const playingList = $derived.by(() => {
     const src = q?.source;
     return src && typeof src === "object" && src.Playlist ? src.Playlist : null;
@@ -41,7 +41,7 @@
       { kind: "item", label: t.menu.newPlaylist, action: () => void addToNewPlaylist([]) },
       { kind: "item", label: t.tab.library, action: () => router.go({ name: "library", section: "playlists" }) },
     ];
-    // Que el menú salga alineado con el desplegable, como un combo de XP.
+    // Make the menu line up with the dropdown, like an XP combo box.
     ui.openMenu({ x: r.left, y: r.bottom + 1 }, items);
   }
 </script>

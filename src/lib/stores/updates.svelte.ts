@@ -1,5 +1,5 @@
-// Actualizaciones de la propia app (007): aviso al detectar versión nueva y
-// estado para Opciones ▸ Acerca de.
+// App self-updates (007): notice when a new version is detected and
+// state for Options ▸ About.
 
 import { commands, events, type UpdateInfo, type UpdaterStatus } from "../bindings";
 import { ui } from "./ui.svelte";
@@ -13,7 +13,7 @@ class UpdatesStore {
   async init(): Promise<void> {
     await events.updateAvailable.listen((e) => void this.offer(e.payload));
     await this.refresh();
-    // Encontrada mientras la ventana estaba cerrada (en la bandeja).
+    // Found while the window was closed (in the tray).
     if (this.status?.pending) void this.offer(this.status.pending);
   }
 
@@ -21,7 +21,7 @@ class UpdatesStore {
     this.status = await commands.updateStatus();
   }
 
-  /// Comprobación pedida por el usuario.
+  /// Check requested by the user.
   async check(): Promise<void> {
     this.busy = true;
     this.message = t.updates.checking;
@@ -45,7 +45,7 @@ class UpdatesStore {
     this.busy = true;
     ui.status = t.updates.downloading;
     const r = await commands.updateInstall();
-    // Si va bien la app se reinicia y no se llega aquí.
+    // If it goes well the app restarts and we never get here.
     this.busy = false;
     ui.status = "";
     if (r.status === "error") ui.error(r.error);

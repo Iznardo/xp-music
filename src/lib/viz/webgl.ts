@@ -1,5 +1,5 @@
-// Presets WebGL2 con realimentación (rastro): Ambiente, Batería, Agua, Alquimia y Espiral.
-// Inspirados en el espíritu de las visualizaciones de WMP, con shaders propios.
+// WebGL2 presets with feedback (trails): Ambience, Battery, Water, Alchemy and Spiral.
+// Inspired by the spirit of WMP's visualizations, with our own shaders.
 
 import type { VizData as VizFrame, VizRenderer } from "./types";
 
@@ -22,12 +22,12 @@ out vec4 o;
 uniform sampler2D prev;
 uniform float bands[64];
 uniform float level;
-// Pulso de ritmo (1 en cada golpe de graves) y graves normalizados a la canción.
+// Beat pulse (1 on each bass hit) and bass normalized to the song.
 uniform float beat;
 uniform float bass;
 uniform float time;
-// Fotogramas de 60 fps que representa este (2 a 30 fps): el rastro avanza igual
-// a cualquier ritmo de dibujo.
+// 60 fps frames that this one represents (2 to 30 fps): the trail advances the
+// same at any draw rate.
 uniform float step;
 uniform vec2 res;
 vec3 hsv(float h, float s, float v) {
@@ -42,7 +42,7 @@ const AMBIENCE = `${COMMON}
 void main() {
   vec2 c = uv - 0.5;
   c.x *= res.x / res.y;
-  // Rastro: lo anterior gira, se aleja y se apaga poco a poco.
+  // Trail: the previous frame rotates, moves away and fades out gradually.
   float ang = (0.006 + level * 0.01) * step;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
   vec2 q = rot * c * pow(0.985 - level * 0.01, step);
@@ -63,14 +63,14 @@ const BATTERY = `${COMMON}
 void main() {
   vec2 c = uv - 0.5;
   c.x *= res.x / res.y;
-  // Caleidoscopio de 6 ejes.
+  // 6-axis kaleidoscope.
   float r = length(c);
   float a = atan(c.y, c.x);
   float seg = 6.2831853 / 6.0;
   a = mod(a, seg);
   a = abs(a - seg * 0.5);
   vec2 k = vec2(cos(a), sin(a)) * r;
-  // Túnel: lo anterior se acerca y gira.
+  // Tunnel: the previous frame zooms in and rotates.
   float zoom = pow(0.94 - bass * 0.04 - beat * 0.06, step);
   float ang = (0.03 * sin(time * 0.3) + level * 0.04) * step;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
@@ -82,7 +82,7 @@ void main() {
   for (int i = 0; i < 3; i++) {
     float fi = float(i);
     float e = avg(i * 20, i * 20 + 20);
-    // Dentro de la cuña: la simetría los multiplica en 12 destellos.
+    // Inside the wedge: symmetry multiplies them into 12 sparkles.
     float pa = (0.5 + 0.5 * sin(time * (0.7 + fi * 0.41) + fi * 2.1)) * seg * 0.5;
     float pr = 0.08 + fi * 0.09 + e * 0.18 + 0.03 * sin(time * (1.3 + fi));
     vec2 pos = vec2(cos(pa), sin(pa)) * pr;
@@ -98,18 +98,18 @@ void main() {
   float asp = res.x / res.y;
   c.x *= asp;
   float mid = avg(8, 30);
-  // Rastro: lo anterior se expande desde el centro, gira despacio y ondula.
+  // Trail: the previous frame expands from the center, rotates slowly and ripples.
   float ang = (0.004 + 0.008 * sin(time * 0.21)) * step;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
   vec2 q = rot * c * pow(0.96 - bass * 0.025 - beat * 0.06, step);
   q += 0.0035 * step * vec2(sin(c.y * 28.0 + time * 2.1), cos(c.x * 28.0 + time * 1.7));
   q.x /= asp;
-  // Se apaga restando además un poco: sin esto el fondo acaba en neblina gris.
+  // It also fades by subtracting a little: without this the background ends up as gray haze.
   vec3 trail = max(texture(prev, q + 0.5).rgb * pow(0.93 + mid * 0.03, step) - vec3(0.008, 0.005, 0.007) * step, 0.0);
 
   float r = length(c);
   float a = atan(c.y, c.x);
-  // Rayos: su largo sale de la banda de frecuencia que toca a cada ángulo (simétrico).
+  // Rays: their length comes from the frequency band at each angle (symmetric).
   float fa = abs(fract(a / 6.2831853 + 0.5) * 2.0 - 1.0);
   float b = band(fa);
   float spike = pow(abs(cos(a * 14.0 + time * 0.35)), 24.0);
@@ -127,7 +127,7 @@ void main() {
   float asp = res.x / res.y;
   c.x *= asp;
   float mid = avg(6, 24);
-  // Plasma con deformación de dominio: el bajo retuerce, los medios aceleran.
+  // Plasma with domain warping: the bass twists, the mids speed it up.
   vec2 p = c * 3.2;
   float t = time * (0.3 + mid * 0.4);
   for (int i = 1; i < 6; i++) {
@@ -135,10 +135,10 @@ void main() {
     p += vec2(0.7 / fi * sin(fi * p.y + t + 0.3 * fi) + bass * 0.2 + beat * 0.35, 0.7 / fi * cos(fi * p.x + t * 1.13 + 0.5 * fi));
   }
   float v = 0.5 + 0.5 * sin(p.x + p.y + time * 0.2);
-  // Franjas de contorno finas: el toque "lámpara de lava" psicodélico.
+  // Thin contour stripes: the psychedelic "lava lamp" touch.
   float bands2 = 0.5 + 0.5 * sin(v * 18.0 - time * 2.0 - bass * 4.0 - beat * 3.0);
   vec3 col = hsv(fract(v * 0.7 + time * 0.035 + bass * 0.25), 0.85, 0.15 + 0.85 * bands2 * smoothstep(0.05, 0.9, v));
-  // Algo de rastro girando para que "fluya".
+  // Some rotating trail so it "flows".
   float ang = (0.012 + level * 0.03) * step;
   vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * pow(0.99, step);
   q.x /= asp;
@@ -155,11 +155,11 @@ void main() {
   float r = length(c) + 1e-4;
   float a = atan(c.y, c.x);
   float lr = log(r);
-  // Brazos en espiral logarítmica que avanzan con el ritmo.
+  // Logarithmic spiral arms that advance with the beat.
   float arms = sin(a * 5.0 + lr * 9.0 - time * 2.2 - bass * 2.0 - beat * 2.5);
   float glow = smoothstep(-0.1, 0.9, arms) * (0.25 + mid * 1.2 + beat * 0.9) * smoothstep(0.0, 0.12, r);
   vec3 col = hsv(fract(lr * 0.35 + time * 0.06 + a / 6.2831853), 0.9, 1.0) * glow;
-  // Rastro hacia dentro: sensación de túnel.
+  // Inward trail: tunnel feeling.
   float ang = (-0.02 - level * 0.03) * step;
   vec2 q = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * c * pow(1.025 + beat * 0.04, step);
   q.x /= asp;
@@ -200,7 +200,7 @@ class Feedback implements VizRenderer {
 
   constructor(canvas: HTMLCanvasElement, frag: string) {
     const gl = canvas.getContext("webgl2", { antialias: false, preserveDrawingBuffer: false });
-    if (!gl) throw new Error("WebGL2 no disponible");
+    if (!gl) throw new Error("WebGL2 unavailable");
     this.gl = gl;
     this.draw_ = program(gl, frag);
     this.copy = program(gl, COPY);
@@ -213,7 +213,7 @@ class Feedback implements VizRenderer {
 
   resize(width: number, height: number) {
     const gl = this.gl;
-    // El rastro se calcula a media resolución: se nota poco y cuesta 4 veces menos.
+    // The trail is computed at half resolution: barely noticeable and 4 times cheaper.
     this.w = Math.max(1, Math.round(width / 2));
     this.h = Math.max(1, Math.round(height / 2));
     this.tex.forEach((t) => gl.deleteTexture(t));
@@ -240,7 +240,7 @@ class Feedback implements VizRenderer {
   draw(f: VizFrame, t: number) {
     const gl = this.gl;
     const next = 1 - this.cur;
-    // 1) Nuevo fotograma a partir del anterior.
+    // 1) New frame from the previous one.
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo[next]!);
     gl.viewport(0, 0, this.w, this.h);
     gl.useProgram(this.draw_);
@@ -252,13 +252,13 @@ class Feedback implements VizRenderer {
     gl.uniform1f(gl.getUniformLocation(this.draw_, "beat"), f.beat);
     gl.uniform1f(gl.getUniformLocation(this.draw_, "bass"), f.bass);
     gl.uniform1f(gl.getUniformLocation(this.draw_, "time"), t);
-    // Tiempo desde el fotograma anterior en "fotogramas de 60 fps" (acotado tras pausas).
+    // Time since the previous frame in "60 fps frames" (clamped after pauses).
     const step = this.lastT === null ? 1 : Math.min(4, Math.max(0.5, (t - this.lastT) * 60));
     this.lastT = t;
     gl.uniform1f(gl.getUniformLocation(this.draw_, "step"), step);
     gl.uniform2f(gl.getUniformLocation(this.draw_, "res"), this.w, this.h);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    // 2) A pantalla.
+    // 2) To screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.useProgram(this.copy);

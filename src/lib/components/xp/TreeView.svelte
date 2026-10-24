@@ -1,12 +1,12 @@
 <script lang="ts">
-  // Árbol estilo explorador de XP (FR-004-04): nodos con icono, expandir/contraer y teclado.
+  // XP Explorer-style tree (FR-004-04): nodes with icon, expand/collapse and keyboard.
   import Icon from "./Icon.svelte";
   import type { TreeNode } from "./types";
 
   let { nodes, selected }: { nodes: TreeNode[]; selected: string | null } = $props();
   let expanded = $state<Set<string>>(new Set(["library", "playlists"]));
 
-  // Lista plana de nodos visibles (para el teclado).
+  // Flat list of visible nodes (for the keyboard).
   const visible = $derived.by(() => {
     const out: { node: TreeNode; depth: number }[] = [];
     const walk = (list: TreeNode[], depth: number) => {

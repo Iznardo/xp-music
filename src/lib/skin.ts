@@ -1,69 +1,69 @@
-// Geometría del skin WMP 9 (specs/008). La ventana no es un rectángulo: es la
-// unión de piezas que se superponen, como en el reproductor original:
+// WMP 9 skin geometry (specs/008). The window is not a rectangle: it is the
+// union of overlapping pieces, as in the original player:
 //
-//            ╭──────── pestaña de la lista (sobresale arriba) ─╮
-//   ╭────────┴─ cuerpo plateado ───────────────────────────────┤
-//  ╭┴╮ lateral                                                 │
-//  │ │ (empieza más abajo,  [ visualización ]  [ lista ]       │
-//  │ │  esquinas redondas)                                     │
+//            ╭──────── list tab (sticks out on top) ───────────╮
+//   ╭────────┴─ silver body ───────────────────────────────────┤
+//  ╭┴╮ side panel                                              │
+//  │ │ (starts lower,       [ visualization ]  [ list ]        │
+//  │ │  rounded corners)                                       │
 //  ╰┬╯                                                         │
-//   ╰─(  píldora de controles  )── barra inferior ─────────── ◢┘ ← esquina recta con agarre
-//      (sobresale por debajo)
+//   ╰─(  controls pill  )── bottom bar ────────────────────── ◢┘ ← square corner with grip
+//      (sticks out below)
 //
-// Todo en píxeles CSS a partir del tamaño de la ventana.
+// All in CSS pixels, derived from the window size.
 
 export type Rect = { x: number; y: number; w: number; h: number };
-/// Radios por esquina: arriba-izq, arriba-dcha, abajo-dcha, abajo-izq.
+/// Radii per corner: top-left, top-right, bottom-right, bottom-left.
 export type Piece = Rect & { r: [number, number, number, number] };
 
 export const SKIN = {
   sideW: 118,
-  /// Borde superior de la lateral: va recto a esta altura y luego sube en S
-  /// (como el de la pestaña) hasta el borde superior del cuerpo.
+  /// Top edge of the side panel: runs straight at this height and then rises in an S
+  /// (like the tab's) up to the body's top edge.
   sideTop: 48,
   sideCorner: 12,
-  /// Tramo de la subida en S de la lateral (x de inicio y de llegada).
+  /// Span of the side panel's S rise (start and end x).
   sideSlope: { from: 40, to: 160 },
-  /// El cuerpo tapa el borde derecho de la lateral.
+  /// The body covers the side panel's right edge.
   sideOverlap: 10,
-  /// La pestaña de la lista sobresale esto por encima del cuerpo.
+  /// The list tab sticks out this much above the body.
   tabRise: 22,
   tabW: 286,
   tabH: 44,
-  /// El borde superior del cuerpo sube en S hasta la pestaña: empieza esto antes
-  /// de la pestaña y llega arriba esto dentro de ella.
+  /// The body's top edge rises in an S up to the tab: it starts this far before
+  /// the tab and reaches the top this far inside it.
   tabSlope: 90,
   tabInset: 34,
-  /// Franja superior del cuerpo (botón de menú y botones redondos).
+  /// Body's top strip (menu button and round buttons).
   topBar: 28,
-  /// Hueco bajo el cuerpo: solo la píldora llega abajo del todo.
+  /// Gap below the body: only the pill reaches the very bottom.
   bottomGap: 26,
-  /// Barra inferior del cuerpo (controles a la derecha de la píldora).
+  /// Body's bottom bar (controls to the right of the pill).
   bottomBar: 58,
   pod: { dx: 22, w: 360, h: 88 },
-  /// Con lateral, su parte de abajo se estrecha en S durante esta altura y
-  /// termina directamente en la esquina inferior izquierda de la píldora
-  /// (lateral y controles, una pieza).
+  /// With a side panel, its lower part narrows in an S over this height and
+  /// ends directly at the pill's bottom-left corner (side panel and controls,
+  /// one piece).
   taper: 150,
-  /// Radio de la esquina inferior izquierda de la píldora unida a la lateral.
+  /// Radius of the bottom-left corner of the pill joined to the side panel.
   podCorner: 40,
-  /// Empalme de la píldora con el cuerpo, por la derecha.
+  /// Fillet joining the pill to the body, on the right.
   podFillet: 18,
   frame: 7,
 } as const;
 
 export type SkinLayout = {
   side: Piece | null;
-  /// Recorte de la lateral (coordenadas locales) con su curva en S.
+  /// Side panel clip (local coordinates) with its S curve.
   sideClip: string | null;
   body: Piece;
   tab: Piece;
   pod: Piece;
-  /// Zona negra de contenido (vistas).
+  /// Black content area (views).
   content: Rect;
-  /// Franja superior del cuerpo, a la izquierda de la pestaña.
+  /// Body's top strip, to the left of the tab.
   topBar: Rect;
-  /// Zona de la barra inferior a la derecha de la píldora.
+  /// Area of the bottom bar to the right of the pill.
   bar: Rect;
 };
 
@@ -73,16 +73,16 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
   const bodyY = s.tabRise;
   const bodyBottom = h - s.bottomGap;
   const podY = h - s.pod.h;
-  // La píldora arranca en el borde del cuerpo: su lado izquierdo es la
-  // continuación de la lateral (o, sin ella, del borde izquierdo de la ventana).
+  // The pill starts at the body's edge: its left side is the continuation of
+  // the side panel (or, without it, of the window's left edge).
   const podX = bodyX;
   const podRight = bodyX + s.pod.dx + s.pod.w;
-  // La lateral ocupa desde arriba del cuerpo; su silueta la da `sideClip`.
+  // The side panel spans from the top of the body; its silhouette comes from `sideClip`.
   const side: Piece | null = sideOpen
     ? { x: 0, y: bodyY, w: s.sideSlope.to, h: podY - bodyY, r: [0, 0, 0, 0] }
     : null;
   const body: Piece = { x: bodyX, y: bodyY, w: w - bodyX, h: bodyBottom - bodyY, r: [sideOpen ? 0 : 16, 0, 0, 0] };
-  // La pestaña empieza donde la curva ya ha llegado arriba.
+  // The tab starts where the curve has already reached the top.
   const tab: Piece = { x: w - s.tabW + s.tabInset, y: 0, w: s.tabW - s.tabInset, h: s.tabH, r: [0, 12, 0, 0] };
   const pr = s.pod.h / 2;
   const pod: Piece = {
@@ -107,7 +107,7 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
       `A ${k} ${k} 0 0 1 ${k} ${t(s.sideTop)}`,
       `L ${c.p0[0]} ${t(c.p0[1])}`,
       `C ${c.c1[0]} ${t(c.c1[1])} ${c.c2[0]} ${t(c.c2[1])} ${c.p3[0]} ${t(c.p3[1])}`,
-      // Más allá de su ancho, la lateral solo ocupa la franja superior (la subida).
+      // Beyond its width, the side panel only occupies the top strip (the rise).
       `L ${c.p3[0]} ${s.topBar}`,
       `L ${s.sideW} ${s.topBar}`,
       `L ${s.sideW} ${t(tp.p3[1])}`,
@@ -126,7 +126,7 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
       w: w - bodyX - (sideOpen ? s.sideOverlap : s.frame) - s.frame,
       h: contentBottom - contentTop,
     },
-    // Con lateral, la franja empieza donde termina su subida.
+    // With a side panel, the strip starts where its rise ends.
     topBar: (() => {
       const x = sideOpen ? s.sideSlope.to : bodyX;
       return { x, y: bodyY, w: w - s.tabW - x, h: s.topBar };
@@ -135,9 +135,9 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
   };
 }
 
-/// Subida en S de la lateral: del tramo recto de su borde superior al borde
-/// superior del cuerpo, con tangentes horizontales en ambos extremos (la misma
-/// figura que la subida del cuerpo hacia la pestaña).
+/// S rise of the side panel: from the straight stretch of its top edge to the
+/// body's top edge, with horizontal tangents at both ends (the same shape as
+/// the body's rise towards the tab).
 function sideCurve(bodyY: number) {
   const { from, to } = SKIN.sideSlope;
   const m = (to - from) / 2;
@@ -149,8 +149,8 @@ function sideCurve(bodyY: number) {
   };
 }
 
-/// Estrechamiento en S de la parte de abajo de la lateral: del borde izquierdo
-/// (vertical) al arranque de la esquina inferior izquierda de la píldora.
+/// S narrowing of the side panel's lower part: from the left edge (vertical)
+/// to the start of the pill's bottom-left corner.
 function taperCurve(pod: Piece) {
   const end = pod.y + pod.h - pod.r[3];
   const y0 = end - SKIN.taper;
@@ -163,15 +163,15 @@ function taperCurve(pod: Piece) {
   };
 }
 
-/// Lateral y píldora como una sola pieza (se pintan con un único relleno, sin
-/// costura): borde superior con su subida, estrechamiento en S y píldora.
+/// Side panel and pill as a single piece (painted with one fill, no seam):
+/// top edge with its rise, S narrowing and pill.
 export function sidePodPath(l: SkinLayout): string {
   const { side, pod } = l;
   const pr = pod.h / 2;
   const cr = pod.x + pod.w - pr;
   const bk = pod.r[3];
   if (!side) {
-    // Sin lateral, solo la píldora (pegada al borde izquierdo).
+    // Without a side panel, just the pill (flush with the left edge).
     return [
       `M ${pod.x} ${pod.y}`,
       `L ${cr} ${pod.y}`,
@@ -201,9 +201,9 @@ export function sidePodPath(l: SkinLayout): string {
   ].join(" ");
 }
 
-/// Empalme cóncavo entre la recta horizontal `y = line` (la forma queda encima) y
-/// una circunferencia que la atraviesa y sobresale por debajo: devuelve el punto
-/// de tangencia en la recta y en la circunferencia. `side` = -1 a la izquierda.
+/// Concave fillet between the horizontal line `y = line` (the shape lies above) and
+/// a circle that crosses it and sticks out below: returns the tangent point on the
+/// line and on the circle. `side` = -1 for the left.
 function lineCircleFillet(line: number, cx: number, cy: number, r: number, f: number, side: 1 | -1) {
   const dy = line + f - cy;
   const fx = cx + side * Math.sqrt((r + f) ** 2 - dy ** 2);
@@ -211,10 +211,10 @@ function lineCircleFillet(line: number, cx: number, cy: number, r: number, f: nu
   return { onLine: [fx, line] as const, onCircle: [cx + (fx - cx) * k, cy + (line + f - cy) * k] as const };
 }
 
-/// Contorno exterior completo: la unión de las piezas con empalmes cóncavos en
-/// cada unión (lateral–cuerpo, cuerpo–pestaña y a ambos lados de la píldora), para
-/// que se lean como una sola carcasa. Se pinta detrás de las piezas y es también
-/// la región de la ventana.
+/// Complete outer outline: the union of the pieces with concave fillets at each
+/// joint (side panel–body, body–tab and on both sides of the pill), so they read
+/// as a single shell. It is painted behind the pieces and is also the window
+/// region.
 export function outlinePath(l: SkinLayout): string {
   const { body, tab, pod, side } = l;
   const bx = body.x;
@@ -227,7 +227,7 @@ export function outlinePath(l: SkinLayout): string {
   const fR = lineCircleFillet(bb, cr, cy, pr, SKIN.podFillet, 1);
   const n = (v: number) => +v.toFixed(2);
   const d: string[] = [];
-  // Curva en S del cuerpo hacia la pestaña.
+  // S curve from the body to the tab.
   const s0 = tab.x - SKIN.tabInset - SKIN.tabSlope;
   const s3 = tab.x;
   const sm = (s3 - s0) * 0.5;
@@ -248,16 +248,16 @@ export function outlinePath(l: SkinLayout): string {
     `C ${s0 + sm} ${by} ${s3 - sm} 0 ${s3} 0`,
     `L ${right - tab.r[1]} 0`,
     `A ${tab.r[1]} ${tab.r[1]} 0 0 1 ${right} ${tab.r[1]}`,
-    // Esquina inferior derecha recta (agarre de tamaño).
+    // Square bottom-right corner (resize grip).
     `L ${right} ${bb}`,
-    // Cuerpo → píldora (derecha), la píldora por debajo, píldora → cuerpo (izquierda).
+    // Body → pill (right), the pill underneath, pill → body (left).
     `L ${n(fR.onLine[0])} ${bb}`,
     `A ${SKIN.podFillet} ${SKIN.podFillet} 0 0 0 ${n(fR.onCircle[0])} ${n(fR.onCircle[1])}`,
     `A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`,
   );
   if (side) {
-    // La píldora termina por la izquierda en una esquina redonda y sube por la
-    // lateral, que se estrecha en S hasta su borde izquierdo.
+    // The pill ends on the left in a round corner and goes up along the side
+    // panel, which narrows in an S down to its left edge.
     const k = pod.r[3];
     const tp = taperCurve(pod);
     d.push(
@@ -266,7 +266,7 @@ export function outlinePath(l: SkinLayout): string {
       `C ${tp.c2[0]} ${tp.c2[1]} ${tp.c1[0]} ${tp.c1[1]} ${tp.p0[0]} ${tp.p0[1]}`,
     );
   } else {
-    // Sin lateral: el borde izquierdo baja recto hasta la esquina de la píldora.
+    // Without a side panel: the left edge goes straight down to the pill's corner.
     const k = pod.r[3];
     d.push(`L ${pod.x + k} ${pod.y + pod.h}`, `A ${k} ${k} 0 0 1 ${pod.x} ${pod.y + pod.h - k}`);
   }
@@ -274,7 +274,7 @@ export function outlinePath(l: SkinLayout): string {
   return d.join(" ");
 }
 
-/// Estilo CSS de posición para un rectángulo.
+/// CSS position style for a rectangle.
 export function place(r: Rect): string {
   return `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px`;
 }

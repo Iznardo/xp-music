@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Lienzo de visualización (specs/005). El analizador del backend solo corre
-  // mientras este componente está montado y la página es visible (AC-005-02).
+  // Visualization canvas (specs/005). The backend analyzer only runs while this
+  // component is mounted and the page is visible (AC-005-02).
   import { onMount } from "svelte";
   import { vizVisible } from "./active";
   import { appWindow } from "../platform";
@@ -20,7 +20,7 @@
       if (preset === "Alchemy") return new Alchemy(c);
       if (preset === "Spiral") return new Spiral(c);
     } catch (e) {
-      void commands.uiLog("warn", `visualización WebGL no disponible: ${String(e)}`);
+      void commands.uiLog("warn", `WebGL visualization unavailable: ${String(e)}`);
       return new Bars(c);
     }
     return preset === "Waves" ? new Waves(c) : new Bars(c);
@@ -33,8 +33,8 @@
     let raf = 0;
     const t0 = performance.now();
 
-    // Ahorro (008): los efectos WebGL se dibujan al 75 % de la resolución de
-    // pantalla (se estiran sin que se note: son difusos) y las barras a 1:1.
+    // Savings (008): WebGL effects are drawn at 75 % of the screen resolution
+    // (stretched without it showing: they are soft) and the bars at 1:1.
     const scale = renderer.continuous ? 0.75 : Math.min(devicePixelRatio || 1, 1);
     const resize = () => {
       canvas.width = Math.max(1, Math.round(canvas.clientWidth * scale));
@@ -46,8 +46,8 @@
     ro.observe(canvas);
     resize();
 
-    // Como mucho 30 fps: es el ritmo al que llega el análisis del audio, así que
-    // dibujar más a menudo solo gasta CPU/GPU.
+    // At most 30 fps: that is the rate the audio analysis arrives at, so drawing
+    // more often only wastes CPU/GPU.
     const MIN_FRAME_MS = 1000 / 30 - 2;
     let last = 0;
     const loop = (now: number) => {
@@ -64,9 +64,9 @@
       dirty = true;
     });
 
-    // Cuenta como visible mientras la página lo está. WebView2 no la da por oculta
-    // al minimizar la ventana: eso se pregunta aparte (si no, se sigue dibujando
-    // y analizando el audio con la ventana en la barra de tareas).
+    // Counts as visible while the page is. WebView2 doesn't report it as hidden
+    // when the window is minimized: that is asked separately (otherwise it keeps
+    // drawing and analyzing audio with the window in the taskbar).
     const win = appWindow();
     let counted = false;
     let minimized = false;

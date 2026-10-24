@@ -5,12 +5,12 @@ result-*
 node_modules/
 dist/
 
-# Herramientas descargadas y sidecars
+# Downloaded tools and sidecars
 tools/
 tools.x64/
 src-tauri/binaries/*.exe
 
-# Credenciales y secretos (nunca al repo)
+# Credentials and secrets (never in the repo)
 browser.json
 headers_auth.json
 cookies*.txt
@@ -22,7 +22,7 @@ src-tauri/signing.local.json
 .env
 .env.*
 
-# Sistema / editores
+# System / editors
 .DS_Store
 Thumbs.db
 .vscode/
@@ -32,10 +32,10 @@ Thumbs.db
 dist/
 src-tauri/gen/schemas/
 
-# Solo en local: documentación de trabajo, prototipos y configuración de herramientas
+# Local only: working docs, prototypes and tool configuration
 .claude/
 specs/
 spike/
 
-# Vídeos de promoción (proyectos de HyperFrames, capturas y renders): solo en local
+# Promo videos (HyperFrames projects, captures and renders): local only
 promo/

@@ -1,4 +1,4 @@
-// Menús de la barra clásica y atajos de teclado de WMP (FR-004-03, T004-17).
+// Classic menu bar menus and WMP keyboard shortcuts (FR-004-03, T004-17).
 
 import { commands } from "./bindings";
 import { router } from "./router.svelte";
@@ -34,12 +34,12 @@ function keyName(e: KeyboardEvent): string {
   return `${e.ctrlKey ? "Ctrl+" : ""}${e.altKey ? "Alt+" : ""}${e.shiftKey ? "Shift+" : ""}${k}`;
 }
 
-/// Atajos globales. No actúan mientras se escribe en un campo de texto (salvo F-keys).
+/// Global shortcuts. They do nothing while typing in a text field (except F-keys).
 export function handleShortcut(e: KeyboardEvent): boolean {
   const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
   const name = keyName(e);
   if (typing && !/^F\d+$/.test(name)) return false;
-  // Mayús+F10 es el menú contextual; no confundirlo con F10 (subir volumen).
+  // Shift+F10 is the context menu; don't confuse it with F10 (volume up).
   const s = shortcuts.find((x) => x.keys === name);
   if (!s) return false;
   e.preventDefault();

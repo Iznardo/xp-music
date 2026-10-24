@@ -1,4 +1,4 @@
-// Estado puramente visual: cuadros de mensaje, menú contextual y diálogos.
+// Purely visual state: message boxes, context menu and dialogs.
 
 import { commands, type AppError, type UiSound } from "../bindings";
 
@@ -21,7 +21,7 @@ function writeFlag(key: string, on: boolean) {
   try {
     localStorage.setItem(key, on ? "1" : "0");
   } catch {
-    /* sin almacenamiento: no se recuerda */
+    /* no storage: not remembered */
   }
 }
 
@@ -32,11 +32,11 @@ class UiStore {
   aboutOpen = $state(false);
   loginOpen = $state(false);
   prompt = $state<{ title: string; label: string; value: string; resolve: (v: string | null) => void } | null>(null);
-  /// Texto de la barra de estado (a la izquierda del transporte).
+  /// Status bar text (left of the transport).
   status = $state("");
-  /// Modo compacto (skin pequeño, siempre encima).
+  /// Compact mode (small skin, always on top).
   compact = $state(false);
-  /// Panel de tareas lateral oculto (se recuerda en este equipo).
+  /// Side task panel hidden (remembered on this machine).
   sideCollapsed = $state(readFlag("xpm.sideCollapsed"));
 
   toggleSide() {
@@ -53,7 +53,7 @@ class UiStore {
     if (r.status === "ok") this.compact = enabled;
   }
 
-  /// Cuadro de mensaje XP. Devuelve el botón pulsado.
+  /// XP message box. Returns the button pressed.
   ask(title: string, text: string, kind: MessageKind = "info", buttons = ["Aceptar"]): Promise<string> {
     this.sound(kind === "error" ? "Error" : kind === "info" ? "Notify" : "Exclamation");
     return new Promise((resolve) => {

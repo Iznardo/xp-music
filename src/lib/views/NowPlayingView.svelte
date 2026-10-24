@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Reproducción actual al estilo WMP 9 (FR-004-08/10): artista y título arriba,
-  // visualización o portada en negro, barra de visualización con ◀ ▶ y la lista
-  // actual a la derecha, también en negro.
+  // Now Playing, WMP 9 style (FR-004-08/10): artist and title on top,
+  // visualization or cover on black, visualization bar with ◀ ▶ and the current
+  // list on the right, also on black.
   import { commands, type Track, type VizPreset } from "../bindings";
   import { settings } from "../stores/settings.svelte";
   import { appWindow } from "../platform";
@@ -19,10 +19,10 @@
   const st = $derived(player.state);
   const q = $derived(player.queue);
   const cover = $derived(thumbSrc(st?.track?.thumbnails, 544));
-  // Se muestra a 22 px: con 48 basta incluso en pantallas de alta densidad.
+  // Shown at 22 px: 48 is enough even on high-density screens.
   const small = $derived(thumbSrc(st?.track?.thumbnails, 48));
 
-  // Visualización (005): "Cover" = solo portada.
+  // Visualization (005): "Cover" = cover only.
   const preset = $derived<VizPreset>(settings.current?.visualization ?? "Cover");
   const showViz = $derived(preset !== "Cover" && !!st?.track);
 
@@ -34,7 +34,7 @@
 
   let clickTimer: ReturnType<typeof setTimeout> | undefined;
   function stageClick() {
-    // Un clic cambia de visualización; el doble clic (pantalla completa) lo cancela.
+    // A click changes the visualization; a double click (fullscreen) cancels it.
     clearTimeout(clickTimer);
     clickTimer = setTimeout(() => step(1), 250);
   }
@@ -75,7 +75,7 @@
       {/if}
     </header>
 
-    <!-- El escenario se maneja con el ratón como en WMP; el teclado tiene Ctrl+… y el menú Ver. -->
+    <!-- The stage is operated with the mouse as in WMP; the keyboard has Ctrl+… and the View menu. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div
       class="stage"
@@ -221,8 +221,8 @@
     background-position: center;
     filter: blur(40px) saturate(1.4) brightness(0.45);
   }
-  /* Centrada en el escenario de forma absoluta: con la rejilla, la altura en %
-     dependía del propio contenido y la portada quedaba desplazada y cortada. */
+  /* Absolutely centered on the stage: with the grid, the % height depended on
+     the content itself and the cover ended up shifted and cut off. */
   .art {
     position: absolute;
     inset: 0;

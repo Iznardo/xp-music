@@ -27,18 +27,18 @@
   let maximized = $state(false);
   let active = $state(true);
 
-  // Como WMP: "Título - XP Music" mientras suena algo.
+  // Like WMP: "Title - XP Music" while something is playing.
   const title = $derived(player.state?.track ? `${player.state.track.title} - ${t.appName}` : t.appName);
   $effect(() => {
     document.title = title;
   });
 
-  // El tema se aplica en <html> para que lo vean todas las variables CSS.
+  // The theme is applied on <html> so every CSS variable sees it.
   $effect(() => {
     document.documentElement.dataset.theme = (settings.current?.theme ?? "Blue").toLowerCase();
   });
 
-  // Skin por piezas (lib/skin.ts): lateral, cuerpo, pestaña de la lista y píldora.
+  // Piecewise skin (lib/skin.ts): side panel, body, playlist tab and pod.
   let winW = $state(0);
   let winH = $state(0);
   const L = $derived(winW && winH ? skinLayout(winW, winH, !ui.sideCollapsed) : null);
@@ -46,10 +46,10 @@
   const sidePod = $derived(L ? sidePodPath(L) : null);
   let outlineEl = $state<SVGPathElement>();
 
-  // El contorno (con sus empalmes) es la forma para los clics: en lo transparente
-  // pasan a lo de detrás. Maximizada, rectangular; el modo compacto pone la suya.
+  // The outline (with its joins) is the shape for clicks: clicks on transparent areas
+  // pass through to whatever is behind. Maximized, it is rectangular; compact mode sets its own.
   $effect(() => {
-    // La máscara pone su forma; al salir de ella se vuelve a poner esta.
+    // A skin sets its own shape; when leaving it, this one is applied again.
     if (ui.compact || skins.active) return;
     const path = outlineEl;
     const shaped = !ui.compact && !maximized && !!outline && path !== undefined;
@@ -74,9 +74,9 @@
     void appWindow()?.startResizeDragging("SouthEast");
   }
 
-  // Vistas y diálogos en trozos aparte del bundle (carga diferida). Las vistas
-  // principales se precargan en segundo plano tras arrancar: cambiar de vista no
-  // espera nunca, pero el primer pintado solo descarga lo imprescindible.
+  // Views and dialogs live in separate bundle chunks (lazy loading). The main views
+  // are preloaded in the background after startup: switching views never waits,
+  // but the first paint only downloads what is essential.
   const views = {
     now: () => import("./lib/views/NowPlayingView.svelte"),
     home: () => import("./lib/views/HomeView.svelte"),
@@ -108,16 +108,16 @@
     });
     const win = appWindow();
     if (!win) return () => clearTimeout(idle);
-    // "Volver al modo completo" del icono de la bandeja (salida de emergencia).
+    // "Back to full mode" from the tray icon (emergency exit).
     const offFull = import("@tauri-apps/api/event").then(({ listen }) =>
       listen("ui://full-mode", () => {
         if (skins.active) void skins.exit();
         else void ui.setCompact(false);
       }),
     );
-    // Los gestores con teselado (Hyprland, sway…) marcan como maximizada cualquier ventana
-    // teselada. En Linux solo se trata como maximizada (modo plano) si además ocupa toda la
-    // zona útil de la pantalla; una mitad de pantalla conserva el contorno de WMP.
+    // Tiling window managers (Hyprland, sway…) flag any tiled window as maximized.
+    // On Linux it is only treated as maximized (flat mode) if it also fills the whole
+    // usable screen area; a half-screen window keeps the WMP outline.
     const linux = /Linux/.test(navigator.userAgent);
     const fillsScreen = () => innerWidth >= screen.availWidth - 2 && innerHeight >= screen.availHeight - 2;
     const sync = async () => (maximized = (await win.isMaximized()) && (!linux || fillsScreen()));
@@ -130,7 +130,7 @@
     };
   });
 
-  // Si la sesión caduca y no se puede renovar sola, se ofrece reconectar.
+  // If the session expires and cannot renew itself, offer to reconnect.
   $effect(() => {
     if (auth.status && typeof auth.status === "object" && "Expired" in auth.status) ui.loginOpen = true;
   });
@@ -145,7 +145,7 @@
 {:else}
 <div class="skin" class:maximized class:inactive={!active} bind:clientWidth={winW} bind:clientHeight={winH}>
   {#if L}
-    <!-- Carcasa: el contorno completo con los empalmes, detrás de las piezas. -->
+    <!-- Shell: the full outline with its joins, behind the pieces. -->
     <svg class="shell" width={winW} height={winH} aria-hidden="true">
       <defs>
         <linearGradient id="shell-fill" x1="0" y1="0" x2="0" y2="1">
@@ -154,15 +154,15 @@
           <stop offset="0.75" class="sh-3" />
           <stop offset="1" class="sh-4" />
         </linearGradient>
-        <!-- Lateral y píldora: el mismo color de punta a punta (son una pieza). -->
+        <!-- Side panel and pod: the same color end to end (they are one piece). -->
         <linearGradient id="side-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={SKIN.sideW} y2="0">
           <stop offset="0" class="sf-edge" />
           <stop offset="0.55" class="sf-mid" />
-          <!-- Más allá de la lateral (la píldora) sigue el tono claro. -->
+          <!-- Beyond the side panel (the pod) the light tone continues. -->
           <stop offset="1" class="sf-mid" />
         </linearGradient>
         <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 1} x2="0" y2={winH}>
-          <!-- Sin efecto por encima de la píldora; dentro, brillo arriba y sombra abajo. -->
+          <!-- No effect above the pod; inside it, highlight on top and shadow below. -->
           <stop offset="0" stop-color="#fff" stop-opacity="0" />
           <stop offset="0.01" stop-color="#fff" stop-opacity="0.1" />
           <stop offset="1" stop-color="#000" stop-opacity="0.1" />
@@ -170,9 +170,9 @@
       </defs>
       <path d={outline} bind:this={outlineEl} class="shell-fill" />
       {#if sidePod}
-        <!-- El trazo del mismo color tapa el hilo claro del plateado de debajo en el borde. -->
+        <!-- The same-colored stroke hides the light thread of the silver underneath at the edge. -->
         <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
-        <!-- Brillo de arriba abajo en la zona de los controles, sin cortes. -->
+        <!-- Top-to-bottom highlight over the controls area, seamless. -->
         <path d={sidePod} fill="url(#side-shade)" />
       {/if}
     </svg>
@@ -239,8 +239,8 @@
 {/if}
 
 <style>
-  /* Skin WMP 9 por piezas (ver lib/skin.ts). La ventana es transparente: lo que no
-     cubre ninguna pieza no se ve (y la región de Windows tampoco lo incluye). */
+  /* Piecewise WMP 9 skin (see lib/skin.ts). The window is transparent: whatever no
+     piece covers is not visible (and the Windows region does not include it either). */
   .skin {
     position: relative;
     height: 100%;
@@ -267,8 +267,8 @@
     position: absolute;
     border: 1px solid var(--skin-edge);
   }
-  /* Lateral: azul, más oscura, por debajo del cuerpo. */
-  /* La lateral no pinta fondo: lo pinta la carcasa junto con la píldora. */
+  /* Side panel: blue, darker, below the body. */
+  /* The side panel paints no background: the shell paints it together with the pod. */
   .side {
     z-index: 1;
     border: 0;
@@ -291,8 +291,8 @@
   :global(.sf-mid) {
     stop-color: var(--side-top);
   }
-  /* Cuerpo y pestaña no pintan nada propio: el plateado es el de la carcasa, así
-     no hay costuras entre ellos. */
+  /* Body and tab paint nothing of their own: the silver comes from the shell, so
+     there are no seams between them. */
   .body,
   .tab {
     border: 0;
@@ -340,7 +340,7 @@
     width: 6px;
     height: 10px;
   }
-  /* Esquina inferior derecha recta con agarre para cambiar el tamaño. */
+  /* Square bottom-right corner with a resize grip. */
   .grip {
     position: absolute;
     z-index: 40;

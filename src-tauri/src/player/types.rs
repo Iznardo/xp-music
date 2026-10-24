@@ -1,4 +1,4 @@
-//! Tipos del reproductor compartidos con el frontend (contrato de specs/002/plan.md).
+//! Player types shared with the frontend (contract from specs/002/plan.md).
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -26,7 +26,7 @@ pub enum PlaybackStatus {
     Error,
 }
 
-/// De dónde salió la cola (para el autoplay y la UI).
+/// Where the queue came from (for autoplay and the UI).
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 pub enum QueueSource {
     Playlist(PlaylistId),
@@ -47,7 +47,7 @@ pub enum InsertPosition {
 #[serde(rename_all = "camelCase")]
 #[tauri_specta(event_name = "queue://changed")]
 pub struct QueueSnapshot {
-    /// En orden de reproducción efectivo (ya barajado si `shuffle`).
+    /// In effective playback order (already shuffled if `shuffle`).
     pub tracks: Vec<Track>,
     pub current_index: Option<u32>,
     pub source: Option<QueueSource>,

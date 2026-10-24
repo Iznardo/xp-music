@@ -1,7 +1,7 @@
-//! Logging a archivo rotativo con redacción de secretos (FR-001-05, principio VI).
+//! Rolling-file logging with secret redaction (FR-001-05, principle VI).
 //!
-//! Toda línea pasa por [`redact`] antes de llegar al disco o a la consola, así
-//! un `debug!` descuidado con cabeceras no filtra cookies.
+//! Every line goes through [`redact`] before reaching disk or the console, so
+//! a careless `debug!` with headers does not leak cookies.
 
 use std::borrow::Cow;
 use std::io::{self, Write};
@@ -11,12 +11,12 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-const MASK: &str = "[REDACTADO]";
+const MASK: &str = "[REDACTED]";
 
-/// Cabeceras cuyo valor se oculta hasta el final de la línea.
+/// Headers whose value is hidden until the end of the line.
 const HEADER_KEYS: &[&str] = &["cookie:", "authorization:", "x-goog-authuser:"];
 
-/// Marcadores cuyo valor se oculta hasta el siguiente separador.
+/// Markers whose value is hidden until the next separator.
 const VALUE_KEYS: &[&str] = &[
     "SAPISIDHASH ",
     "SAPISID=",
@@ -36,7 +36,7 @@ fn is_value_end(c: char) -> bool {
     c.is_whitespace() || matches!(c, ';' | '"' | '\'' | ',' | '&')
 }
 
-/// Oculta cookies, cabeceras de autenticación y tokens en una línea de log.
+/// Hides cookies, authentication headers and tokens in a log line.
 pub fn redact(input: &str) -> Cow<'_, str> {
     let lower = input.to_ascii_lowercase();
     let mut spans: Vec<(usize, usize)> = Vec::new();
@@ -83,7 +83,7 @@ pub fn redact(input: &str) -> Cow<'_, str> {
     Cow::Owned(out)
 }
 
-/// `Write` que redacta cada bloque antes de pasarlo al escritor real.
+/// `Write` that redacts each chunk before passing it to the real writer.
 pub struct RedactingWriter<W>(W);
 
 impl<W: Write> Write for RedactingWriter<W> {
@@ -110,7 +110,7 @@ impl<'a, M: MakeWriter<'a>> MakeWriter<'a> for Redacting<M> {
     }
 }
 
-/// Inicia el logging. El `WorkerGuard` debe vivir mientras la app esté abierta.
+/// Starts logging. The `WorkerGuard` must live as long as the app is open.
 pub fn init(log_dir: &Path) -> WorkerGuard {
     let appender = tracing_appender::rolling::Builder::new()
         .rotation(tracing_appender::rolling::Rotation::DAILY)
@@ -118,7 +118,7 @@ pub fn init(log_dir: &Path) -> WorkerGuard {
         .filename_suffix("log")
         .max_log_files(7)
         .build(log_dir)
-        .expect("no se pudo crear el archivo de log");
+        .expect("could not create the log file");
     let (file, guard) = tracing_appender::non_blocking(appender);
 
     let filter = EnvFilter::try_from_env("XP_MUSIC_LOG").unwrap_or_else(|_| EnvFilter::new("info"));
@@ -136,45 +136,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn redacta_cabecera_cookie_completa() {
-        let line = "GET /browse Cookie: SID=abc; HSID=def; PREF=x\nsiguiente";
+    fn redacts_full_cookie_header() {
+        let line = "GET /browse Cookie: SID=abc; HSID=def; PREF=x\nnext";
         let r = redact(line);
         assert!(
             !r.contains("abc") && !r.contains("def") && !r.contains("PREF=x"),
             "{r}"
         );
-        assert!(r.ends_with("\nsiguiente"));
+        assert!(r.ends_with("\nnext"));
     }
 
     #[test]
-    fn redacta_sapisidhash_y_cookies_sueltas() {
+    fn redacts_sapisidhash_and_loose_cookies() {
         let line = r#"headers: Authorization: SAPISIDHASH 1700000000_abcdef, url="x?SAPISID=zzz;__Secure-3PSID=yyy""#;
         let r = redact(line);
         for secret in ["1700000000_abcdef", "zzz", "yyy"] {
-            assert!(!r.contains(secret), "{secret} sigue en: {r}");
+            assert!(!r.contains(secret), "{secret} still in: {r}");
         }
     }
 
     #[test]
-    fn redacta_token_de_github() {
-        let r = redact("token=github_pat_11ABCDEF hecho");
+    fn redacts_github_token() {
+        let r = redact("token=github_pat_11ABCDEF done");
         assert!(!r.contains("11ABCDEF"));
-        assert!(r.ends_with(" hecho"));
+        assert!(r.ends_with(" done"));
     }
 
     #[test]
-    fn deja_intactas_las_lineas_normales() {
-        let line = "reproduciendo yQd4xQBlBa0 a 48000 Hz";
+    fn leaves_normal_lines_untouched() {
+        let line = "playing yQd4xQBlBa0 at 48000 Hz";
         assert!(matches!(redact(line), Cow::Borrowed(_)));
     }
 
     #[test]
-    fn el_writer_redacta() {
+    fn writer_redacts() {
         let mut out = Vec::new();
         RedactingWriter(&mut out)
-            .write_all(b"cookie: SID=secreto\n")
+            .write_all(b"cookie: SID=secret\n")
             .unwrap();
         let s = String::from_utf8(out).unwrap();
-        assert!(!s.contains("secreto"), "{s}");
+        assert!(!s.contains("secret"), "{s}");
     }
 }

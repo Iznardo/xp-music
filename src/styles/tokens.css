@@ -1,4 +1,4 @@
-/* Variables de los temas Luna de Windows XP. El tema activo va en <html data-theme="...">. */
+/* Variables for the Windows XP Luna themes. The active theme goes in <html data-theme="...">. */
 
 :root,
 :root[data-theme="blue"] {
@@ -109,7 +109,7 @@
   --font-title: "Trebuchet MS", Tahoma, sans-serif;
 }
 
-/* Skin WMP 9 (marco asimétrico). Por tema; el resto de colores sale de --wmp-*. */
+/* WMP 9 skin (asymmetric frame). Per theme; the remaining colors come from --wmp-*. */
 :root,
 :root[data-theme="blue"] {
   --skin-hi: #9cc0ff;
@@ -120,17 +120,17 @@
   --skin-edge: #06143f;
   --side-top: #6d9cf0;
   --side-bottom: #2d5cc4;
-  /* Carcasa (cuerpo, pestaña y barra inferior) de arriba abajo. */
+  /* Shell (body, tab and bottom bar), top to bottom. */
   --shell-1: #eef2fc;
   --shell-2: #cdd7f0;
   --shell-3: #b4c3e8;
   --shell-4: #9eb0dc;
-  /* Texto de la lateral sobre su color. */
+  /* Side panel text over its color. */
   --side-text: #fff;
   --side-text-shadow: 0 1px 1px rgb(0 0 40 / 0.55);
   --side-line: rgb(255 255 255 / 0.75);
   --side-line-shadow: rgb(0 0 60 / 0.35);
-  /* Botones redondos, píldora, desplegable y deslizadores. */
+  /* Round buttons, pod, dropdown and sliders. */
   --btn-1: #ffffff;
   --btn-2: #e2e9f8;
   --btn-3: #a6b8e2;
@@ -185,7 +185,7 @@
   --shell-2: #e2e3e9;
   --shell-3: #cdced8;
   --shell-4: #b4b6c3;
-  /* Sobre plata clara el texto va oscuro, con reflejo claro. */
+  /* On light silver the text is dark, with a light highlight. */
   --side-text: #20222e;
   --side-text-shadow: 0 1px 0 rgb(255 255 255 / 0.8);
   --side-line: rgb(60 62 80 / 0.35);

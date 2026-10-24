@@ -1,4 +1,4 @@
-/* La ventana es transparente y sin decoración: el marco lo dibuja la app. */
+/* The window is transparent and undecorated: the app draws the frame. */
 
 *,
 *::before,
@@ -45,7 +45,7 @@ legend {
   padding: 0 3px;
 }
 
-/* Botón XP (Luna): bordes redondeados, degradado claro, halo naranja al pasar. */
+/* XP button (Luna): rounded borders, light gradient, orange halo on hover. */
 .xp-btn {
   min-width: 75px;
   height: 23px;
@@ -85,7 +85,7 @@ legend {
   border-color: #3c7fb1;
 }
 
-/* Barras de desplazamiento al estilo XP (azul Luna). */
+/* XP-style scrollbars (Luna blue). */
 ::-webkit-scrollbar {
   width: 17px;
   height: 17px;

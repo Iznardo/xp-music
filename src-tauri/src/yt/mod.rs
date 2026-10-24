@@ -1,4 +1,4 @@
-//! Integración con YouTube Music (specs/003).
+//! YouTube Music integration (specs/003).
 
 pub mod innertube;
 pub mod login;
@@ -10,9 +10,9 @@ pub mod thumbs;
 
 #[cfg(test)]
 mod dev_dump {
-    //! Herramienta de desarrollo: vuelca respuestas reales a
-    //! `%USERPROFILE%\.xp-music\dumps\` (fuera del repo; contienen datos personales).
-    //! `cargo test --lib -- --ignored --nocapture volcar_respuestas`
+    //! Development tool: dumps real responses to
+    //! `%USERPROFILE%\.xp-music\dumps\` (outside the repo; they contain personal data).
+    //! `cargo test --lib -- --ignored --nocapture dump_responses`
     use super::innertube::{Raw, Yt, run};
     use serde_json::json;
 
@@ -36,7 +36,7 @@ mod dev_dump {
 
     #[tokio::test(flavor = "current_thread")]
     #[ignore]
-    async fn volcar_respuestas() {
+    async fn dump_responses() {
         let yt = client().await;
         let out = dirs::home_dir().unwrap().join(".xp-music").join("dumps");
         std::fs::create_dir_all(&out).unwrap();

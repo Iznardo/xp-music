@@ -1,4 +1,4 @@
-// Estado de la sesión de YouTube Music (se hidrata al montar; `auth://changed` lo mantiene).
+// YouTube Music session state (hydrated on mount; kept up to date by `auth://changed`).
 
 import { commands, events, type AuthStatus } from "../bindings";
 import { clearResourceCache } from "../resource.svelte";
@@ -10,7 +10,7 @@ class AuthStore {
     await events.authChanged.listen((e) => {
       const before = this.accountName;
       this.status = e.payload;
-      // Otra cuenta (o ninguna): lo que había en caché era de la anterior.
+      // A different account (or none): whatever was cached belonged to the previous one.
       if (this.accountName !== before || !this.signedIn) clearResourceCache();
     });
     this.status = await commands.authStatus();

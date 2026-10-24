@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Secciones de la biblioteca: playlists, canciones, me gusta, álbumes, artistas, historial.
+  // Library sections: playlists, songs, liked, albums, artists, history.
   import { commands, type MediaItem, type Page, type Track } from "../bindings";
   import type { LibrarySection } from "../router.svelte";
   import { Resource } from "../resource.svelte";
@@ -43,7 +43,7 @@
   }, () => `section:${section}`);
   void res.load();
 
-  // Las listas salen de la biblioteca: una lista nueva aparece al momento.
+  // The lists come from the library: a new list shows up immediately.
   const tiles = $derived<MediaItem[]>(
     section === "playlists" ? library.playlists.map((p) => ({ Playlist: p }) as MediaItem) : res.data?.kind === "tiles" ? res.data.items : [],
   );

@@ -1,5 +1,5 @@
 <script lang="ts" generics="T">
-  // Envoltorio de carga: barra "marquee" de XP mientras carga, mensaje y reintento si falla.
+  // Loading wrapper: XP "marquee" bar while loading, message and retry if it fails.
   import type { Snippet } from "svelte";
   import type { Resource } from "../../resource.svelte";
   import { t } from "../../i18n.svelte";
@@ -36,7 +36,7 @@
     font-weight: bold;
     color: #a01010;
   }
-  /* Barra de progreso indeterminada de XP: bloques verdes que avanzan. */
+  /* XP indeterminate progress bar: green blocks that advance. */
   .marquee {
     position: relative;
     width: 160px;

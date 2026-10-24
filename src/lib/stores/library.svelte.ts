@@ -1,4 +1,4 @@
-// Playlists del usuario (para el árbol y el submenú "Añadir a playlist").
+// The user's playlists (for the tree and the "Add to playlist" submenu).
 
 import { commands, events, type PlaylistSummary } from "../bindings";
 import { shared } from "../resource.svelte";
@@ -14,7 +14,7 @@ class LibraryStore {
   }
 
   async refresh(): Promise<void> {
-    // Varias partes la piden a la vez al arrancar: una sola petición para todas.
+    // Several parts request it at once on startup: a single request for all of them.
     const r = await shared("library:playlists", () => commands.ytLibraryPlaylists());
     if (r.status === "ok") {
       this.playlists = r.data;
@@ -22,7 +22,7 @@ class LibraryStore {
     }
   }
 
-  /// Playlists propias donde se pueden añadir canciones (no "Me gusta" ni automáticas).
+  /// Own playlists that songs can be added to (not "Liked" nor automatic ones).
   get editable(): PlaylistSummary[] {
     return this.playlists.filter((p) => p.id !== "VLLM" && p.id !== "VLSE" && !p.id.startsWith("VLRD"));
   }

@@ -1,15 +1,15 @@
-//! Cola de reproducción: lógica pura, sin audio ni E/S (FR-002-11..13).
+//! Playback queue: pure logic, no audio or I/O (FR-002-11..13).
 //!
-//! `tracks` guarda el orden original y `order` el orden de reproducción
-//! (igual al original salvo con aleatorio). Todos los índices públicos se
-//! refieren al orden de reproducción, que es lo que ve el usuario.
+//! `tracks` keeps the original order and `order` the playback order
+//! (same as the original except when shuffled). All public indices
+//! refer to the playback order, which is what the user sees.
 
 use serde::{Deserialize, Serialize};
 
 use super::types::{InsertPosition, QueueSnapshot, QueueSource, RepeatMode};
 use crate::domain::{LikeStatus, Track, TrackId};
 
-/// "Anterior" con más de este tiempo reproducido reinicia la canción.
+/// "Previous" with more than this much time played restarts the song.
 pub const RESTART_THRESHOLD_MS: u32 = 3_000;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -24,7 +24,7 @@ pub struct Queue {
     seed: u64,
 }
 
-/// Resultado de "anterior".
+/// Result of "previous".
 #[derive(Debug, PartialEq, Eq)]
 pub enum Previous {
     Restart,
@@ -44,7 +44,7 @@ impl Queue {
         self.order.len()
     }
 
-    #[allow(dead_code)] // Pareja obligada de `len` (clippy).
+    #[allow(dead_code)] // Mandatory companion of `len` (clippy).
     pub fn is_empty(&self) -> bool {
         self.order.is_empty()
     }
@@ -69,7 +69,7 @@ impl Queue {
         self.autoplay
     }
 
-    #[allow(dead_code)] // La usará el autoplay con contexto (003).
+    #[allow(dead_code)] // Will be used by context-aware autoplay (003).
     pub fn source(&self) -> Option<&QueueSource> {
         self.source.as_ref()
     }
@@ -78,7 +78,7 @@ impl Queue {
         self.order.iter().map(|&i| &self.tracks[i])
     }
 
-    /// Sustituye la cola y se coloca en `start` (índice del orden original).
+    /// Replaces the queue and positions at `start` (index in the original order).
     pub fn set(&mut self, tracks: Vec<Track>, start: usize, source: QueueSource) {
         let start = start.min(tracks.len().saturating_sub(1));
         self.order = (0..tracks.len()).collect();
@@ -113,8 +113,8 @@ impl Queue {
         }
     }
 
-    /// Quita la pista en `index`. Devuelve `true` si era la actual: en ese caso
-    /// la actual pasa a ser la siguiente (o ninguna si era la última).
+    /// Removes the track at `index`. Returns `true` if it was the current one: in that
+    /// case the current one becomes the next (or none if it was the last).
     pub fn remove(&mut self, index: usize) -> bool {
         if index >= self.order.len() {
             return false;
@@ -158,7 +158,7 @@ impl Queue {
         }
     }
 
-    /// Marca el "Me gusta" de una canción en todas sus apariciones; `true` si estaba.
+    /// Sets the "Like" of a song in all its occurrences; `true` if it was present.
     pub fn set_like(&mut self, id: &TrackId, status: LikeStatus) -> bool {
         let mut found = false;
         for t in self.tracks.iter_mut().filter(|t| &t.id == id) {
@@ -183,9 +183,9 @@ impl Queue {
         self.autoplay = enabled;
     }
 
-    /// Activa o desactiva el aleatorio. Al activarlo, la pista actual queda la
-    /// primera y el resto se baraja; al desactivarlo se vuelve al orden original
-    /// manteniendo la pista actual.
+    /// Turns shuffle on or off. When turned on, the current track becomes the
+    /// first and the rest is shuffled; when turned off, the original order is
+    /// restored keeping the current track.
     pub fn set_shuffle(&mut self, enabled: bool) {
         if enabled == self.shuffle {
             return;
@@ -208,7 +208,7 @@ impl Queue {
             .copied()
             .filter(|&i| Some(i) != current)
             .collect();
-        // Fisher-Yates con xorshift propio: determinista con la semilla (tests).
+        // Fisher-Yates with our own xorshift: deterministic with the seed (tests).
         for i in (1..rest.len()).rev() {
             let j = (self.next_rand() % (i as u64 + 1)) as usize;
             rest.swap(i, j);
@@ -232,8 +232,8 @@ impl Queue {
         self
     }
 
-    /// Índice que sonaría tras la actual, sin moverse. `auto` = fin natural de
-    /// la canción (respeta "repetir una"); `false` = botón Siguiente.
+    /// Index that would play after the current one, without moving. `auto` = natural
+    /// end of the song (honors "repeat one"); `false` = Next button.
     pub fn peek_next(&self, auto: bool) -> Option<usize> {
         let p = self.pos?;
         if auto && self.repeat == RepeatMode::One {
@@ -252,8 +252,8 @@ impl Queue {
         self.order.get(index).map(|&i| &self.tracks[i])
     }
 
-    /// Avanza. Devuelve `false` si se llegó al final (el servicio decide si
-    /// tirar de autoplay).
+    /// Advances. Returns `false` if the end was reached (the service decides whether
+    /// to fall back to autoplay).
     pub fn advance(&mut self, auto: bool) -> bool {
         match self.peek_next(auto) {
             Some(n) => {
@@ -332,17 +332,20 @@ mod tests {
     }
 
     #[test]
-    fn set_y_avance_basico() {
+    fn set_and_basic_advance() {
         let mut q = queue(3, 1);
         assert_eq!(cur(&q), "t1");
         assert!(q.advance(false));
         assert_eq!(cur(&q), "t2");
-        assert!(!q.advance(false), "al final sin repetir no avanza");
+        assert!(
+            !q.advance(false),
+            "at the end without repeat it does not advance"
+        );
         assert_eq!(cur(&q), "t2");
     }
 
     #[test]
-    fn set_vacio_no_tiene_actual() {
+    fn set_empty_has_no_current() {
         let mut q = Queue::new();
         q.set(vec![], 5, QueueSource::Manual);
         assert!(q.current().is_none());
@@ -350,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn repetir_todo_vuelve_al_principio() {
+    fn repeat_all_wraps_to_start() {
         let mut q = queue(2, 1);
         q.set_repeat(RepeatMode::All);
         assert!(q.advance(true));
@@ -358,18 +361,18 @@ mod tests {
     }
 
     #[test]
-    fn repetir_una_solo_en_fin_natural() {
+    fn repeat_one_only_on_natural_end() {
         let mut q = queue(3, 0);
         q.set_repeat(RepeatMode::One);
         assert_eq!(q.peek_next(true), Some(0));
         assert!(q.advance(true));
         assert_eq!(cur(&q), "t0");
-        assert!(q.advance(false), "el botón Siguiente sí avanza");
+        assert!(q.advance(false), "the Next button does advance");
         assert_eq!(cur(&q), "t1");
     }
 
     #[test]
-    fn anterior_reinicia_o_retrocede() {
+    fn previous_restarts_or_goes_back() {
         let mut q = queue(3, 1);
         assert_eq!(q.previous(10_000), Previous::Restart);
         assert_eq!(cur(&q), "t1");
@@ -378,7 +381,7 @@ mod tests {
         assert_eq!(
             q.previous(0),
             Previous::Restart,
-            "en la primera sin repetir reinicia"
+            "on the first without repeat it restarts"
         );
         q.set_repeat(RepeatMode::All);
         assert_eq!(q.previous(0), Previous::Moved);
@@ -386,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    fn anadir_siguiente_y_al_final() {
+    fn add_next_and_at_end() {
         let mut q = queue(3, 0);
         q.add(vec![tr("n")], InsertPosition::Next);
         q.add(vec![tr("e")], InsertPosition::End);
@@ -395,28 +398,34 @@ mod tests {
     }
 
     #[test]
-    fn anadir_a_cola_vacia_fija_actual() {
+    fn add_to_empty_queue_sets_current() {
         let mut q = Queue::new();
         q.add(vec![tr("a"), tr("b")], InsertPosition::Next);
         assert_eq!(cur(&q), "a");
     }
 
     #[test]
-    fn quitar_antes_despues_y_la_actual() {
+    fn remove_before_after_and_current() {
         let mut q = queue(4, 2);
         assert!(!q.remove(0));
         assert_eq!(cur(&q), "t2");
-        assert!(!q.remove(2), "quitar una posterior no cambia la actual");
+        assert!(
+            !q.remove(2),
+            "removing a later one does not change the current"
+        );
         assert_eq!(ids(&q), ["t1", "t2"]);
-        assert!(q.remove(1), "quitar la actual (última) la deja sin actual");
+        assert!(
+            q.remove(1),
+            "removing the current (last) one leaves no current"
+        );
         assert!(q.current().is_none());
         let mut q = queue(3, 0);
         assert!(q.remove(0));
-        assert_eq!(cur(&q), "t1", "quitar la actual pasa a la siguiente");
+        assert_eq!(cur(&q), "t1", "removing the current moves to the next");
     }
 
     #[test]
-    fn mover_ajusta_la_actual() {
+    fn move_adjusts_current() {
         let mut q = queue(4, 1);
         q.move_item(1, 3);
         assert_eq!(ids(&q), ["t0", "t2", "t3", "t1"]);
@@ -430,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    fn aleatorio_mantiene_actual_primera_y_todas_las_pistas() {
+    fn shuffle_keeps_current_first_and_all_tracks() {
         let mut q = queue(20, 7).with_seed(42);
         q.set_shuffle(true);
         assert_eq!(cur(&q), "t7");
@@ -440,11 +449,11 @@ mod tests {
         let mut expected: Vec<String> = (0..20).map(|i| format!("t{i}")).collect();
         expected.sort();
         assert_eq!(sorted, expected);
-        assert_ne!(ids(&q)[1..], expected[..19], "debe cambiar el orden");
+        assert_ne!(ids(&q)[1..], expected[..19], "the order must change");
     }
 
     #[test]
-    fn quitar_aleatorio_vuelve_al_orden_original() {
+    fn unshuffle_restores_original_order() {
         let mut q = queue(10, 4).with_seed(7);
         q.set_shuffle(true);
         q.advance(false);
@@ -458,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_en_orden_de_reproduccion() {
+    fn snapshot_in_playback_order() {
         let mut q = queue(3, 2).with_seed(1);
         q.set_shuffle(true);
         let s = q.snapshot();
@@ -468,7 +477,7 @@ mod tests {
     }
 
     #[test]
-    fn serializa_para_persistir() {
+    fn serializes_for_persistence() {
         let q = queue(3, 1);
         let json = serde_json::to_string(&q).unwrap();
         let back: Queue = serde_json::from_str(&json).unwrap();
@@ -476,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn me_gusta_marca_todas_las_apariciones() {
+    fn like_marks_all_occurrences() {
         let mut q = Queue::new();
         let a = tr("a");
         q.set(vec![a.clone(), tr("b"), a], 0, QueueSource::Manual);

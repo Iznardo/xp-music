@@ -1,10 +1,10 @@
-// Utilidades del motor de skins.
+// Skin engine utilities.
 
 /**
- * Objeto del modelo de WMP visto desde los scripts: COM no distingue mayúsculas,
- * así que `Player.Controls.Play()` y `player.controls.play()` son lo mismo. Las
- * clases definen sus miembros en minúsculas; lo desconocido se guarda en una
- * bolsa (los skins se inventan propiedades) y lo interno empieza por "_".
+ * WMP model object as seen from scripts: COM is case-insensitive, so
+ * `Player.Controls.Play()` and `player.controls.play()` are the same. The
+ * classes define their members in lowercase; unknown things are stored in a
+ * bag (skins invent properties) and internals start with "_".
  * @template {object} T @param {T} target @returns {T}
  */
 export function wmpObject(target) {
@@ -26,7 +26,7 @@ export function wmpObject(target) {
       if (typeof k === "symbol") return false;
       const lk = k.toLowerCase();
       const d = lk[0] !== "_" ? describe(t, lk) : undefined;
-      // Solo lectura (un getter sin setter): WMP lo ignora sin error.
+      // Read-only (a getter without a setter): WMP ignores it without an error.
       if (d && (d.set || (d.writable && typeof d.value !== "function"))) /** @type {any} */ (t)[lk] = v;
       else if (!d) bag[lk] = v;
       return true;
@@ -37,7 +37,7 @@ export function wmpObject(target) {
   });
 }
 
-/** Descriptor de una propiedad en el objeto o sus prototipos. @param {object} o @param {string} k */
+/** Descriptor of a property on the object or its prototypes. @param {object} o @param {string} k */
 function describe(o, k) {
   for (let p = o; p && p !== Object.prototype; p = Object.getPrototypeOf(p)) {
     const d = Object.getOwnPropertyDescriptor(p, k);
@@ -46,7 +46,7 @@ function describe(o, k) {
   return undefined;
 }
 
-/** "#FF00FF", "FF00FF", "#f0f", "none"… → [r, g, b] o null. @param {unknown} v */
+/** "#FF00FF", "FF00FF", "#f0f", "none"… → [r, g, b] or null. @param {unknown} v */
 export function parseColor(v) {
   if (typeof v !== "string") return null;
   let s = v.trim().toLowerCase();
@@ -65,13 +65,13 @@ const NAMED = /** @type {Record<string, string>} */ ({
   teal: "008080", orange: "ffa500",
 });
 
-/** Color CSS de un valor de skin, o "" si es transparente. @param {unknown} v */
+/** CSS color of a skin value, or "" if transparent. @param {unknown} v */
 export function cssColor(v) {
   const c = parseColor(v);
   return c ? `rgb(${c[0]} ${c[1]} ${c[2]})` : "";
 }
 
-/** "true"/"false"/números/booleanos de los atributos. @param {unknown} v */
+/** "true"/"false"/numbers/booleans from attributes. @param {unknown} v */
 export function bool(v) {
   if (typeof v === "string") return !/^(false|0|no|)$/i.test(v.trim());
   return !!v;
@@ -83,7 +83,7 @@ export function num(v, def = 0) {
   return Number.isFinite(n) ? n : def;
 }
 
-/** Segundos → "m:ss" (o "h:mm:ss"), como WMP. @param {number} s */
+/** Seconds → "m:ss" (or "h:mm:ss"), like WMP. @param {number} s */
 export function timeString(s) {
   if (!Number.isFinite(s) || s < 0) s = 0;
   s = Math.floor(s);
@@ -93,7 +93,7 @@ export function timeString(s) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${String(m).padStart(2, "0")}:${ss}`;
 }
 
-/** Quita el prefijo "jscript:" de un manejador o expresión. @param {string} code */
+/** Strips the "jscript:" prefix from a handler or expression. @param {string} code */
 export function stripJs(code) {
   return code.replace(/^\s*jscript\s*:/i, "");
 }

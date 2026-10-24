@@ -31,7 +31,7 @@ mkShell {
     xdotool
   ];
 
-  # yt-dlp y deno de nixpkgs, sin necesidad de `npm run fetch-tools`.
+  # yt-dlp and deno from nixpkgs, no need for `npm run fetch-tools`.
   XP_MUSIC_TOOLS = "${xp-music.passthru.tools}";
   RUST_SRC_PATH = "${rustc.unwrapped}/lib/rustlib/src/rust/library";
 

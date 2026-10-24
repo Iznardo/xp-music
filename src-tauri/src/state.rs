@@ -1,4 +1,4 @@
-//! Estado global del backend, registrado con `app.manage(...)`.
+//! Global backend state, registered with `app.manage(...)`.
 
 use std::path::PathBuf;
 
@@ -8,7 +8,7 @@ pub struct AppState {
     pub db: std::sync::Arc<Db>,
 }
 
-/// Carpetas de la app según specs/001: datos en `%APPDATA%\xp-music`, logs en
+/// App folders per specs/001: data in `%APPDATA%\xp-music`, logs in
 /// `%LOCALAPPDATA%\xp-music\logs`.
 pub struct AppDirs {
     pub data: PathBuf,
@@ -19,7 +19,7 @@ pub struct AppDirs {
 impl AppDirs {
     pub fn resolve() -> std::io::Result<Self> {
         let base = |d: Option<PathBuf>| {
-            d.ok_or_else(|| std::io::Error::other("carpeta de usuario no disponible"))
+            d.ok_or_else(|| std::io::Error::other("user directory not available"))
         };
         let dirs = Self {
             data: base(dirs::config_dir())?.join("xp-music"),

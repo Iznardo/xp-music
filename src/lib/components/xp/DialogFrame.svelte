@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Ventana de diálogo XP dentro de la app (modal), con barra de título Luna.
+  // XP dialog window inside the app (modal), with a Luna title bar.
   import type { Snippet } from "svelte";
   import { t } from "../../i18n.svelte";
 

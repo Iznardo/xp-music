@@ -1,8 +1,8 @@
 <script lang="ts">
-  // Modo compacto (FR-004-13): un reproductor MP3 plateado de los 2000 con la
-  // silueta asimétrica de la ventana principal: lóbulo redondo para el disco que
-  // sobresale arriba y abajo, empalmes curvos y una pestaña que sube en S arriba a
-  // la derecha. Disco con la portada girando, LCD azul y botones "físicos".
+  // Compact mode (FR-004-13): a silver 2000s MP3 player with the asymmetric
+  // silhouette of the main window: a round lobe for the disc that sticks out at
+  // the top and bottom, curved fillets and a tab that rises in an S at the top
+  // right. Disc with the spinning cover, blue LCD and "physical" buttons.
   import { onMount } from "svelte";
   import { commands } from "../bindings";
   import { player } from "../stores/player.svelte";
@@ -22,7 +22,7 @@
   const artist = $derived(st?.track ? artistNames(st.track) : "XP Music");
   const volume = $derived(Math.round((st?.volume ?? 0.8) * 100));
 
-  // El título se desplaza si no cabe, como en las pantallas de la época.
+  // The title scrolls if it doesn't fit, as on the displays of the era.
   let titleBox = $state(0);
   let titleText = $state(0);
   const scroll = $derived(titleText > titleBox + 2);
@@ -39,19 +39,19 @@
     void commands.playerSeek(Math.round(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * duration));
   }
 
-  // --- Silueta ---
+  // --- Silhouette ---
   let w = $state(460);
   let h = $state(150);
-  const R = 68; // lóbulo del disco
+  const R = 68; // disc lobe
   const CX = 72;
-  const TOP = 24; // banda del cuerpo (arriba)
-  const BOTTOM_GAP = 20; // y su borde inferior, a esta distancia del final
-  const F = 14; // empalmes
-  const TAB_Y = 6; // pestaña de arriba a la derecha
+  const TOP = 24; // body band (top)
+  const BOTTOM_GAP = 20; // and its bottom edge, this far from the end
+  const F = 14; // fillets
+  const TAB_Y = 6; // tab at the top right
   function fillet(line: number, below: boolean, cy: number) {
     const fcY = line + (below ? F : -F);
     const dy = fcY - cy;
-    // Al montarse, la ventana aún puede tener el tamaño grande: sin raíces negativas.
+    // On mount, the window may still have the large size: no negative roots.
     const fx = CX + Math.sqrt(Math.max(0, (R + F) ** 2 - dy ** 2));
     const k = R / (R + F);
     return { fx, tx: CX + (fx - CX) * k, ty: cy + dy * k };
@@ -66,7 +66,7 @@
       `M ${n(t.tx)} ${n(t.ty)}`,
       `A ${F} ${F} 0 0 0 ${n(t.fx)} ${TOP}`,
       `L ${w - 170} ${TOP}`,
-      // Sube en S hasta la pestaña de los tornillos, como en la ventana grande.
+      // Rises in an S up to the screws tab, as in the large window.
       `C ${w - 140} ${TOP} ${w - 130} ${TAB_Y} ${w - 100} ${TAB_Y}`,
       `L ${w - 20} ${TAB_Y}`,
       `A 16 16 0 0 1 ${w - 4} ${TAB_Y + 16}`,
@@ -79,8 +79,8 @@
     ].join(" ");
   });
 
-  // La silueta es también la forma para los clics: en lo transparente pasan a lo
-  // de detrás (como en la ventana grande).
+  // The silhouette is also the shape for clicks: on transparent areas they pass
+  // through to what is behind (as in the large window).
   let pathEl = $state<SVGPathElement>();
   $effect(() => {
     void outline;
@@ -108,7 +108,7 @@
 
 <div class="frame" bind:clientWidth={w} bind:clientHeight={h}>
 <div class="device" style="clip-path: path('{outline}')" data-tauri-drag-region>
-  <!-- Disco: la portada gira mientras suena. -->
+  <!-- Disc: the cover spins while playing. -->
   <div class="disc" class:spin={playing} data-tauri-drag-region>
     {#if cover}
       <img src={cover} alt="" data-tauri-drag-region />
@@ -176,7 +176,7 @@
     </button>
   </div>
 </div>
-<!-- Bisel: brillo por dentro del borde, sin delineado oscuro. -->
+<!-- Bezel: glow inside the edge, no dark outline. -->
 <svg class="bevel" width={w} height={h} aria-hidden="true">
   <defs><clipPath id="compact-clip"><path d={outline} /></clipPath></defs>
   <path d={outline} bind:this={pathEl} clip-path="url(#compact-clip)" />
@@ -187,7 +187,7 @@
   .frame {
     position: absolute;
     inset: 0;
-    /* La sombra sigue la silueta (se aplica después del recorte). */
+    /* The shadow follows the silhouette (applied after the clipping). */
     filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45));
   }
   .bevel {
@@ -198,7 +198,7 @@
     stroke: rgb(255 255 255 / 0.85);
     stroke-width: 3;
   }
-  /* Cuerpo de aluminio cepillado, recortado con la silueta. */
+  /* Brushed aluminum body, clipped to the silhouette. */
   .device {
     position: absolute;
     inset: 0;
@@ -207,7 +207,7 @@
       linear-gradient(to bottom, #f7f8fa 0%, #dfe2e7 30%, #c9cdd4 70%, #b3b8c1 100%);
     user-select: none;
   }
-  /* Reflejo diagonal del metal. */
+  /* Diagonal reflection on the metal. */
   .shine {
     position: absolute;
     inset: 0;
@@ -215,8 +215,8 @@
     pointer-events: none;
   }
 
-  /* --- Disco con la portada --- */
-  /* El disco ocupa el lóbulo de la izquierda. */
+  /* --- Disc with the cover --- */
+  /* The disc fills the left lobe. */
   .disc {
     position: absolute;
     left: 18px;
@@ -249,7 +249,7 @@
       transform: rotate(360deg);
     }
   }
-  /* Agujero central y brillo fijo encima (no gira). */
+  /* Center hole and fixed highlight on top (doesn't spin). */
   .hole {
     position: absolute;
     left: 50%;
@@ -270,20 +270,20 @@
     pointer-events: none;
   }
 
-  /* Pantalla y botones en la banda del cuerpo. */
+  /* Display and buttons in the body band. */
   .main {
     position: absolute;
     left: 152px;
     right: 16px;
     top: 30px;
-    /* Botones algo por encima del borde inferior del cuerpo. */
+    /* Buttons slightly above the body's bottom edge. */
     bottom: 26px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
   }
 
-  /* --- Pantalla LCD azul retroiluminada --- */
+  /* --- Blue backlit LCD display --- */
   .lcd {
     position: relative;
     display: flex;
@@ -320,7 +320,7 @@
   }
   .title {
     display: inline-block;
-    /* Su ancho natural: así se sabe si cabe o hay que desplazarlo. */
+    /* Its natural width: that tells whether it fits or has to scroll. */
     width: max-content;
     font-weight: bold;
     font-size: 14px;
@@ -360,7 +360,7 @@
     flex: none;
     font-variant-numeric: tabular-nums;
   }
-  /* Barra segmentada, como los LCD de la época. */
+  /* Segmented bar, like the LCDs of the era. */
   .seek {
     position: relative;
     flex: 1;
@@ -385,7 +385,7 @@
     fill: currentColor;
   }
 
-  /* --- Botones físicos --- */
+  /* --- Physical buttons --- */
   .keys {
     display: flex;
     align-items: center;
@@ -420,7 +420,7 @@
     width: 22px;
     height: 15px;
   }
-  /* Al pulsar, el botón se hunde. */
+  /* When pressed, the button sinks in. */
   .key:active,
   .rocker button:active {
     transform: translateY(2px);
@@ -446,11 +446,11 @@
     border-left: 0;
   }
 
-  /* --- Botoncitos de ventana, como tornillos --- */
-  /* En la pestaña que sube arriba a la derecha. */
+  /* --- Small window buttons, like screws --- */
+  /* On the tab that rises at the top right. */
   .screws {
     position: absolute;
-    /* Algo separados del borde superior de la pestaña. */
+    /* Slightly away from the tab's top edge. */
     top: 11px;
     right: 22px;
     display: flex;

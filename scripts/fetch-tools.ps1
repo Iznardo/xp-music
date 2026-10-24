@@ -1,6 +1,6 @@
-﻿# Descarga yt-dlp (versión "onedir") y deno a tools/, en las versiones fijadas en
-# tools.lock.json, y comprueba sus SHA-256. Sin argumentos usa el lock; con -Update
-# toma las últimas versiones publicadas y reescribe el lock.
+﻿# Downloads yt-dlp ("onedir" version) and deno into tools/, at the versions pinned in
+# tools.lock.json, and checks their SHA-256. With no arguments it uses the lock; with
+# -Update it takes the latest published versions and rewrites the lock.
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\fetch-tools.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\fetch-tools.ps1 -Update
@@ -19,12 +19,12 @@ function Get-Asset($repo, $tag, $name) {
     $rel = if ($tag) { "tags/$tag" } else { 'latest' }
     $r = Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$repo/releases/$rel"
     $a = $r.assets | Where-Object name -eq $name
-    if (-not $a) { throw "No existe $name en $repo $($r.tag_name)" }
+    if (-not $a) { throw "$name does not exist in $repo $($r.tag_name)" }
     [pscustomobject]@{ Tag = $r.tag_name; Url = $a.browser_download_url }
 }
 
 $lock = if (Test-Path $lockPath) { Get-Content $lockPath -Raw | ConvertFrom-Json } else { $null }
-if (-not $Update -and -not $lock) { throw 'Falta tools.lock.json (usa -Update para crearlo).' }
+if (-not $Update -and -not $lock) { throw 'tools.lock.json is missing (use -Update to create it).' }
 
 # Windows ARM64 usa la entrada "windows-arm64" del lock; x64 sigue en las claves de la raíz.
 $arm64 = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64'
@@ -44,7 +44,7 @@ try {
         $tag = if ($Update) { $null } else { $entry.($s.Key).version }
         $asset = Get-Asset $s.Repo $tag $s.Asset
         $zip = Join-Path $tmp $s.Asset
-        Write-Host "Descargando $($s.Asset) $($asset.Tag)…"
+        Write-Host "Downloading $($s.Asset) $($asset.Tag)…"
         Invoke-WebRequest -Headers $headers $asset.Url -OutFile $zip
         $hash = Get-Sha256 $zip
         if (-not $Update -and $hash -ne $entry.($s.Key).sha256) {
@@ -58,13 +58,13 @@ try {
         if ($s.Key -eq 'ytDlp' -and (Test-Path $armExe)) { Move-Item -Force $armExe (Join-Path $dest 'yt-dlp.exe') }
         $newLock[$s.Key] = [ordered]@{ version = $asset.Tag; asset = $s.Asset; sha256 = $hash }
     }
-    # La versión de un solo archivo ya no hace falta: la app usa la "onedir".
+    # The single-file version is no longer needed: the app uses the "onedir" one.
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $tools 'yt-dlp.exe')
     if ($Update) {
         # Conserva las entradas de las demás plataformas (linux, macos-*, *-arm64).
         foreach ($p in $lock.PSObject.Properties) { if ($p.Name -notin 'ytDlp', 'deno') { $newLock[$p.Name] = $p.Value } }
         $newLock | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $lockPath
-        Write-Host "tools.lock.json actualizado."
+        Write-Host "tools.lock.json updated."
     }
     & (Join-Path $tools 'yt-dlp\yt-dlp.exe') --version
     & (Join-Path $tools 'deno.exe') --version | Select-Object -First 1

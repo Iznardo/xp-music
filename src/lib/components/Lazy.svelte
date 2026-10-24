@@ -1,6 +1,6 @@
 <script lang="ts" generics="P extends Record<string, unknown>">
-  // Carga diferida de un componente: su código va en un trozo aparte del bundle y
-  // solo se descarga la primera vez que se muestra (después queda en caché).
+  // Lazy loading of a component: its code goes in a separate bundle chunk and is
+  // only downloaded the first time it is shown (then it stays cached).
   import type { Component } from "svelte";
 
   let { load, props }: { load: () => Promise<{ default: Component<P> }>; props?: P } = $props();
