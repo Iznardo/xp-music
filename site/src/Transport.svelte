@@ -1,16 +1,17 @@
 <script lang="ts">
-  // Píldora de controles y barra inferior (copia visual de TransportBar de la app).
-  // Controla la música de la portada (player.svelte.ts).
+  // Controls pill and bottom bar (visual copy of the app's TransportBar).
+  // Controls the home page music (player.svelte.ts).
   import Slider from "../../src/lib/components/xp/Slider.svelte";
   import { place, radii, type Piece, type Rect } from "../../src/lib/skin";
   import { REPO, fmt } from "./content";
+  import { t } from "./i18n.svelte";
   import { current, next, player, seek, setVolume, stop, toggle, toggleMute } from "./player.svelte";
 
   let { pod, bar }: { pod: Piece; bar: Rect } = $props();
 
   const track = $derived(current());
   const pct = $derived(Math.min(100, (player.pos / track.dur) * 100));
-  const lcd = $derived(player.playing ? `${track.artist}: ${track.title}` : player.pos ? "En pausa" : player.started ? "Detenido" : "Listo: pulsa ▶ para escuchar");
+  const lcd = $derived(player.playing ? `${track.artist}: ${track.title}` : player.pos ? t.player.paused : player.started ? t.player.stopped : t.player.ready);
 
   let seekEl: HTMLDivElement;
   function seekAt(e: PointerEvent) {
@@ -20,21 +21,21 @@
 </script>
 
 <div class="pod" class:joined={pod.r[0] === 0} style="{place(pod)};border-radius:{radii(pod)}">
-  <button class="play" class:on={player.playing} title={player.playing ? "Pausa" : "Reproducir"} aria-label={player.playing ? "Pausa" : "Reproducir"} onclick={toggle}>
+  <button class="play" class:on={player.playing} title={player.playing ? t.player.pause : t.player.play} aria-label={player.playing ? t.player.pause : t.player.play} onclick={toggle}>
     {#if player.playing}
       <svg viewBox="0 0 16 16"><rect x="4" y="3" width="3" height="10" rx=".5" /><rect x="9" y="3" width="3" height="10" rx=".5" /></svg>
     {:else}
       <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" /></svg>
     {/if}
   </button>
-  <button class="round stop" title="Detener" aria-label="Detener" onclick={stop}>
+  <button class="round stop" title={t.player.stop} aria-label={t.player.stop} onclick={stop}>
     <svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1" /></svg>
   </button>
 
   <div class="right">
     <div class="seekrow">
       <svg class="tick" viewBox="0 0 10 8" aria-hidden="true"><path d="M5 0v8L0 4zM10 0v8L5 4z" /></svg>
-      <div class="seek" bind:this={seekEl} role="slider" aria-label="Posición" aria-valuemin={0} aria-valuemax={track.dur} aria-valuenow={Math.round(player.pos)} tabindex="-1" onpointerdown={seekAt}>
+      <div class="seek" bind:this={seekEl} role="slider" aria-label={t.player.position} aria-valuemin={0} aria-valuemax={track.dur} aria-valuenow={Math.round(player.pos)} tabindex="-1" onpointerdown={seekAt}>
         <div class="played" style:width="{pct}%"></div>
         <div class="thumb" style:left="{pct}%"></div>
       </div>
@@ -42,14 +43,14 @@
     </div>
     <div class="row">
       <div class="pill">
-        <button title="Anterior" aria-label="Anterior" onclick={() => next(-1)}>
+        <button title={t.player.previous} aria-label={t.player.previous} onclick={() => next(-1)}>
           <svg viewBox="0 0 16 16"><rect x="3" y="4" width="2" height="8" /><path d="M13 4v8L6 8z" /></svg>
         </button>
-        <button title="Siguiente" aria-label="Siguiente" onclick={() => next(1)}>
+        <button title={t.player.next} aria-label={t.player.next} onclick={() => next(1)}>
           <svg viewBox="0 0 16 16"><path d="M3 4v8l7-4z" /><rect x="11" y="4" width="2" height="8" /></svg>
         </button>
       </div>
-      <button class="round mute" title={player.muted ? "Activar sonido" : "Silencio"} aria-label={player.muted ? "Activar sonido" : "Silencio"} onclick={toggleMute}>
+      <button class="round mute" title={player.muted ? t.player.unmute : t.player.mute} aria-label={player.muted ? t.player.unmute : t.player.mute} onclick={toggleMute}>
         <svg viewBox="0 0 16 16">
           <path d="M2 6h3l4-3v10l-4-3H2z" />
           {#if player.muted}
@@ -60,24 +61,24 @@
         </svg>
       </button>
       <div class="volume">
-        <Slider value={player.volume} min={0} max={100} label="Volumen" onchange={setVolume} />
+        <Slider value={player.volume} min={0} max={100} label={t.player.volume} onchange={setVolume} />
       </div>
     </div>
   </div>
 </div>
 
 <div class="bar" style={place(bar)}>
-  <a class="lcd" href="#/" title="Reproduciendo">
+  <a class="lcd" href="#/" title={t.player.nowPlaying}>
     <span class="lcd-text">{lcd}</span>
     <span class="lcd-time">{fmt(player.pos)} / {fmt(track.dur)}</span>
   </a>
-  <a class="flat heart" href={REPO} title="¿Te gusta? Dale una estrella en GitHub" aria-label="Dar una estrella en GitHub">
+  <a class="flat heart" href={REPO} title={t.player.star} aria-label={t.player.starShort}>
     <svg viewBox="0 0 16 16"><path d="M8 13.5S2 9.8 2 5.8C2 4 3.4 2.7 5 2.7c1.3 0 2.4.8 3 1.9.6-1.1 1.7-1.9 3-1.9 1.6 0 3 1.3 3 3.1 0 4-6 7.7-6 7.7z" stroke="currentColor" stroke-width="1.3" fill="none" /></svg>
   </a>
   <button
     class="flat"
     class:on={player.shuffle}
-    title={player.shuffle ? "Desactivar orden aleatorio" : "Orden aleatorio"}
+    title={player.shuffle ? t.player.shuffleOn : t.player.shuffleOff}
     aria-pressed={player.shuffle}
     onclick={() => (player.shuffle = !player.shuffle)}
   >

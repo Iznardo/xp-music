@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Las visualizaciones de la app (src/lib/viz) siguiendo la música de la portada.
-  // Hasta que se pulsa ▶ (el navegador no deja sonar nada antes) van solas con un
-  // ritmo inventado: un pulso a 120 ppm y bandas que ondulan.
+  // The app's visualizations (src/lib/viz) following the home page music.
+  // Until ▶ is pressed (the browser does not allow any sound before that) they run on
+  // their own with a made-up rhythm: a 120 bpm pulse and undulating bands.
   import { onMount } from "svelte";
   import { Bars } from "../../src/lib/viz/canvas2d";
   import { EMPTY_FRAME, type VizData, type VizRenderer } from "../../src/lib/viz/types";
@@ -27,7 +27,7 @@
     try {
       r = make(canvas);
     } catch {
-      r = new Bars(canvas); // Sin WebGL2.
+      r = new Bars(canvas); // No WebGL2.
     }
     const scale = r.continuous ? 0.75 : Math.min(devicePixelRatio || 1, 1);
     const resize = () => {
@@ -41,7 +41,7 @@
     resize();
     const t0 = performance.now();
     let last = 0;
-    // En pausa se dibujan unos fotogramas más (el rastro se apaga) y se para.
+    // When paused, a few more frames are drawn (the trail fades out) and then it stops.
     let idle = 0;
     let raf = requestAnimationFrame(function loop(now) {
       raf = requestAnimationFrame(loop);

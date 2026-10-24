@@ -4,16 +4,17 @@ import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-/** Donde viven los .md en GitHub: los enlaces relativos que no son otra página de docs/ van ahí. */
+/** Where the .md files live on GitHub: relative links that are not another docs/ page go there. */
 const DOCS_ON_GITHUB = "https://github.com/Iznardo/xp-music/blob/main/docs/";
-/** Páginas de docs/ solo para el mantenedor: no salen en la web y sus enlaces van a GitHub.
- *  También hay que excluirlas en el glob de src/docs.ts. */
-const MAINTAINER_ONLY = ["publicar"];
+const DOCS_DIR = fileURLToPath(new URL("../docs", import.meta.url));
+/** docs/ pages for the maintainer only: not on the website, and links to them go to GitHub.
+ *  They must also be excluded in the globs of src/docs.ts. */
+const MAINTAINER_ONLY = ["releasing"];
 
 /**
- * `docs/*.md` → `{ title, html }`. Los enlaces entre páginas de docs/ pasan a rutas
- * de la web (`#/docs/…`), el resto de enlaces relativos a GitHub, y las imágenes
- * se empaquetan como cualquier otro recurso.
+ * `docs/*.md` and `docs/es/*.md` → `{ title, html }`. Links between docs pages become
+ * website routes (`#/docs/…`, the language is not part of the route), other relative
+ * links go to GitHub, and images are bundled like any other asset.
  */
 function markdown(): Plugin {
   return {
@@ -21,14 +22,22 @@ function markdown(): Plugin {
     transform(src, id) {
       if (!id.endsWith(".md")) return;
       const title = /^#\s+(.+)$/m.exec(src)?.[1]?.trim() ?? path.basename(id, ".md");
+      // Relative links resolve against the page's own folder (docs/ or docs/es/).
+      const base = new URL(path.relative(DOCS_DIR, path.dirname(id)).split(path.sep).join("/") + "/", DOCS_ON_GITHUB);
+      const pageIsEs = base.href.startsWith(`${DOCS_ON_GITHUB}es/`);
+      // The page's own language only: a link to the other language's copy stays on GitHub.
+      const isDoc = (url: string) => {
+        const rel = url.slice(DOCS_ON_GITHUB.length);
+        return /^([\w-]+)\.md$/.exec(pageIsEs ? (rel.startsWith("es/") ? rel.slice(3) : "") : rel);
+      };
       const images: string[] = [];
       const html = marked
         .parse(src, { async: false })
-        // El título lo pinta la vista, no el documento.
+        // The view draws the title, not the document.
         .replace(/^<h1>.*?<\/h1>\n?/, "")
         .replace(/ href="([^"#:]+)(#[^"]*)?"/g, (_, href: string, hash = "") => {
-          const url = new URL(href, DOCS_ON_GITHUB).href;
-          const doc = url.startsWith(DOCS_ON_GITHUB) ? /^([\w-]+)\.md$/.exec(url.slice(DOCS_ON_GITHUB.length)) : null;
+          const url = new URL(href, base).href;
+          const doc = url.startsWith(DOCS_ON_GITHUB) ? isDoc(url) : null;
           if (!doc || MAINTAINER_ONLY.includes(doc[1]!)) return ` href="${url}${hash}"`;
           return ` href="#/docs${doc[1] === "README" ? "" : `/${doc[1]}`}"`;
         })
@@ -40,8 +49,8 @@ function markdown(): Plugin {
   };
 }
 
-// Web del proyecto (GitHub Pages). Reutiliza estilos, geometría del skin, iconos y
-// visualizaciones de la app (../src) y la documentación de ../docs.
+// Project website (GitHub Pages). Reuses styles, skin geometry, icons and visualizations
+// from the app (../src) and the documentation in ../docs.
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   base: "./",

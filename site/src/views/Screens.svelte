@@ -1,19 +1,20 @@
 <script lang="ts">
-  // Capturas de la app, cada una en una ventana de XP.
-  import biblioteca from "../../../docs/biblioteca.jpg";
-  import reproduciendo from "../../../docs/reproduciendo.jpg";
+  // App screenshots, each in an XP window. Each language has its own, taken with that UI language.
+  import nowPlaying from "../../../docs/now-playing.jpg";
+  import library from "../../../docs/library.jpg";
+  import nowPlayingEs from "../../../docs/now-playing.es.jpg";
+  import libraryEs from "../../../docs/library.es.jpg";
+  import { language, t } from "../i18n.svelte";
 
-  const shots = [
-    { src: reproduciendo, title: "Reproduciendo", text: "La visualización «Ambiente: Agua» y la lista de reproducción actual." },
-    { src: biblioteca, title: "Biblioteca", text: "Tus listas de YouTube Music en el árbol de la izquierda y las canciones a la derecha." },
-  ];
+  const images = { en: [nowPlaying, library], es: [nowPlayingEs, libraryEs] };
+  const shots = $derived(t.screenshots.shots.map((s, i) => ({ ...s, src: images[language()][i]! })));
 </script>
 
 <div class="view">
   <header class="vhead">
     <div>
-      <h1>Capturas</h1>
-      <span class="muted">{shots.length} elementos</span>
+      <h1>{t.sections.screenshots}</h1>
+      <span class="muted">{t.screenshots.items(shots.length)}</span>
     </div>
   </header>
   {#each shots as s (s.title)}

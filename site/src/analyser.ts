@@ -1,6 +1,6 @@
-// Port de src-tauri/src/viz/bands.rs al navegador: de los datos de un AnalyserNode
-// (espectro en dB y forma de onda) al VizData que esperan las visualizaciones de la app.
-// Sin dependencias del navegador para poder probarlo con Node (site/analyser.test.mjs).
+// Browser port of src-tauri/src/viz/bands.rs: turns the data from an AnalyserNode
+// (dB spectrum and waveform) into the VizData the app's visualizations expect.
+// No browser dependencies, so it can be tested with Node (site/analyser.test.mjs).
 
 import type { VizData } from "../../src/lib/viz/types";
 
@@ -16,8 +16,8 @@ const BEAT_LO_HZ = 40;
 const BEAT_HI_HZ = 160;
 const BEAT_JUMP = 1.45;
 const BEAT_GAP = 7;
-/** El AnalyserNode escala la FFT por 1/N y usa ventana de Blackman: un seno a fondo
- *  de escala queda ~13 dB por debajo que con la normalización de la app. */
+/** The AnalyserNode scales the FFT by 1/N and uses a Blackman window: a full-scale
+ *  sine ends up ~13 dB lower than with the app's normalization. */
 export const DB_OFFSET = 13;
 
 export class Analyzer {
@@ -65,7 +65,7 @@ export class Analyzer {
     for (let i = 0; i < WAVE; i++) this.wave[i] = time[start + i * 4]!;
     this.level += (Math.min(1, Math.sqrt(sumSq / time.length) * 2) - this.level) * 0.3;
 
-    // Ritmo: salto de energía de graves sobre su media reciente (como en la app).
+    // Beat: jump in bass energy over its recent average (as in the app).
     let e = 0;
     for (let i = this.bassBins[0]; i < this.bassBins[1]; i++) e += 10 ** ((freqDb[i]! + DB_OFFSET) / 10);
     this.bassMax = Math.max(this.bassMax * 0.996, e, 1e-6);

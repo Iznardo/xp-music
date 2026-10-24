@@ -1,4 +1,5 @@
-// Estado de la web: ruta (hash), tema y última versión. El reproductor está en player.svelte.ts.
+// Website state: route (hash), theme and latest release. The player is in player.svelte.ts;
+// the language is in i18n.svelte.ts.
 
 import { REPO } from "./content";
 import { classify, type Build } from "./builds";
@@ -15,9 +16,21 @@ export const site = $state({
 
 addEventListener("hashchange", () => (site.hash = location.hash));
 
+/** Routes used before the site was translated, so published links keep working. */
+const LEGACY: Record<string, string> = {
+  descargar: "download",
+  capturas: "screenshots",
+  instalar: "install",
+  uso: "usage",
+  mascaras: "skins",
+  "preguntas-frecuentes": "faq",
+  compilar: "building",
+};
+
 export function route(hash: string) {
   const [section = "", doc = ""] = hash.replace(/^#\/?/, "").split("/");
-  return { section, doc: decodeURIComponent(doc) };
+  const slug = decodeURIComponent(doc);
+  return { section: LEGACY[section] ?? section, doc: LEGACY[slug] ?? slug };
 }
 
 export function setTheme(t: Theme) {
@@ -26,21 +39,22 @@ export function setTheme(t: Theme) {
   localStorage.setItem("xp-theme", t);
 }
 
-/** Un instalador de la release. `sha256`: el que calcula GitHub al subirlo. */
+/** A release installer. `sha256`: the one GitHub computes on upload. */
 export type Asset = Build & { name: string; size: number; url: string; sha256: string | null };
-export type Release = { tag: string; date: string; url: string; assets: Asset[] };
+/** `published` is an ISO date; the view formats it in the active language. */
+export type Release = { tag: string; published: string; url: string; assets: Asset[] };
 
-/** Última versión publicada (API de GitHub, sin autenticar: 60 peticiones/hora por IP). */
+/** Latest published release (GitHub API, unauthenticated: 60 requests/hour per IP). */
 export const release = $state<{ data: Release | null; failed: boolean }>({ data: null, failed: false });
 
-// VITE_RELEASE_API: otra URL con el mismo formato, para probar la página con una
-// release de ejemplo (`VITE_RELEASE_API=/ejemplo.json npm run site:dev`).
+// VITE_RELEASE_API: another URL with the same format, to try the page with a sample
+// release (`VITE_RELEASE_API=/sample.json npm run site:dev`).
 fetch(import.meta.env.VITE_RELEASE_API || `${REPO.replace("github.com", "api.github.com/repos")}/releases/latest`)
   .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
   .then((j) => {
     release.data = {
       tag: j.tag_name,
-      date: new Date(j.published_at).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }),
+      published: j.published_at,
       url: j.html_url,
       assets: j.assets.flatMap((a: { name: string; size: number; browser_download_url: string; digest?: string | null }) => {
         const build = classify(a.name);

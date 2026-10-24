@@ -1,10 +1,11 @@
 <!doctype html>
 <!--
-  Plantilla de la imagen para redes (site/public/og.png, 1200×630). No forma parte
-  de la web. Para regenerarla, abre este archivo directamente en el navegador
-  (file://, para que carguen las rutas relativas) a 1200×630 y haz una captura.
+  Template of the social image (site/public/og.jpg, 1200×630). It is not part of the
+  website. To regenerate it, open this file directly in the browser (file://, so the
+  relative paths load) at 1200×630, take a screenshot and encode it with
+  `ffmpeg -q:v 3`. It is in English: crawlers do not run the page's JavaScript.
 -->
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <style>
@@ -17,7 +18,7 @@
       }
       body {
         position: relative;
-        /* Velo de cielo detrás del texto: las nubes no deben cruzarse con las letras. */
+        /* Sky veil behind the text: the clouds must not cross the letters. */
         background:
           radial-gradient(ellipse 600px 175px at 300px 150px, #1857dc 0%, rgb(24 87 220 / 0.9) 60%, rgb(24 87 220 / 0) 100%),
           url("src/desktop.svg") center 38% / cover;
@@ -63,8 +64,8 @@
         font-size: 19px;
         text-shadow: none;
       }
-      /* La captura recortada con la silueta real de la ventana (outlinePath de
-         src/lib/skin.ts para 1100×720, el tamaño de la captura), sin marco añadido. */
+      /* The screenshot clipped to the window's real silhouette (outlinePath from
+         src/lib/skin.ts for 1100×720, the screenshot size), with no added frame. */
       .shot {
         position: absolute;
         left: 552px;
@@ -87,9 +88,9 @@
         <img src="../src/assets/logo.webp" alt="" />
         <h1>XP Music</h1>
       </div>
-      <p>YouTube Music con el aspecto de Windows Media Player&nbsp;9</p>
-      <div class="tags"><span>Windows</span><span>macOS</span><span>Linux</span><span>Gratis · MIT</span></div>
+      <p>YouTube Music with the look of Windows Media Player&nbsp;9</p>
+      <div class="tags"><span>Windows</span><span>macOS</span><span>Linux</span><span>Free · MIT</span></div>
     </div>
-    <div class="shot"><img src="../docs/reproduciendo.jpg" alt="" width="1100" height="720" /></div>
+    <div class="shot"><img src="../docs/now-playing.jpg" alt="" width="1100" height="720" /></div>
   </body>
 </html>
