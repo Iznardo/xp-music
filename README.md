@@ -26,8 +26,8 @@ SHA-256 y el enlace directo de descarga (`sha256sum archivo` para comprobarlo).
 | Windows 10/11 | ARM64 | `XP Music_x.y.z_arm64-setup.exe` | Experimental; sin firma Authenticode |
 | Linux | x64 | `…_amd64.deb`, `…_amd64.AppImage`, `…-1.x86_64.rpm` | Experimental |
 | Linux | ARM64 | `…_arm64.deb`, `…_aarch64.AppImage`, `…-1.aarch64.rpm` | Experimental |
-| macOS | Intel (x64) | `…_x64.dmg` | Experimental |
-| macOS | Apple Silicon (ARM64) | `…_aarch64.dmg` | Experimental |
+| macOS | Intel (x64) | `…_x64.dmg` | Experimental; sin actualizaciones automáticas |
+| macOS | Apple Silicon (ARM64) | `…_aarch64.dmg` | Experimental; sin actualizaciones automáticas |
 | Arch Linux | x86_64, aarch64 | `packaging/arch/PKGBUILD` (se compila desde el código) | Experimental |
 | NixOS / Nix | x86_64, aarch64 | flake del repositorio | Experimental |
 
@@ -109,8 +109,12 @@ Requiere macOS 11 o posterior.
 
 El CI abre el `.dmg`, comprueba la firma del bundle y arranca la app en macOS 15
 (Intel y Apple Silicon). Faltan las funciones propias de Windows (botones de miniatura,
-pausa al bloquear la sesión, clic a través de las máscaras). La app se actualiza sola
-descargando el `.app.tar.gz` firmado de la release.
+pausa al bloquear la sesión, clic a través de las máscaras).
+
+**No se actualiza sola:** para cambiar de versión, descarga el `.dmg` nuevo y sustituye la
+app en *Aplicaciones*. Con firma *ad hoc*, cada versión tiene una firma distinta y macOS
+pedirá una vez permiso para que la app lea su sesión del Llavero («Permitir siempre»).
+Las actualizaciones automáticas se activarán cuando la app se firme con Developer ID.
 
 ### NixOS / Nix
 
@@ -136,9 +140,8 @@ Si un yt-dlp antiguo falla con YouTube, actualiza `nixpkgs` y reconstruye.
 Las releases firmadas ofrecen actualizaciones desde la propia app:
 - **AppImage:** reemplaza el archivo original; debe estar en una carpeta donde puedas escribir.
 - **`.deb` y `.rpm`:** instalan la nueva versión solicitando autorización de administrador.
-- **macOS:** reemplaza la `.app` con el `.app.tar.gz` de la release.
 
-No se activa en binarios de desarrollo, Nix (`/nix/store`), Flatpak ni Snap.
+No se activa en macOS (experimental, ver arriba), binarios de desarrollo, Nix (`/nix/store`), Flatpak ni Snap.
 Para paquetes mantenidos por un repositorio (como el de Arch), el empaquetador puede
 desactivarlo con `XP_MUSIC_DISABLE_UPDATER=1` y dejar las actualizaciones al gestor de paquetes.
 Las compilaciones locales sin clave pública tampoco se autoactualizan.
@@ -211,7 +214,7 @@ recogida de artefactos del CI. Al añadir un target, actualiza esa tabla y la ma
 | Windows x64 | **El equipo Windows del mantenedor** (`npm run release`) | Authenticode con el certificado local + updater |
 | Windows ARM64 | CI (`windows-11-arm`) | Solo updater (sin Authenticode) |
 | Linux x64 / ARM64 | CI (`ubuntu-24.04`, `ubuntu-24.04-arm`): `.deb`, AppImage, `.rpm` | Updater |
-| macOS Intel / Apple Silicon | CI (`macos-15-intel`, `macos-15`): `.dmg` y `.app.tar.gz` | Updater; *ad hoc* o Developer ID + notarización si hay secretos `APPLE_*` |
+| macOS Intel / Apple Silicon | CI (`macos-15-intel`, `macos-15`): `.dmg` | Sin updater; *ad hoc* o Developer ID + notarización si hay secretos `APPLE_*` |
 
 Se conserva el certificado Authenticode de Windows: `setup-signing.ps1` lo crea
 **no exportable**, así que el instalador x64 sigue firmándose en el equipo Windows del
@@ -263,12 +266,12 @@ el workflow único:
 4. Escribe en las notas de la release, **encima** de las notas del mantenedor, una tabla
    *Sistema (SO y arquitectura) · SHA-256 · Descarga* con los instaladores; el texto del
    enlace es el nombre del archivo, que ya indica el formato. Los archivos del actualizador
-   (`.app.tar.gz`, `.sig`, `latest.json`) siguen en la release pero no se listan. La tabla va
+   (`.sig`, `latest.json`) siguen en la release pero no se listan. La tabla va
    entre marcadores HTML, así que reintentar el workflow la sustituye en vez de duplicarla.
 5. Crea un único `latest.json` (con solo las notas del mantenedor) con una entrada por
    target y formato: `windows-x86_64`, `windows-aarch64`, `linux-{x86_64,aarch64}-{deb,appimage,rpm}`
-   y `darwin-{x86_64,aarch64}-app`; las de Windows y macOS conservan también la clave
-   sin formato (`windows-x86_64`, `darwin-aarch64`…) que usan las instalaciones existentes.
+   (macOS no tiene entrada: es experimental y no se autoactualiza); las de Windows conservan
+   también la clave sin formato (`windows-x86_64`…) que usan las instalaciones existentes.
 6. Publica el draft solo cuando todo ha pasado.
 
 Si falla, el draft no se publica. Corrige el problema y reintenta **el mismo tag**

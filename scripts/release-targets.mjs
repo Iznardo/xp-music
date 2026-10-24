@@ -1,12 +1,9 @@
 // Fuente única de los artefactos de cada release: la usan el manifiesto del updater
 // (update-manifest.mjs), las notas (release-notes.mjs) y la recogida en CI
 // (collect-artifacts.mjs). Los nombres son los que genera el bundler de Tauri 2.10
-// (tauri-bundler: nsis/mod.rs, linux/{debian,rpm}.rs, appimage/linuxdeploy.rs, dmg/mod.rs),
-// salvo el `.app.tar.gz` de macOS, que Tauri llama «XP Music.app.tar.gz» sin arquitectura:
-// collect-artifacts.mjs lo renombra para que x64 y aarch64 no choquen en la release.
+// (tauri-bundler: nsis/mod.rs, linux/{debian,rpm}.rs, appimage/linuxdeploy.rs, dmg/mod.rs).
+// macOS es experimental y sin updater: solo se publica el `.dmg`, sin `.app.tar.gz`.
 import { readFile, readdir } from "node:fs/promises";
-
-export const PRODUCT = "XP Music";
 
 // target: id del job de CI (nombre del artefacto de Actions); coincide con el updater de Tauri.
 // suffix: final del nombre de archivo (los assets de GitHub cambian los espacios por puntos,
@@ -14,7 +11,6 @@ export const PRODUCT = "XP Music";
 // installer: aparece en la tabla de descargas de las notas.
 // updater: claves de `latest.json` para este archivo (con su `.sig`); la última puede ser
 //   un alias sin formato que usan las instalaciones ya existentes.
-// built: sufijo con el que lo deja Tauri, si es distinto de `suffix`.
 export const ARTIFACTS = [
   { target: "windows-x86_64", system: "Windows", arch: "x64", format: "Instalador (.exe)",
     suffix: (v) => `_${v}_x64-setup.exe`, installer: true,
@@ -36,14 +32,8 @@ export const ARTIFACTS = [
     suffix: (v) => `-${v}-1.aarch64.rpm`, installer: true, updater: ["linux-aarch64-rpm"] },
   { target: "darwin-x86_64", system: "macOS", arch: "Intel", format: "Disco (.dmg)",
     suffix: (v) => `_${v}_x64.dmg`, installer: true },
-  { target: "darwin-x86_64", system: "macOS", arch: "Intel", format: "Actualizador (.app.tar.gz)",
-    suffix: (v) => `_${v}_x64.app.tar.gz`, built: ".app.tar.gz",
-    updater: ["darwin-x86_64-app", "darwin-x86_64"] },
   { target: "darwin-aarch64", system: "macOS", arch: "Apple Silicon", format: "Disco (.dmg)",
     suffix: (v) => `_${v}_aarch64.dmg`, installer: true },
-  { target: "darwin-aarch64", system: "macOS", arch: "Apple Silicon", format: "Actualizador (.app.tar.gz)",
-    suffix: (v) => `_${v}_aarch64.app.tar.gz`, built: ".app.tar.gz",
-    updater: ["darwin-aarch64-app", "darwin-aarch64"] },
 ];
 
 export async function readVersion() {

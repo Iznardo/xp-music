@@ -52,7 +52,7 @@ test("generateNotes hashes local files, uses uploaded URLs and fails closed", as
     const notes = await generateNotes(metadata, packages, output);
     assert.equal(await readFile(output, "utf8"), notes);
     assert.ok(notes.includes(`| Linux ARM64 | \`${sha("payload-6")}\` | [${release.assets[6].name}](${release.assets[6].browser_download_url}) |`));
-    assert.ok(notes.includes(`| macOS Apple Silicon | \`${sha("payload-10")}\` | [${release.assets[10].name}](${release.assets[10].browser_download_url}) |`));
+    assert.ok(notes.includes(`| macOS Apple Silicon | \`${sha("payload-9")}\` | [${release.assets[9].name}](${release.assets[9].browser_download_url}) |`));
     assert.ok(!notes.includes("app.tar.gz"));
     assert.ok(notes.endsWith("\nMis notas\n"));
     // Regenerar sobre unas notas ya publicadas da el mismo resultado.

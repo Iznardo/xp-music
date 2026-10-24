@@ -145,9 +145,13 @@ jobs:
           bundles: ${{ matrix.bundles }}
           tag: ${{ inputs.tag }}
           updater-pubkey: ${{ inputs.tag && vars.XP_MUSIC_UPDATER_PUBKEY }}
-          signing-key: ${{ inputs.tag && secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # macOS no tiene updater (experimental): no recibe la clave.
+          signing-key: >-
+            ${{ inputs.tag && !startsWith(matrix.target, 'darwin-') &&
+            secrets.TAURI_SIGNING_PRIVATE_KEY }}
           signing-key-password: >-
-            ${{ inputs.tag && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+            ${{ inputs.tag && !startsWith(matrix.target, 'darwin-') &&
+            secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           windows-thumbprint: >-
             ${{ inputs.tag && vars.WINDOWS_SIGNING_THUMBPRINT }}
           apple-certificate: ${{ inputs.tag && secrets.APPLE_CERTIFICATE }}
