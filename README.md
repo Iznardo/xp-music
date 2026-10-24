@@ -43,6 +43,20 @@ No se guardan las cookies en texto plano si el almacén no está disponible.
 En GNOME, el icono de bandeja necesita una extensión AppIndicator.
 Por eso, en Linux cerrar la ventana sale de la app por defecto; activa «Cerrar a
 la bandeja» solo si tu escritorio muestra ese icono.
+En gestores de ventanas con teselado (Hyprland, sway, i3…) conviene que XP Music flote,
+sobre todo para el modo compacto: una ventana teselada ocupa todo su hueco y el reproductor
+compacto queda en una esquina. Una aplicación no puede pedir flotar en Wayland, así que
+hay que indicarlo en el gestor (clase/`app_id`: `xp-music`):
+
+```ini
+# Hyprland ≥ 0.53
+windowrule = float on, match:class ^xp-music$
+# Hyprland anterior
+windowrulev2 = float, class:^(xp-music)$
+# sway
+for_window [app_id="xp-music"] floating enable
+```
+
 Linux usa MPRIS para los controles multimedia; no incluye los botones de miniatura,
 la pausa al bloquear la sesión ni el clic a través de las zonas transparentes de las máscaras.
 ### NixOS / Nix
