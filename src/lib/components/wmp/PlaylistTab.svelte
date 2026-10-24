@@ -8,7 +8,7 @@
   import { ui, type MenuItem } from "../../stores/ui.svelte";
   import { router } from "../../router.svelte";
   import { addToNewPlaylist, playPlaylist } from "../../actions";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
 
   let { maximized = false }: { maximized?: boolean } = $props();
   const win = appWindow();

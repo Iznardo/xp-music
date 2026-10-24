@@ -4,7 +4,7 @@
   import { hintTrack, itemSubtitle, itemThumbs, itemTitle, openItem, playTracks, trackMenu } from "../../actions";
   import { ui, type MenuItem } from "../../stores/ui.svelte";
   import { thumbSrc } from "../../thumb";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
 
   let { items, row = false }: { items: MediaItem[]; row?: boolean } = $props();
 

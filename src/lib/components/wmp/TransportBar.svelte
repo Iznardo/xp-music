@@ -7,7 +7,7 @@
   import { ui } from "../../stores/ui.svelte";
   import { router } from "../../router.svelte";
   import { artistNames, fmtTime, playlistChoices, setLike } from "../../actions";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
   import Slider from "../xp/Slider.svelte";
   import { place, radii, type Piece, type Rect } from "../../skin";
 

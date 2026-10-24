@@ -2,7 +2,7 @@
   // Envoltorio de carga: barra "marquee" de XP mientras carga, mensaje y reintento si falla.
   import type { Snippet } from "svelte";
   import type { Resource } from "../../resource.svelte";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
 
   let { res, children }: { res: Resource<T>; children: Snippet } = $props();
 </script>

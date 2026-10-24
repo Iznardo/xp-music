@@ -11,7 +11,7 @@
   import { thumbSrc } from "../thumb";
   import { handleShortcut } from "../menus";
   import { vizVisible } from "../viz/active";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
 
   let { id }: { id: string } = $props();
 

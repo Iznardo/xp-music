@@ -6,7 +6,7 @@
   import { library } from "../stores/library.svelte";
   import { ui } from "../stores/ui.svelte";
   import { thumbUrl } from "../thumb";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
 
   let browsers = $state<BrowserProfile[]>([]);

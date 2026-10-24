@@ -170,6 +170,7 @@ try {
 
 let settings: Settings = {
   theme: "Blue",
+  language: null,
   volume: 0.8,
   normalizeVolume: true,
   audioQuality: "Aac128",

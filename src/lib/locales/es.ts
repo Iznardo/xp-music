@@ -1,6 +1,8 @@
-// Todos los textos de la interfaz (constitución: UI en español, en un único módulo).
+// Spanish translation of the interface. It must have exactly the shape of `en`.
 
-export const t = {
+import type { Dict } from "./en";
+
+export const es: Dict = {
   updates: {
     title: "Actualización de XP Music",
     question: (v: string, notes: string | null) =>
@@ -209,6 +211,8 @@ ${notes}` : ""}
     },
     theme: "Combinación de colores",
     themes: { Blue: "Azul (predeterminado)", Olive: "Verde oliva", Silver: "Plateado" },
+    language: "Idioma",
+    languageAuto: "Automático (idioma del sistema)",
     xpSounds: "Reproducir sonidos del sistema",
     notifications: "Notificar la canción nueva cuando la ventana esté oculta",
     closeToTray: "Al cerrar, seguir en el área de notificación",
@@ -262,4 +266,4 @@ ${msg}`,
     aboutText:
       "Reproductor de YouTube Music con aspecto de Windows XP.\nHecho con Rust, Tauri y Svelte.\n\nNo está afiliado a Google, YouTube ni Microsoft.\nUsa yt-dlp (Unlicense) y Deno (MIT).",
   },
-} as const;
+};

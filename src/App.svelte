@@ -20,7 +20,7 @@
   import { appWindow } from "./lib/platform";
   import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
-  import { t } from "./lib/strings";
+  import { t } from "./lib/i18n.svelte";
   import logo from "./assets/logo.webp";
   import type { SearchFilter } from "./lib/bindings";
 

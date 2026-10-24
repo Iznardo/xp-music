@@ -3,7 +3,7 @@
 
 import { commands, events, type UpdateInfo, type UpdaterStatus } from "../bindings";
 import { ui } from "./ui.svelte";
-import { t } from "../strings";
+import { t } from "../i18n.svelte";
 
 class UpdatesStore {
   status = $state<UpdaterStatus | null>(null);

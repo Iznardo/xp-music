@@ -1,11 +1,11 @@
 <script lang="ts">
   // Opciones estilo hoja de propiedades de XP (FR-004-14).
-  import { commands, type AudioDevice, type Settings, type Theme, type ToolVersions, type VizPreset } from "../bindings";
+  import { commands, type AudioDevice, type Language, type Settings, type Theme, type ToolVersions, type VizPreset } from "../bindings";
   import { settings } from "../stores/settings.svelte";
   import { auth } from "../stores/auth.svelte";
   import { ui } from "../stores/ui.svelte";
   import { updates } from "../stores/updates.svelte";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import logo from "../../assets/logo.webp";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
   import { VIZ_ORDER } from "../viz/presets";
@@ -53,6 +53,8 @@
   }
 
   const themes: Theme[] = ["Blue", "Olive", "Silver"];
+  // Each language is named in itself, so it can be found whatever the current one is.
+  const languages: [Language, string][] = [["en", "English"], ["es", "Español"]];
   const vizs: VizPreset[] = VIZ_ORDER;
 
   async function apply() {
@@ -88,6 +90,13 @@
           {#each themes as th}
             <label><input type="radio" name="theme" checked={draft.theme === th} onchange={() => draft && (draft.theme = th)} /> {t.options.themes[th]}</label>
           {/each}
+        </fieldset>
+        <fieldset>
+          <legend>{t.options.language}</legend>
+          <select class="xp-input wide" value={draft.language ?? ""} onchange={(e) => draft && (draft.language = (e.currentTarget.value || null) as Language | null)}>
+            <option value="">{t.options.languageAuto}</option>
+            {#each languages as [id, name]}<option value={id}>{name}</option>{/each}
+          </select>
         </fieldset>
         <fieldset>
           <legend>{t.options.title}</legend>

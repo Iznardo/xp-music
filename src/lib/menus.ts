@@ -7,7 +7,7 @@ import { ui, type MenuItem } from "./stores/ui.svelte";
 import { auth } from "./stores/auth.svelte";
 import { skins } from "./stores/skins.svelte";
 import { appWindow } from "./platform";
-import { t } from "./strings";
+import { t } from "./i18n.svelte";
 
 const vol = (d: number) => {
   const v = player.state?.volume ?? 0.8;

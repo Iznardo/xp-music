@@ -3,7 +3,7 @@
   import { router, type LibrarySection } from "../router.svelte";
   import { library } from "../stores/library.svelte";
   import { auth } from "../stores/auth.svelte";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import TreeView from "../components/xp/TreeView.svelte";
   import type { TreeNode } from "../components/xp/types";
   import SectionView from "./SectionView.svelte";

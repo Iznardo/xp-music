@@ -3,7 +3,7 @@
   import { Resource } from "../resource.svelte";
   import { playTracks } from "../actions";
   import { router } from "../router.svelte";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import DetailHeader from "../components/wmp/DetailHeader.svelte";
   import TrackTable from "../components/wmp/TrackTable.svelte";
   import Loading from "../components/xp/Loading.svelte";
