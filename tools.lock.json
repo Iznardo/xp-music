@@ -20,5 +20,53 @@
                  "version":  "v2.9.7",
                  "asset":  "deno-x86_64-pc-windows-msvc.zip",
                  "sha256":  "a0c3101b4158d1dfb7d6a78a7bf0f3de80c96bb423c152beec8beb22786f2238"
-             }
+             },
+    "linux-arm64": {
+        "ytDlp": {
+            "version": "2026.08.19",
+            "asset": "yt-dlp_linux_aarch64",
+            "sha256": "b16e4dab368a816cd05d477d698a605a6ae87ccee1c8ffd38fa21d7254141fcc"
+        },
+        "deno": {
+            "version": "v2.9.7",
+            "asset": "deno-aarch64-unknown-linux-gnu.zip",
+            "sha256": "c832298b1ad4422481334855f6003e0f54145762c5a134f20a489511d2f65bbf"
+        }
+    },
+    "windows-arm64": {
+        "ytDlp": {
+            "version": "2026.08.19",
+            "asset": "yt-dlp_win_arm64.zip",
+            "sha256": "2ad49db7429a6204721f711a44199a8c9fa8d5df2183dd7fedc4ef6c9e2e50d3"
+        },
+        "deno": {
+            "version": "v2.9.7",
+            "asset": "deno-aarch64-pc-windows-msvc.zip",
+            "sha256": "c4c4ac8bfdaa37814bda5c05fc9cdf2154904e2ef8277673a30bdceaaa649807"
+        }
+    },
+    "macos-x64": {
+        "ytDlp": {
+            "version": "2026.08.19",
+            "asset": "yt-dlp_macos",
+            "sha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202"
+        },
+        "deno": {
+            "version": "v2.9.7",
+            "asset": "deno-x86_64-apple-darwin.zip",
+            "sha256": "95daaff11c116a52ad54785e7914c8e9c9cdcaba793c5ed929c74ca2d8e6259a"
+        }
+    },
+    "macos-arm64": {
+        "ytDlp": {
+            "version": "2026.08.19",
+            "asset": "yt-dlp_macos",
+            "sha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202"
+        },
+        "deno": {
+            "version": "v2.9.7",
+            "asset": "deno-aarch64-apple-darwin.zip",
+            "sha256": "5cd46d6268f6f78f5d88bdc7159d20bd44cdaa4b3303474839f87ec6fe7ae25c"
+        }
+    }
 }

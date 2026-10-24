@@ -9,6 +9,20 @@ import { generateManifest } from "./update-manifest.mjs";
 
 const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
+// Nombres tal y como los genera Tauri (contrato escrito a mano, no sacado de la tabla).
+const payloads = [
+  [`XP Music_${version}_x64-setup.exe`, ["windows-x86_64-nsis", "windows-x86_64"]],
+  [`XP Music_${version}_arm64-setup.exe`, ["windows-aarch64-nsis", "windows-aarch64"]],
+  [`XP Music_${version}_amd64.deb`, ["linux-x86_64-deb"]],
+  [`XP Music_${version}_amd64.AppImage`, ["linux-x86_64-appimage"]],
+  [`XP Music-${version}-1.x86_64.rpm`, ["linux-x86_64-rpm"]],
+  [`XP Music_${version}_arm64.deb`, ["linux-aarch64-deb"]],
+  [`XP Music_${version}_aarch64.AppImage`, ["linux-aarch64-appimage"]],
+  [`XP Music-${version}-1.aarch64.rpm`, ["linux-aarch64-rpm"]],
+  [`XP Music_${version}_x64.app.tar.gz`, ["darwin-x86_64-app", "darwin-x86_64"]],
+  [`XP Music_${version}_aarch64.app.tar.gz`, ["darwin-aarch64-app", "darwin-aarch64"]],
+];
+
 test("manifest uses uploaded URLs and fails closed on incomplete or unsafe releases", async () => {
   const directory = await mkdtemp(join(tmpdir(), "xp-music-manifest-"));
   const packages = join(directory, "packages");
@@ -19,13 +33,8 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
       tag_name: `v${version}`, draft: true, prerelease: false,
       body: "Existing release notes", created_at: "2026-05-01T12:34:56Z", assets: [],
     };
-    const names = [
-      `XP Music_${version}_x64-setup.exe`,
-      `XP Music_${version}_amd64.deb`,
-      `XP Music_${version}_amd64.AppImage`,
-    ];
     const signaturePaths = [];
-    for (const [index, name] of names.entries()) {
+    for (const [index, [name]] of payloads.entries()) {
       const nested = join(packages, String(index), "bundle");
       await mkdir(nested, { recursive: true });
       await writeFile(join(nested, name), "payload");
@@ -40,23 +49,27 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
         });
       }
     }
+    // Instaladores sin firma de updater (.dmg) y notas con el bloque generado: no cuentan.
+    release.assets.push({ name: `XP.Music_${version}_x64.dmg`, size: 1,
+      browser_download_url: `https://github.com/Iznardo/xp-music/releases/download/v${version}/XP.Music_${version}_x64.dmg` });
+    release.body = "<!-- xp-music:downloads:start -->\n## Descargas\n<!-- xp-music:downloads:end -->\n\nExisting release notes\n";
     await writeFile(metadata, JSON.stringify(release));
     // A different cwd must not change where package.json is read.
     execFileSync(process.execPath, [fileURLToPath(new URL("./update-manifest.mjs", import.meta.url)),
       metadata, packages, output], { cwd: directory });
     const manifest = JSON.parse(await readFile(output, "utf8"));
     assert.equal(manifest.version, version);
-    assert.equal(manifest.notes, release.body);
+    assert.equal(manifest.notes, "Existing release notes");
     assert.equal(manifest.pub_date, release.created_at);
-    assert.deepEqual(Object.keys(manifest.platforms).sort(), [
-      "linux-x86_64-appimage", "linux-x86_64-deb", "windows-x86_64", "windows-x86_64-nsis",
-    ]);
-    for (const [index, platform] of ["windows-x86_64-nsis", "linux-x86_64-deb", "linux-x86_64-appimage"].entries()) {
-      assert.deepEqual(manifest.platforms[platform], {
-        signature: `signature-${index}`, url: release.assets[index * 2].browser_download_url,
-      });
+    assert.deepEqual(Object.keys(manifest.platforms).sort(), payloads.flatMap(([, keys]) => keys).sort());
+    for (const [index, [, keys]] of payloads.entries()) {
+      for (const key of keys) {
+        assert.deepEqual(manifest.platforms[key], {
+          signature: `signature-${index}`, url: release.assets[index * 2].browser_download_url,
+        });
+      }
     }
-    assert.deepEqual(manifest.platforms["windows-x86_64"], manifest.platforms["windows-x86_64-nsis"]);
+    release.body = "Existing release notes";
 
     async function rejectsRelease(change, pattern) {
       const invalid = structuredClone(release);
@@ -71,10 +84,14 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
     await rejectsRelease((r) => { r.prerelease = true; }, /must be a draft/);
     await rejectsRelease((r) => { r.assets.splice(0, 1); }, /remote artifact/);
     await rejectsRelease((r) => { r.assets.splice(1, 1); }, /remote artifact/);
+    // Faltan las entradas de ARM64 o macOS: no se publica un manifiesto parcial.
+    await rejectsRelease((r) => { r.assets.splice(2, 2); }, /remote artifact/);
+    await rejectsRelease((r) => { r.assets.splice(16, 2); }, /remote artifact/);
     await rejectsRelease((r) => { r.assets.push(r.assets[0]); }, /found 2/);
     await rejectsRelease((r) => { r.assets.push(r.assets[1]); }, /found 2/);
     await rejectsRelease((r) => { r.assets[0].size++; }, /size mismatch/);
     await rejectsRelease((r) => { r.assets[1].size = 0; }, /empty uploaded signature/);
+    await rejectsRelease((r) => { r.body = "<!-- xp-music:downloads:start -->"; }, /incompleto/);
     for (const url of [
       release.assets[0].browser_download_url.replace("https:", "http:"),
       release.assets[0].browser_download_url.replace("github.com", "github.com.evil.test"),
@@ -91,9 +108,13 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
     await rm(signaturePaths[2]);
     await assert.rejects(generateManifest(metadata, packages, output), /local artifact/);
     await writeFile(signaturePaths[2], "signature-2");
-    const duplicate = join(packages, names[0]);
+    const duplicate = join(packages, payloads[0][0]);
     await writeFile(duplicate, "payload");
     await assert.rejects(generateManifest(metadata, packages, output), /found 2/);
+    await rm(duplicate);
+    // Sin el .app.tar.gz local de macOS tampoco se genera.
+    await rm(join(packages, "9", "bundle", payloads[9][0]));
+    await assert.rejects(generateManifest(metadata, packages, output), /local artifact/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

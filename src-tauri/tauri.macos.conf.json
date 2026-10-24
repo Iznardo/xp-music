@@ -1,0 +1,16 @@
+{
+  "bundle": {
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "resources": {
+      "../tools/deno": "tools/deno",
+      "../tools/yt-dlp/": "tools/yt-dlp/"
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
+    }
+  }
+}

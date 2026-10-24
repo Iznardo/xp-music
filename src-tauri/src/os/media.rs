@@ -1,8 +1,9 @@
-//! Controles multimedia del sistema (SMTC en Windows, MPRIS en Linux).
+//! Controles multimedia del sistema (SMTC en Windows, MPRIS en Linux, MediaPlayer en macOS).
 //!
 //! En Windows, una ventana oculta en su propio hilo mantiene SMTC y los avisos
 //! de bloqueo de sesión aunque la WebView esté destruida (en la bandeja).
-//! En Linux, MPRIS no necesita ventana; la pausa al bloquear no está soportada.
+//! En Linux y macOS no hace falta ventana (en macOS basta el bucle de eventos de la app,
+//! que ya corre en el hilo principal); la pausa al bloquear no está soportada.
 
 use std::sync::Arc;
 #[cfg(windows)]

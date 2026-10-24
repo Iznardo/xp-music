@@ -1,6 +1,10 @@
 ﻿# Publica una versión de XP Music (specs/007, FR-007-07): sube la versión, compila
-# el instalador firmado, prepara un draft y lanza el workflow Windows/Linux.
-# Solo el workflow publica la release y latest.json cuando pasan ambos sistemas.
+# el instalador Windows x64 firmado (el único que se hace aquí: el certificado es
+# no exportable), prepara un draft y lanza el workflow multiplataforma.
+# El workflow compila el resto (Windows ARM64, Linux x64/ARM64, macOS Intel/Apple
+# Silicon), y solo él publica la release, la tabla de descargas y latest.json
+# cuando pasan todos los targets. -Notes son las notas del mantenedor: el workflow
+# les añade encima la tabla de descargas.
 #
 #   npm run release                 # patch: 0.1.0 → 0.1.1
 #   npm run release -- -Bump minor
@@ -131,7 +135,7 @@ if (Test-Path $signingPath) {
 }
 if ($NoPublish) { Write-Host 'Compilado sin publicar.'; exit 0 }
 
-# --- 6. Preparar draft; el workflow verifica ambos sistemas y publica ----------
+# --- 6. Preparar draft; el workflow compila el resto, lo verifica y publica -----
 $sigFile = "$($installer.FullName).sig"
 if (-not (Test-Path $sigFile)) { Fail 'Falta la firma del updater del instalador.' }
 $tag = "v$v"
@@ -146,9 +150,10 @@ if ($LASTEXITCODE -ne 0) { Fail 'No se pudo crear el tag (si ya existe el draft,
 git push origin main $tag
 if ($LASTEXITCODE -ne 0) { Fail 'No se pudo subir el tag.' }
 
+# Notas del mantenedor; el workflow antepone la tabla de descargas (SHA-256 y enlaces).
 if (-not $Notes) { $Notes = "XP Music $v" }
 gh release create $tag $installer.FullName $sigFile --repo $repo --draft --title "XP Music $v" --notes $Notes
 if ($LASTEXITCODE -ne 0) { Fail 'No se pudo preparar el draft.' }
 gh workflow run release.yml --repo $repo --ref main -f "tag=$tag"
 if ($LASTEXITCODE -ne 0) { Fail 'El draft sigue sin publicar: lanza release.yml con su tag desde Actions.' }
-Write-Host "Draft $tag preparado. El workflow publicará Windows, Linux y latest.json si pasan las pruebas." -ForegroundColor Green
+Write-Host "Draft $tag preparado. El workflow compilará y probará Windows ARM64, Linux y macOS, y publicará la release con la tabla de descargas y latest.json si todo pasa." -ForegroundColor Green

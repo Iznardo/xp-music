@@ -13,8 +13,25 @@ use tauri::{AppHandle, Manager, WebviewWindowBuilder};
 use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+use crate::error::{AppError, AppResult};
 use crate::player::service::PlayerService;
 use crate::settings::Settings;
+
+/// Abre una carpeta en el gestor de archivos del sistema.
+pub fn open_dir(dir: &std::path::Path) -> AppResult<()> {
+    let opener = if cfg!(windows) {
+        "explorer.exe"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(opener)
+        .arg(dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| AppError::internal(e.to_string()))
+}
 
 /// Si se está saliendo de verdad (no solo cerrando la ventana a la bandeja).
 #[derive(Default)]
