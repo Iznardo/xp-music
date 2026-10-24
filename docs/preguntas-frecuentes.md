@@ -8,9 +8,17 @@ No. XP Music no está afiliado, patrocinado ni respaldado por Google, YouTube ni
 
 El instalador está firmado, pero no con un certificado comercial, así que SmartScreen avisa las primeras veces. Pulsa «Más información» → «Ejecutar de todas formas».
 
+## macOS dice que no puede abrir la app
+
+La app de macOS es experimental y lleva una firma *ad hoc*, sin certificado de Apple ni notarización, así que Gatekeeper la bloquea la primera vez. En macOS 15 o posterior, intenta abrirla y luego ve a **Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente»**; en versiones anteriores, clic derecho → **Abrir**. Más detalles en [Instalar](instalar.md).
+
+## En macOS no me llegan las actualizaciones
+
+Es intencionado mientras macOS sea experimental: descarga el `.dmg` nuevo y sustituye la app en *Aplicaciones*. Tras cambiar de versión, macOS pedirá una vez permiso para que la app lea su sesión del Llavero.
+
 ## ¿Dónde se guarda mi sesión?
 
-En Windows, cifrada con DPAPI (ligada a tu usuario). En Linux, en el Secret Service (GNOME Keyring, KeePassXC); si no está disponible, la sesión no se guarda en texto plano.
+En Windows, cifrada con DPAPI (ligada a tu usuario). En Linux, en el Secret Service (GNOME Keyring, KeePassXC); si no está disponible, la sesión no se guarda en texto plano. En macOS, en el Llavero.
 
 ## En Linux no puedo iniciar sesión o se me olvida la cuenta
 

@@ -24,7 +24,7 @@
         <p>Reproductor de escritorio para <b>YouTube Music</b> con el aspecto de <b>Windows Media Player 9</b> en Windows XP.</p>
         <p class="sub">
           Inicio, búsqueda, biblioteca, «Me gusta», historial y radio de tu cuenta; visualizaciones, modo compacto y máscaras de WMP.
-          Para Windows 10/11 y Linux x86_64 (experimental). Gratis y de código abierto.
+          Para Windows 10/11, y en pruebas para Linux y macOS. Gratis y de código abierto.
         </p>
         <div class="cta">
           <a class="xp-btn" href="#/descargar">Descargar{release.data ? ` ${release.data.tag}` : ""}</a>
