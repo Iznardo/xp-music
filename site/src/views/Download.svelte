@@ -9,6 +9,9 @@
   const exe = $derived(find(/\.exe$/i));
   const deb = $derived(find(/\.deb$/i));
   const appimage = $derived(find(/\.AppImage$/i));
+  // macOS (en preparación): la tarjeta sale sola cuando la release trae los .dmg.
+  const macArm = $derived(find(/(aarch64|arm64).*\.dmg$/i));
+  const macIntel = $derived(find(/(x64|x86_64|intel).*\.dmg$/i));
   const mb = (a: Asset) => `${(a.size / 1048576).toFixed(1)} MB`;
 </script>
 
@@ -41,6 +44,17 @@
       </div>
       <p class="hint"><a href="#/docs/instalar">Instrucciones para Linux</a></p>
     </fieldset>
+    {#if macArm || macIntel}
+      <fieldset>
+        <legend>macOS</legend>
+        <p>Imagen de disco: ábrela y arrastra XP Music a Aplicaciones.</p>
+        <div class="row">
+          {#if macArm}<a class="xp-btn big" href={macArm.url}>Apple Silicon ({mb(macArm)})</a>{/if}
+          {#if macIntel}<a class="xp-btn big" href={macIntel.url}>Intel ({mb(macIntel)})</a>{/if}
+        </div>
+        <p class="hint"><a href="#/docs/instalar">Instrucciones para macOS</a></p>
+      </fieldset>
+    {/if}
   </div>
 
   {#if assets.length}
