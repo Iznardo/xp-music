@@ -182,8 +182,12 @@ Otras órdenes útiles:
 El workflow único `.github/workflows/release.yml` compila, comprueba y empaqueta
 **los seis targets** (Windows x64/ARM64, Linux x64/ARM64, macOS Intel/Apple Silicon) en
 cada PR y en cada push a `main`, y comprueba el flake de Nix en x86_64 y aarch64. Cada
-target ejecuta la acción local `.github/actions/build-target` (dependencias, `npm run check`,
-empaquetado, smoke test y subida de artefactos). Los smoke tests arrancan el paquete real:
+target ejecuta la acción local `.github/actions/build-target` (dependencias, empaquetado,
+smoke test y subida de artefactos). `npm run check` corre en un target por sistema
+(Windows x64, Linux x64 y macOS Apple Silicon), porque el código específico de cada SO
+no cambia con la arquitectura. Fuera de las releases se usa una caché de compilación de
+Rust (`Swatinem/rust-cache`, la guarda solo `main`); al publicar se compila siempre sin
+caché. Los smoke tests arrancan el paquete real:
 
 - Linux (`.deb`, AppImage): arranque, recursos, modo compacto y cierre, con
   `scripts/smoke-linux.sh`. El `.rpm` se instala en un contenedor `fedora:latest`
