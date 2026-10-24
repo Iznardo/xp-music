@@ -63,31 +63,21 @@
         font-size: 19px;
         text-shadow: none;
       }
-      /* Ventana de XP con la captura, cortada por la derecha. */
-      .win {
+      /* La captura recortada con la silueta real de la ventana (outlinePath de
+         src/lib/skin.ts para 1100×720, el tamaño de la captura), sin marco añadido. */
+      .shot {
         position: absolute;
-        left: 590px;
-        top: 96px;
-        width: 760px;
-        border: 3px solid #0831d9;
-        border-top: 0;
-        border-radius: 9px 9px 0 0;
-        background: #ece9d8;
-        box-shadow: 0 14px 40px rgb(0 0 0 / 0.5);
+        left: 552px;
+        top: 158px;
+        width: 1100px;
+        height: 720px;
+        transform: scale(0.58);
+        transform-origin: 0 0;
+        filter: drop-shadow(0 16px 26px rgb(0 0 0 / 0.5));
       }
-      .bar {
-        height: 30px;
-        margin: 0 -3px;
-        padding: 0 10px;
-        border-radius: 8px 8px 0 0;
-        background: linear-gradient(to bottom, #0997ff 0%, #0053ee 8%, #0050ee 40%, #0066ff 88%, #005bff 95%, #003dd7 100%);
-        color: #fff;
-        font: bold 15px/30px "Trebuchet MS", sans-serif;
-        text-shadow: 1px 1px #0f1089;
-      }
-      .win img {
+      .shot img {
         display: block;
-        width: 100%;
+        clip-path: path("M 0 60 A 12 12 0 0 1 12 48 L 40 48 C 100 48 100 22 160 22 L 724 22 C 786 22 786 0 848 0 L 1088 0 A 12 12 0 0 1 1100 12 L 1100 694 L 496.48 694 A 18 18 0 0 0 481.82 701.55 A 44 44 0 0 1 446 720 L 148 720 A 40 40 0 0 1 108 680 C 108 605 0 605 0 530 Z");
       }
     </style>
   </head>
@@ -98,11 +88,8 @@
         <h1>XP Music</h1>
       </div>
       <p>YouTube Music con el aspecto de Windows Media Player&nbsp;9</p>
-      <div class="tags"><span>Windows 10/11</span><span>Linux</span><span>Gratis · MIT</span></div>
+      <div class="tags"><span>Windows</span><span>macOS</span><span>Linux</span><span>Gratis · MIT</span></div>
     </div>
-    <div class="win">
-      <div class="bar">Reproduciendo - XP Music</div>
-      <img src="../docs/reproduciendo.jpg" alt="" />
-    </div>
+    <div class="shot"><img src="../docs/reproduciendo.jpg" alt="" width="1100" height="720" /></div>
   </body>
 </html>
