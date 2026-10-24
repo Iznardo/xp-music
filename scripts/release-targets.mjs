@@ -63,16 +63,22 @@ export async function listFiles(directory) {
   return (await readdir(directory, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile());
 }
 
+// Mientras la release es un draft, GitHub da a sus assets una URL con un tag
+// provisional (`.../download/untagged-<hash>/archivo`); al publicarla pasa a
+// `.../download/<tag>/archivo`. Se valida la URL que da la API y se devuelve la
+// definitiva, que es la que irá en las notas y en latest.json.
 export function downloadUrl(asset, tag) {
   const url = new URL(asset.browser_download_url);
   const parts = url.pathname.split("/");
+  const given = parts[5] === undefined ? "" : decodeURIComponent(parts[5]);
   if (url.protocol !== "https:" || url.host !== "github.com" || url.username || url.password ||
       url.search || url.hash || parts.length !== 7 || !parts[1] || !parts[2] ||
       parts[3] !== "releases" || parts[4] !== "download" ||
-      decodeURIComponent(parts[5]) !== tag || decodeURIComponent(parts[6]) !== asset.name) {
+      (given !== tag && !/^untagged-[0-9a-f]+$/.test(given)) ||
+      decodeURIComponent(parts[6]) !== asset.name) {
     throw new Error(`Unsafe GitHub download URL for ${asset.name}`);
   }
-  return asset.browser_download_url;
+  return `https://github.com/${parts[1]}/${parts[2]}/releases/download/${encodeURIComponent(tag)}/${parts[6]}`;
 }
 
 // `node scripts/release-targets.mjs signed-count`: nº de firmas `.sig` que debe haber en una release.

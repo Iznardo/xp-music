@@ -29,7 +29,13 @@ concurrency:
 jobs:
   validate:
     # Antes de tocar ninguna clave: solo hace algo al publicar una release.
+    # Los drafts solo los ve un token con permiso de escritura, así que este
+    # es el único job previo con `contents: write`. No ejecuta código del
+    # repositorio salvo `node -e` en línea; los jobs de compilación, que sí
+    # ejecutan dependencias y llevan las claves, siguen en solo lectura.
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: inputs.tag != ''
@@ -37,7 +43,8 @@ jobs:
           ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         if: inputs.tag != ''
         with:
           node-version: 24
@@ -62,14 +69,38 @@ jobs:
             assert.equal(process.env.TAG, `v${version}`);
           '
           git merge-base --is-ancestor HEAD origin/main
-          gh api "repos/$GH_REPO/releases/tags/$TAG" \
-            > "$RUNNER_TEMP/release.json"
+          # `releases/tags/<tag>` no devuelve drafts: se busca en la lista.
+          gh api "repos/$GH_REPO/releases?per_page=100" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\")" \
+            | sed -n 1p > "$RUNNER_TEMP/release.json"
+          test -s "$RUNNER_TEMP/release.json"
           node -e '
             const assert = require("node:assert/strict");
             const release = require(process.env.RUNNER_TEMP + "/release.json");
             assert.equal(release.draft, true, "La release debe estar en draft");
             assert.equal(release.prerelease, false);
           '
+      - name: Reunir el instalador Windows x64 firmado en local
+        if: inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          mkdir draft-windows
+          gh release download "$TAG" --dir draft-windows \
+            --pattern "*_${version}_x64-setup.exe" \
+            --pattern "*_${version}_x64-setup.exe.sig"
+          test "$(find draft-windows -type f | wc -l)" -eq 2
+      # actions/upload-artifact v7.0.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: inputs.tag != ''
+        with:
+          name: draft-windows-x86_64
+          path: draft-windows/*
+          if-no-files-found: error
+          retention-days: 1
 
   build:
     needs: validate
@@ -156,13 +187,14 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24
           package-manager-cache: false
       # Un artefacto por target; los nombres de archivo no se repiten.
-      # actions/download-artifact v4.3.0
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      # actions/download-artifact v8.0.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           path: packages
           merge-multiple: true
@@ -190,8 +222,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
         run: |
-          api() { gh api "repos/$GH_REPO/releases/$1"; }
-          api "tags/$TAG" > "$RUNNER_TEMP/release.json"
+          # `releases/tags/<tag>` no devuelve drafts: se busca en la lista.
+          find_release() {
+            gh api "repos/$GH_REPO/releases?per_page=100" --paginate \
+              --jq ".[] | select(.tag_name == \"$TAG\")" | sed -n 1p
+          }
+          find_release > "$RUNNER_TEMP/release.json"
+          test -s "$RUNNER_TEMP/release.json"
           # Si alguien publicó durante el build, no modificar esa release.
           node -e '
             const release = require(process.env.RUNNER_TEMP + "/release.json");
@@ -204,18 +241,20 @@ jobs:
               ! -name '*_x64-setup.exe.sig' -print0
           )
           gh release upload "$TAG" "${uploads[@]}" --clobber
-          api "tags/$TAG" > "$RUNNER_TEMP/release.json"
+          find_release > "$RUNNER_TEMP/release.json"
           release_id=$(node -p \
             'require(process.env.RUNNER_TEMP + "/release.json").id')
           # Tabla de descargas (idempotente) sobre las notas del mantenedor.
           node scripts/release-notes.mjs \
             "$RUNNER_TEMP/release.json" packages "$RUNNER_TEMP/notes.md"
+          # Un PATCH de un draft sin `tag_name` lo desvincula del tag
+          # (pasa a `untagged-<hash>`): hay que repetirlo en cada PATCH.
           gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
-            -F "body=@$RUNNER_TEMP/notes.md" --silent
+            -f "tag_name=$TAG" -F "body=@$RUNNER_TEMP/notes.md" --silent
           # El manifiesto solo lleva las notas del mantenedor.
           node scripts/update-manifest.mjs \
             "$RUNNER_TEMP/release.json" packages "$RUNNER_TEMP/latest.json"
           gh release upload "$TAG" "$RUNNER_TEMP/latest.json" --clobber
           # GitHub elige latest por fecha/semver, no por orden de los builds.
           gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
-            -F draft=false -f make_latest=legacy --silent
+            -f "tag_name=$TAG" -F draft=false -f make_latest=legacy --silent
