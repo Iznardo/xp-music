@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XP Music</title>
+    <meta name="description" content="Reproductor de escritorio para YouTube Music con el aspecto de Windows Media Player 9 en Windows XP. Para Windows 10/11 y Linux." />
+    <meta property="og:title" content="XP Music" />
+    <meta property="og:description" content="YouTube Music con el aspecto de Windows Media Player 9 en Windows XP." />
+    <link rel="icon" type="image/png" href="../src-tauri/icons/32x32.png" />
+    <script>
+      // Tema antes de pintar, para que no parpadee.
+      document.documentElement.dataset.theme = { olive: "olive", silver: "silver" }[localStorage.getItem("xp-theme")] || "blue";
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
