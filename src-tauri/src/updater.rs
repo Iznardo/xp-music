@@ -2,14 +2,16 @@
 //!
 //! `latest.json` de la última release dice qué versión hay y dónde está el
 //! instalador; el updater de Tauri comprueba su firma con la clave pública, que
-//! se inyecta al compilar (`XP_MUSIC_UPDATER_PUBKEY`, lo hace `scripts/release.ps1`).
-//! Sin ella la comprobación queda desactivada.
+//! se inyecta al compilar (`XP_MUSIC_UPDATER_PUBKEY`). Solo se actualizan
+//! instalaciones con un formato compatible y no gestionadas externamente.
 
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
 use specta::Type;
+use tauri::utils::config::BundleType;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
 use tauri_specta::Event;
@@ -35,7 +37,7 @@ pub struct UpdateInfo {
 #[derive(Serialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdaterStatus {
-    /// Esta compilación trae la clave pública del updater.
+    /// Las actualizaciones automáticas están disponibles en esta instalación.
     pub enabled: bool,
     pub pending: Option<UpdateInfo>,
 }
@@ -45,15 +47,50 @@ pub struct UpdaterState {
     pending: Mutex<Option<(UpdateInfo, Update)>>,
 }
 
+fn installation_allows_updates(
+    pubkey: Option<&str>,
+    bundle: Option<BundleType>,
+    executable: Option<&Path>,
+    disabled: bool,
+) -> bool {
+    pubkey.is_some_and(|key| !key.trim().is_empty())
+        && !disabled
+        && matches!(
+            bundle,
+            Some(
+                BundleType::Deb
+                    | BundleType::AppImage
+                    | BundleType::Rpm
+                    | BundleType::Msi
+                    | BundleType::Nsis
+                    | BundleType::App
+            )
+        )
+        // El marcador del bundle puede seguir siendo Deb tras reempaquetar en Nix.
+        && executable.is_some_and(|path| !path.starts_with("/nix/store"))
+}
+
+fn enabled() -> bool {
+    installation_allows_updates(
+        PUBKEY,
+        tauri::utils::platform::bundle_type(),
+        tauri::utils::platform::current_exe().ok().as_deref(),
+        std::env::var_os("XP_MUSIC_DISABLE_UPDATER").is_some_and(|value| value == "1")
+            || std::env::var_os("FLATPAK_ID").is_some()
+            || Path::new("/.flatpak-info").exists()
+            || std::env::var_os("SNAP").is_some(),
+    )
+}
+
 fn not_configured() -> AppError {
     AppError::new(
         ErrorCode::InvalidInput,
-        "Esta compilación no tiene activadas las actualizaciones automáticas.",
+        "Las actualizaciones automáticas no están disponibles en esta instalación.",
     )
 }
 
 pub async fn check(app: &AppHandle) -> AppResult<Option<UpdateInfo>> {
-    if PUBKEY.is_none() {
+    if !enabled() {
         return Err(not_configured());
     }
     let endpoint = url::Url::parse(LATEST_JSON).map_err(|e| AppError::internal(e.to_string()))?;
@@ -90,7 +127,7 @@ pub async fn check(app: &AppHandle) -> AppResult<Option<UpdateInfo>> {
 
 /// Comprobación al arrancar, como mucho una vez al día.
 pub fn spawn_startup_check(app: AppHandle, db: std::sync::Arc<crate::storage::Db>) {
-    if PUBKEY.is_none() {
+    if !enabled() {
         return;
     }
     tauri::async_runtime::spawn(async move {
@@ -124,14 +161,19 @@ pub fn spawn_startup_check(app: AppHandle, db: std::sync::Arc<crate::storage::Db
 #[tauri::command]
 #[specta::specta]
 pub fn update_status(state: tauri::State<'_, UpdaterState>) -> UpdaterStatus {
+    let enabled = enabled();
     UpdaterStatus {
-        enabled: PUBKEY.is_some(),
-        pending: state
-            .pending
-            .lock()
-            .unwrap()
-            .as_ref()
-            .map(|(i, _)| i.clone()),
+        enabled,
+        pending: if enabled {
+            state
+                .pending
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|(i, _)| i.clone())
+        } else {
+            None
+        },
     }
 }
 
@@ -145,6 +187,9 @@ pub async fn update_check(app: AppHandle) -> AppResult<Option<UpdateInfo>> {
 #[tauri::command]
 #[specta::specta]
 pub async fn update_install(app: AppHandle) -> AppResult<()> {
+    if !enabled() {
+        return Err(not_configured());
+    }
     let update = {
         let state = app.state::<UpdaterState>();
         let pending = state.pending.lock().unwrap();
@@ -163,11 +208,83 @@ pub async fn update_install(app: AppHandle) -> AppResult<()> {
     };
     // Primero se descarga (y se verifica la firma); si falla, todo sigue como estaba.
     let bytes = update.download(|_, _| {}, || {}).await.map_err(fail)?;
-    // Guardar la cola antes de que el instalador cierre la app.
+    // Guardar sin parar la reproducción: la instalación puede fallar o cancelarse.
     if let Some(player) = app.try_state::<std::sync::Arc<crate::player::service::PlayerService>>() {
-        player.shutdown();
+        player.save_now();
     }
     tracing::info!(version = %update.version, "instalando actualización");
     update.install(bytes).map_err(fail)?;
     app.restart();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn updater_requires_key_and_supported_bundle() {
+        let executable = Some(Path::new("/usr/bin/xp-music"));
+        for bundle in [
+            BundleType::Deb,
+            BundleType::AppImage,
+            BundleType::Rpm,
+            BundleType::Msi,
+            BundleType::Nsis,
+            BundleType::App,
+        ] {
+            for key in [None, Some(""), Some(" \n")] {
+                assert!(!installation_allows_updates(
+                    key,
+                    Some(bundle.clone()),
+                    executable,
+                    false,
+                ));
+            }
+            assert!(installation_allows_updates(
+                Some("key"),
+                Some(bundle),
+                executable,
+                false,
+            ));
+        }
+        for bundle in [None, Some(BundleType::Dmg)] {
+            assert!(!installation_allows_updates(
+                Some("key"),
+                bundle,
+                executable,
+                false,
+            ));
+        }
+    }
+
+    #[test]
+    fn updater_rejects_external_management_and_unknown_executable() {
+        for bundle in [BundleType::Deb, BundleType::AppImage, BundleType::Rpm] {
+            for executable in [
+                None,
+                Some(Path::new("/nix/store/hash-xp-music/bin/.xp-music-wrapped")),
+            ] {
+                assert!(!installation_allows_updates(
+                    Some("key"),
+                    Some(bundle.clone()),
+                    executable,
+                    false,
+                ));
+            }
+            // La exclusión de Nix respeta los límites de los componentes de la ruta.
+            assert!(installation_allows_updates(
+                Some("key"),
+                Some(bundle.clone()),
+                Some(Path::new("/nix/store-other/bin/xp-music")),
+                false,
+            ));
+            // Opt-out explícito, Flatpak y Snap comparten este veto.
+            assert!(!installation_allows_updates(
+                Some("key"),
+                Some(bundle),
+                Some(Path::new("/usr/bin/xp-music")),
+                true,
+            ));
+        }
+    }
 }

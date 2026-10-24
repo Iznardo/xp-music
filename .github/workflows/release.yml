@@ -1,0 +1,248 @@
+name: Desktop (Windows y Linux)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag del draft preparado con npm run release (v1.0.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Una sola publicación a la vez; los checks de PR no bloquean las releases.
+concurrency:
+  group: >-
+    desktop-${{ github.event_name == 'workflow_dispatch' &&
+    'publish' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: windows-x86_64
+            bundles: nsis
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+            bundles: deb,appimage
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: >-
+            ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) ||
+            github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        with:
+          components: rustfmt, clippy
+      - name: Validar la release antes de usar claves
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          XP_MUSIC_UPDATER_PUBKEY: ${{ vars.XP_MUSIC_UPDATER_PUBKEY }}
+        run: |
+          test "$GH_REPO" = Iznardo/xp-music
+          test -n "$XP_MUSIC_UPDATER_PUBKEY"
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { readFileSync } from "node:fs";
+            const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+            const version = pkg.version;
+            assert.match(version, /^\d+\.\d+\.\d+$/);
+            assert.equal(process.env.TAG, `v${version}`);
+          '
+          git merge-base --is-ancestor HEAD origin/main
+          gh api "repos/$GH_REPO/releases/tags/$TAG" \
+            > "$RUNNER_TEMP/release.json"
+          node -e '
+            const assert = require("node:assert/strict");
+            const release = require(process.env.RUNNER_TEMP + "/release.json");
+            assert.equal(release.draft, true, "La release debe estar en draft");
+            assert.equal(release.prerelease, false);
+          '
+      - name: Dependencias Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libasound2-dev libdbus-1-dev libssl-dev \
+            xvfb xauth xdotool dbus-x11 openbox gnome-keyring \
+            pulseaudio libasound2-plugins
+      - run: npm ci
+      - run: npm run fetch-tools
+      - run: npm run check
+      - name: Empaquetar para comprobar la PR
+        if: github.event_name != 'workflow_dispatch'
+        run: npm run tauri build -- --bundles '${{ matrix.bundles }}'
+        env:
+          NO_STRIP: "true"
+      - name: Recuperar el instalador Windows con su firma local
+        if: github.event_name == 'workflow_dispatch' && runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          gh release download "$TAG" \
+            --pattern "*_${version}_x64-setup.exe" \
+            --pattern "*_${version}_x64-setup.exe.sig" \
+            --dir src-tauri/target/release/bundle/nsis
+      - name: Verificar Authenticode sin cambiar el certificado de Windows
+        if: github.event_name == 'workflow_dispatch' && runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_THUMBPRINT: ${{ vars.WINDOWS_SIGNING_THUMBPRINT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = $env:WINDOWS_SIGNING_THUMBPRINT
+          if (-not $expected) { throw 'Falta WINDOWS_SIGNING_THUMBPRINT.' }
+          $bundle = 'src-tauri/target/release/bundle/nsis'
+          $files = @(Get-ChildItem "$bundle/*-setup.exe")
+          if ($files.Count -ne 1) { throw 'Debe haber un instalador Windows.' }
+          $file = $files[0].FullName
+          $signature = Get-AuthenticodeSignature $file
+          if ($signature.SignerCertificate.Thumbprint -ne $expected) {
+            throw 'El instalador no usa el certificado Windows esperado.'
+          }
+          # Confiar solo en la huella fijada y solo en este runner efímero.
+          $type = 'System.Security.Cryptography.X509Certificates.X509Store'
+          $store = New-Object -TypeName $type -ArgumentList 'Root','CurrentUser'
+          $store.Open('ReadWrite')
+          try { $store.Add($signature.SignerCertificate) }
+          finally { $store.Close() }
+          if ((Get-AuthenticodeSignature $file).Status -ne 'Valid') {
+            throw 'Firma Authenticode no válida.'
+          }
+      - name: Compilar paquetes Linux con actualizaciones firmadas
+        if: github.event_name == 'workflow_dispatch' && runner.os == 'Linux'
+        env:
+          XP_MUSIC_UPDATER_PUBKEY: ${{ vars.XP_MUSIC_UPDATER_PUBKEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: >-
+            ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          NO_STRIP: "true"
+        run: |
+          test -n "$TAURI_SIGNING_PRIVATE_KEY"
+          node -e '
+            const fs = require("node:fs");
+            const config = {
+              bundle: { createUpdaterArtifacts: true },
+              plugins: {
+                updater: { pubkey: process.env.XP_MUSIC_UPDATER_PUBKEY }
+              }
+            };
+            fs.writeFileSync(process.env.RUNNER_TEMP + "/updater.json",
+              JSON.stringify(config));
+          '
+          npm run tauri build -- --bundles deb,appimage \
+            --config "$RUNNER_TEMP/updater.json"
+      - name: Probar paquetes Linux fuera del repositorio
+        if: runner.os == 'Linux'
+        run: |
+          sudo dpkg -i src-tauri/target/release/bundle/deb/*.deb
+          xvfb-run -a dbus-run-session -- \
+            bash scripts/smoke-linux.sh /usr/bin/xp-music
+          for package in src-tauri/target/release/bundle/appimage/*.AppImage
+          do
+            APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a dbus-run-session -- \
+              bash scripts/smoke-linux.sh "$package"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/deb/*.deb.sig
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.sig
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: '*-x86_64'
+          path: packages
+          merge-multiple: true
+      - name: Verificar las tres firmas del updater
+        env:
+          XP_MUSIC_UPDATER_PUBKEY: ${{ vars.XP_MUSIC_UPDATER_PUBKEY }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends minisign
+          printf '%s' "$XP_MUSIC_UPDATER_PUBKEY" | base64 --decode \
+            > "$RUNNER_TEMP/updater.pub"
+          mapfile -d '' signatures < <(
+            find packages -type f -name '*.sig' -print0
+          )
+          test "${#signatures[@]}" -eq 3
+          for signature in "${signatures[@]}"; do
+            base64 --decode "$signature" > "$RUNNER_TEMP/artifact.sig"
+            minisign -Vm "${signature%.sig}" \
+              -x "$RUNNER_TEMP/artifact.sig" -p "$RUNNER_TEMP/updater.pub"
+          done
+      - name: Completar manifiesto y publicar la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh api "repos/$GH_REPO/releases/tags/$TAG" \
+            > "$RUNNER_TEMP/release.json"
+          # Si alguien publicó durante el build, no modificar esa release.
+          node -e '
+            const release = require(process.env.RUNNER_TEMP + "/release.json");
+            if (!release.draft) process.exit(1);
+          '
+          mapfile -d '' linux < <(
+            find packages -type f \( -name '*.deb' -o -name '*.deb.sig' \
+              -o -name '*.AppImage' -o -name '*.AppImage.sig' \) -print0
+          )
+          test "${#linux[@]}" -eq 4
+          gh release upload "$TAG" "${linux[@]}" --clobber
+          gh api "repos/$GH_REPO/releases/tags/$TAG" \
+            > "$RUNNER_TEMP/release.json"
+          node scripts/update-manifest.mjs \
+            "$RUNNER_TEMP/release.json" packages "$RUNNER_TEMP/latest.json"
+          gh release upload "$TAG" "$RUNNER_TEMP/latest.json" --clobber
+          release_id=$(node -p \
+            'require(process.env.RUNNER_TEMP + "/release.json").id')
+          # GitHub elige latest por fecha/semver, no por orden de los builds.
+          gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
+            -F draft=false -f make_latest=legacy --silent
