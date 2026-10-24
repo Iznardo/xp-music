@@ -39,7 +39,10 @@ impl Db {
             tracing::error!(error = %e, "migración fallida");
             AppError::new(
                 crate::error::ErrorCode::Storage,
-                "No se pudo actualizar la base de datos local.",
+                tr!(
+                    "Could not update the local database.",
+                    "No se pudo actualizar la base de datos local."
+                ),
             )
         })?;
         Ok(Self(Mutex::new(conn)))

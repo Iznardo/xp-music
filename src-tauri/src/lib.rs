@@ -1,3 +1,5 @@
+#[macro_use]
+mod i18n;
 mod audio;
 mod commands;
 mod domain;
@@ -178,8 +180,14 @@ pub fn run() {
             .expect("no se pudo abrir la base de datos"),
     );
     match settings::Settings::load(&db) {
-        Ok(s) => tracing::info!(theme = ?s.theme, volume = s.volume, "ajustes cargados"),
-        Err(e) => tracing::warn!(error = %e, "no se pudieron cargar los ajustes"),
+        Ok(s) => {
+            i18n::set(s.language);
+            tracing::info!(theme = ?s.theme, volume = s.volume, "ajustes cargados");
+        }
+        Err(e) => {
+            i18n::set(None);
+            tracing::warn!(error = %e, "no se pudieron cargar los ajustes");
+        }
     }
     let thumbs = ThumbCache::new(dirs.thumbs.clone(), Arc::clone(&db));
     let data_dir = dirs.data.clone();

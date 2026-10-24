@@ -163,7 +163,10 @@ impl YtService {
         if self.session.read().unwrap().is_none() {
             return Err(AppError::new(
                 ErrorCode::NotAuthenticated,
-                "Inicia sesión en YouTube Music para ver esto.",
+                tr!(
+                    "Sign in to YouTube Music to see this.",
+                    "Inicia sesión en YouTube Music para ver esto."
+                ),
             ));
         }
         Ok(())
@@ -191,7 +194,10 @@ impl YtService {
         let (cookie, auth_user) = {
             let s = self.session.read().unwrap();
             let s = s.as_ref().ok_or_else(|| {
-                AppError::new(ErrorCode::NotAuthenticated, "No hay sesión iniciada.")
+                AppError::new(
+                    ErrorCode::NotAuthenticated,
+                    tr!("You are not signed in.", "No hay sesión iniciada."),
+                )
             })?;
             (s.cookie_header.clone(), s.auth_user)
         };
@@ -217,7 +223,10 @@ impl YtService {
                 if signed_out(&v) {
                     Err(AppError::new(
                         ErrorCode::AuthExpired,
-                        "La sesión de YouTube Music ha caducado.",
+                        tr!(
+                            "The YouTube Music session has expired.",
+                            "La sesión de YouTube Music ha caducado."
+                        ),
                     ))
                 } else {
                     Ok(v)
@@ -245,7 +254,7 @@ impl YtService {
         let Some(mut s) = current else {
             return Err(AppError::new(
                 ErrorCode::NotAuthenticated,
-                "No hay sesión iniciada.",
+                tr!("You are not signed in.", "No hay sesión iniciada."),
             ));
         };
         let (header, netscape) = if s.app_login {
@@ -261,7 +270,10 @@ impl YtService {
                 self.mark_expired();
                 return Err(AppError::new(
                     ErrorCode::AuthExpired,
-                    "La sesión caducó. Vuelve a iniciar sesión.",
+                    tr!(
+                        "The session expired. Sign in again.",
+                        "La sesión caducó. Vuelve a iniciar sesión."
+                    ),
                 ));
             };
             tokio::task::spawn_blocking(move || session::read_cookies(&source))
@@ -279,7 +291,10 @@ impl YtService {
             self.mark_expired();
             return Err(AppError::new(
                 ErrorCode::AuthExpired,
-                "La cuenta ya no está en ese navegador. Vuelve a iniciar sesión.",
+                tr!(
+                    "The account is no longer in that browser. Sign in again.",
+                    "La cuenta ya no está en ese navegador. Vuelve a iniciar sesión."
+                ),
             ));
         };
         s.cookie_header = header;
@@ -356,7 +371,10 @@ impl YtService {
         if out.is_empty() {
             return Err(AppError::new(
                 ErrorCode::NotAuthenticated,
-                "Esa sesión no tiene ninguna cuenta iniciada.",
+                tr!(
+                    "That session has no signed-in account.",
+                    "Esa sesión no tiene ninguna cuenta iniciada."
+                ),
             ));
         }
         Ok(out)
@@ -378,7 +396,10 @@ impl YtService {
         if containers.is_empty() {
             return Err(AppError::new(
                 ErrorCode::NotAuthenticated,
-                "Ese navegador no tiene ninguna sesión de YouTube iniciada.",
+                tr!(
+                    "That browser has no signed-in YouTube session.",
+                    "Ese navegador no tiene ninguna sesión de YouTube iniciada."
+                ),
             ));
         }
         let mut out = Vec::new();
@@ -415,7 +436,10 @@ impl YtService {
         if out.is_empty() {
             return Err(AppError::new(
                 ErrorCode::AuthExpired,
-                "La sesión de ese navegador no es válida. Abre music.youtube.com en él y vuelve a probar.",
+                tr!(
+                    "The session in that browser is not valid. Open music.youtube.com in it and try again.",
+                    "La sesión de ese navegador no es válida. Abre music.youtube.com en él y vuelve a probar."
+                ),
             ));
         }
         Ok(out)
@@ -476,14 +500,20 @@ impl YtService {
             }
             AccountSource::Pasted => {
                 let cookie = self.pasted.lock().unwrap().take().ok_or_else(|| {
-                    AppError::new(ErrorCode::InvalidInput, "Vuelve a pegar la cookie.")
+                    AppError::new(
+                        ErrorCode::InvalidInput,
+                        tr!("Paste the cookie again.", "Vuelve a pegar la cookie."),
+                    )
                 })?;
                 let n = session::netscape_from_header(&cookie);
                 (cookie, n, None)
             }
             AccountSource::App => {
                 let (h, n) = self.app_login.lock().unwrap().take().ok_or_else(|| {
-                    AppError::new(ErrorCode::InvalidInput, "Vuelve a iniciar sesión.")
+                    AppError::new(
+                        ErrorCode::InvalidInput,
+                        tr!("Sign in again.", "Vuelve a iniciar sesión."),
+                    )
                 })?;
                 (h, n, None)
             }
@@ -872,7 +902,10 @@ impl YtService {
         {
             return Err(AppError::new(
                 ErrorCode::Internal,
-                "YouTube Music no aceptó el cambio en la playlist.",
+                tr!(
+                    "YouTube Music did not accept the playlist change.",
+                    "YouTube Music no aceptó el cambio en la playlist."
+                ),
             ));
         }
         self.invalidate(&format!("playlist:VL{plain}"));
@@ -894,10 +927,15 @@ impl YtService {
         let v = self
             .query(|| Raw::new("playlist/create", json!({ "title": title, "description": description.clone().unwrap_or_default(), "privacyStatus": privacy })))
             .await?;
-        let id = v
-            .get("playlistId")
-            .and_then(Value::as_str)
-            .ok_or_else(|| AppError::new(ErrorCode::Internal, "No se pudo crear la playlist."))?;
+        let id = v.get("playlistId").and_then(Value::as_str).ok_or_else(|| {
+            AppError::new(
+                ErrorCode::Internal,
+                tr!(
+                    "Could not create the playlist.",
+                    "No se pudo crear la playlist."
+                ),
+            )
+        })?;
         self.invalidate("library:playlists");
         Ok(PlaylistId(format!("VL{id}")))
     }

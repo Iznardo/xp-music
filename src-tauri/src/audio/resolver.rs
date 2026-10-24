@@ -227,7 +227,10 @@ impl YtDlpResolver {
             tracing::warn!(track = %id.0, error = %last, "yt-dlp falló");
             return Err(AppError::new(
                 ErrorCode::ResolveFailed,
-                "No se pudo obtener el audio de esta canción.",
+                tr!(
+                    "Could not get the audio for this song.",
+                    "No se pudo obtener el audio de esta canción."
+                ),
             ));
         }
         parse_info(id, &out.stdout)
@@ -239,7 +242,10 @@ fn parse_info(id: &TrackId, stdout: &[u8]) -> AppResult<ResolvedStream> {
         tracing::warn!(error = %e, "JSON de yt-dlp no válido");
         AppError::new(
             ErrorCode::ResolveFailed,
-            "Respuesta inesperada al obtener el audio.",
+            tr!(
+                "Unexpected response while getting the audio.",
+                "Respuesta inesperada al obtener el audio."
+            ),
         )
     })?;
     let expires_at = info
@@ -277,7 +283,10 @@ fn run_with_timeout(mut cmd: Command, timeout: Duration) -> AppResult<std::proce
             tracing::error!(error = %e, "no se pudo lanzar yt-dlp");
             AppError::new(
                 ErrorCode::ResolveFailed,
-                "Falta la herramienta de extracción de audio (yt-dlp).",
+                tr!(
+                    "The audio extraction tool (yt-dlp) is missing.",
+                    "Falta la herramienta de extracción de audio (yt-dlp)."
+                ),
             )
         })?;
     // Leer stdout/stderr en hilos para que el proceso no se bloquee con la tubería llena.
@@ -306,7 +315,10 @@ fn run_with_timeout(mut cmd: Command, timeout: Duration) -> AppResult<std::proce
             tracing::warn!("yt-dlp superó el tiempo límite");
             return Err(AppError::new(
                 ErrorCode::ResolveFailed,
-                "La extracción del audio tardó demasiado.",
+                tr!(
+                    "Extracting the audio took too long.",
+                    "La extracción del audio tardó demasiado."
+                ),
             ));
         }
         std::thread::sleep(Duration::from_millis(25));
@@ -391,7 +403,10 @@ impl StreamResolver for MissingTools {
     fn resolve(&self, _: &TrackId, _: FormatPreference) -> AppResult<ResolvedStream> {
         Err(AppError::new(
             ErrorCode::ResolveFailed,
-            "No se encuentran yt-dlp y deno (carpeta tools/).",
+            tr!(
+                "yt-dlp and deno were not found (tools/ folder).",
+                "No se encuentran yt-dlp y deno (carpeta tools/)."
+            ),
         ))
     }
 }

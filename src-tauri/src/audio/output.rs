@@ -98,7 +98,10 @@ impl Output {
             .ok_or_else(|| {
                 AppError::new(
                     ErrorCode::AudioDevice,
-                    "No hay ningún dispositivo de audio disponible.",
+                    tr!(
+                        "No audio device is available.",
+                        "No hay ningún dispositivo de audio disponible."
+                    ),
                 )
             })?;
         let device_name = device
@@ -109,14 +112,20 @@ impl Output {
             tracing::error!(error = %e, "sin configuración de salida");
             AppError::new(
                 ErrorCode::AudioDevice,
-                "No se pudo abrir el dispositivo de audio.",
+                tr!(
+                    "Could not open the audio device.",
+                    "No se pudo abrir el dispositivo de audio."
+                ),
             )
         })?;
         if config.sample_format() != cpal::SampleFormat::F32 {
             tracing::error!(format = ?config.sample_format(), "formato de salida no soportado");
             return Err(AppError::new(
                 ErrorCode::AudioDevice,
-                "El dispositivo de audio usa un formato no soportado.",
+                tr!(
+                    "The audio device uses an unsupported format.",
+                    "El dispositivo de audio usa un formato no soportado."
+                ),
             ));
         }
         let config: cpal::StreamConfig = config.into();
@@ -190,14 +199,20 @@ impl Output {
                 tracing::error!(error = %e, "no se pudo crear el stream");
                 AppError::new(
                     ErrorCode::AudioDevice,
-                    "No se pudo abrir el dispositivo de audio.",
+                    tr!(
+                        "Could not open the audio device.",
+                        "No se pudo abrir el dispositivo de audio."
+                    ),
                 )
             })?;
         stream.play().map_err(|e| {
             tracing::error!(error = %e, "no se pudo iniciar el stream");
             AppError::new(
                 ErrorCode::AudioDevice,
-                "No se pudo iniciar la salida de audio.",
+                tr!(
+                    "Could not start audio output.",
+                    "No se pudo iniciar la salida de audio."
+                ),
             )
         })?;
 

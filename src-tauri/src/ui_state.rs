@@ -60,7 +60,10 @@ pub fn window_is_compact(ui: State<'_, UiState>) -> bool {
 
 fn window_err(e: tauri::Error) -> AppError {
     tracing::warn!(error = %e, "no se pudo cambiar el modo de ventana");
-    AppError::internal("No se pudo cambiar el tamaño de la ventana.")
+    AppError::internal(tr!(
+        "Could not resize the window.",
+        "No se pudo cambiar el tamaño de la ventana."
+    ))
 }
 
 /// Ventana pequeña de tamaño fijo (modo compacto o máscara). Guarda el tamaño y
@@ -156,7 +159,10 @@ pub async fn window_set_skin(
     match size {
         Some((w, h)) => {
             if !(w.is_finite() && h.is_finite()) {
-                return Err(AppError::internal("Tamaño de máscara no válido."));
+                return Err(AppError::internal(tr!(
+                    "Invalid skin size.",
+                    "Tamaño de máscara no válido."
+                )));
             }
             let size = LogicalSize::new(w.clamp(16.0, 4096.0), h.clamp(16.0, 4096.0));
             shrink(&window, &ui, size, false).map_err(window_err)?;

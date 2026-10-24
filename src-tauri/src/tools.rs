@@ -140,7 +140,10 @@ fn net_err(what: &str, e: impl std::fmt::Display) -> AppError {
     tracing::warn!(error = %e, "{what}");
     AppError::new(
         ErrorCode::Network,
-        "No se pudo comprobar si hay una versión nueva de yt-dlp.",
+        tr!(
+            "Could not check for a new yt-dlp version.",
+            "No se pudo comprobar si hay una versión nueva de yt-dlp."
+        ),
     )
 }
 
@@ -156,7 +159,10 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
     if managed_externally() {
         return Err(AppError::new(
             ErrorCode::InvalidInput,
-            "yt-dlp lo gestiona el paquete del sistema: actualízalo con él.",
+            tr!(
+                "yt-dlp is managed by the system package: update it with that.",
+                "yt-dlp lo gestiona el paquete del sistema: actualízalo con él."
+            ),
         ));
     }
     {
@@ -180,9 +186,10 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
         return Ok(None);
     }
     let Some(asset) = asset_name(std::env::consts::OS, std::env::consts::ARCH) else {
-        return Err(AppError::internal(
-            "No hay yt-dlp actualizable para esta plataforma.",
-        ));
+        return Err(AppError::internal(tr!(
+            "There is no updatable yt-dlp for this platform.",
+            "No hay yt-dlp actualizable para esta plataforma."
+        )));
     };
     let url = |name: &str| {
         rel.assets
@@ -191,9 +198,10 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
             .map(|a| a.browser_download_url.clone())
     };
     let (Some(zip_url), Some(sums_url)) = (url(asset), url(SUMS)) else {
-        return Err(AppError::internal(
-            "La versión nueva de yt-dlp no trae el paquete esperado.",
-        ));
+        return Err(AppError::internal(tr!(
+            "The new yt-dlp release does not include the expected package.",
+            "La versión nueva de yt-dlp no trae el paquete esperado."
+        )));
     };
     let sums = client
         .get(sums_url)
@@ -207,7 +215,12 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
                 .filter(|(_, n)| n.trim() == asset)
                 .map(|(h, _)| h.to_ascii_lowercase())
         })
-        .ok_or_else(|| AppError::internal("Falta la suma SHA-256 del paquete de yt-dlp."))?;
+        .ok_or_else(|| {
+            AppError::internal(tr!(
+                "The SHA-256 checksum of the yt-dlp package is missing.",
+                "Falta la suma SHA-256 del paquete de yt-dlp."
+            ))
+        })?;
     let mut zip_bytes = Vec::new();
     client
         .get(zip_url)
@@ -222,9 +235,10 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
         .collect();
     if got != expected {
         tracing::error!("hash de yt-dlp no coincide; se descarta");
-        return Err(AppError::internal(
-            "El paquete descargado de yt-dlp no pasó la verificación.",
-        ));
+        return Err(AppError::internal(tr!(
+            "The downloaded yt-dlp package failed verification.",
+            "El paquete descargado de yt-dlp no pasó la verificación."
+        )));
     }
     install(&zip_bytes)?;
     tracing::info!(desde = ?current, hasta = %rel.tag_name, "yt-dlp actualizado");
@@ -233,7 +247,9 @@ fn update_inner(force: bool, reinstall: bool) -> AppResult<Option<String>> {
 
 /// Descomprime en `bin/yt-dlp.new`, comprueba que arranca y sustituye a la anterior.
 fn install(zip_bytes: &[u8]) -> AppResult<()> {
-    let bin = bin_dir().ok_or_else(|| AppError::internal("Sin carpeta de datos local."))?;
+    let bin = bin_dir().ok_or_else(|| {
+        AppError::internal(tr!("No local data folder.", "Sin carpeta de datos local."))
+    })?;
     install_into(zip_bytes, &bin)
 }
 
@@ -241,7 +257,11 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
     let io = |e: std::io::Error| {
         AppError::new(
             ErrorCode::Storage,
-            format!("No se pudo instalar yt-dlp: {e}"),
+            tr!(
+                "Could not install yt-dlp: {e}",
+                "No se pudo instalar yt-dlp: {e}",
+                e = e
+            ),
         )
     };
     let staging = bin.join("yt-dlp.new");
@@ -252,8 +272,13 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
 
     #[cfg(windows)]
     {
-        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes))
-            .map_err(|e| AppError::internal(format!("Paquete de yt-dlp no válido: {e}")))?;
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes)).map_err(|e| {
+            AppError::internal(tr!(
+                "Invalid yt-dlp package: {e}",
+                "Paquete de yt-dlp no válido: {e}",
+                e = e
+            ))
+        })?;
         for i in 0..archive.len() {
             let mut f = archive
                 .by_index(i)
@@ -289,9 +314,10 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
     }
     if version_of(&exe).is_none() {
         let _ = std::fs::remove_dir_all(&staging);
-        return Err(AppError::internal(
-            "La versión nueva de yt-dlp no arranca; se mantiene la anterior.",
-        ));
+        return Err(AppError::internal(tr!(
+            "The new yt-dlp version does not start; keeping the previous one.",
+            "La versión nueva de yt-dlp no arranca; se mantiene la anterior."
+        )));
     }
     let _ = std::fs::remove_dir_all(&old);
     if target.exists() {

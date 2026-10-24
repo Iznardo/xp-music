@@ -86,7 +86,10 @@ fn enabled() -> bool {
 fn not_configured() -> AppError {
     AppError::new(
         ErrorCode::InvalidInput,
-        "Las actualizaciones automáticas no están disponibles en esta instalación.",
+        tr!(
+            "Automatic updates are not available in this installation.",
+            "Las actualizaciones automáticas no están disponibles en esta instalación."
+        ),
     )
 }
 
@@ -99,7 +102,11 @@ pub async fn check(app: &AppHandle) -> AppResult<Option<UpdateInfo>> {
         tracing::warn!(error = %e, "updater");
         AppError::new(
             ErrorCode::Network,
-            format!("No se pudo comprobar la actualización: {e}"),
+            tr!(
+                "Could not check for updates: {e}",
+                "No se pudo comprobar la actualización: {e}",
+                e = e
+            ),
         )
     };
     let updater = app
@@ -199,13 +206,20 @@ pub async fn update_install(app: AppHandle) -> AppResult<()> {
     let Some(update) = update else {
         return Err(AppError::new(
             ErrorCode::NotFound,
-            "No hay ninguna actualización pendiente.",
+            tr!(
+                "There is no pending update.",
+                "No hay ninguna actualización pendiente."
+            ),
         ));
     };
     tracing::info!(version = %update.version, "descargando actualización");
     let fail = |e: tauri_plugin_updater::Error| {
         tracing::error!(error = %e, "fallo al actualizar");
-        AppError::internal(format!("No se pudo instalar la actualización: {e}"))
+        AppError::internal(tr!(
+            "Could not install the update: {e}",
+            "No se pudo instalar la actualización: {e}",
+            e = e
+        ))
     };
     // Primero se descarga (y se verifica la firma); si falla, todo sigue como estaba.
     let bytes = update.download(|_, _| {}, || {}).await.map_err(fail)?;
