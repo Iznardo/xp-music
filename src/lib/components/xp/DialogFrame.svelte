@@ -1,7 +1,7 @@
 <script lang="ts">
   // Ventana de diálogo XP dentro de la app (modal), con barra de título Luna.
   import type { Snippet } from "svelte";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
 
   let { title, onclose, children, width }: { title: string; onclose: () => void; children: Snippet; width?: number } = $props();
 </script>

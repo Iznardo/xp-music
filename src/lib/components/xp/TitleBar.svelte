@@ -4,7 +4,7 @@
   // botones de ventana están en la pestaña de la lista (PlaylistTab).
   import { ui, type MenuItem } from "../../stores/ui.svelte";
   import { menuBar } from "../../menus";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
 
   function openMenu(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();

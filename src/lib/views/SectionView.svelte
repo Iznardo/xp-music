@@ -5,7 +5,7 @@
   import { Resource } from "../resource.svelte";
   import { library } from "../stores/library.svelte";
   import { addToNewPlaylist, playTracks } from "../actions";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import TrackTable from "../components/wmp/TrackTable.svelte";
   import TileGrid from "../components/wmp/TileGrid.svelte";
   import Loading from "../components/xp/Loading.svelte";

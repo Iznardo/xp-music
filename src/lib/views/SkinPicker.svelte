@@ -6,7 +6,7 @@
   import DialogFrame from "../components/xp/DialogFrame.svelte";
   import { skins, SKIN_BASE } from "../stores/skins.svelte";
   import { isTauri } from "../platform";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
 
   const BOX = { w: 300, h: 230 };
 

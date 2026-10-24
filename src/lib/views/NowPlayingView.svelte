@@ -12,7 +12,7 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "../router.svelte";
   import { thumbSrc } from "../thumb";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import ListView from "../components/xp/ListView.svelte";
   import type { Column } from "../components/xp/types";
 

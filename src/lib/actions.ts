@@ -4,7 +4,7 @@ import { commands, type MediaItem, type QueueSource, type Track } from "./bindin
 import { router } from "./router.svelte";
 import { library } from "./stores/library.svelte";
 import { ui, type MenuItem } from "./stores/ui.svelte";
-import { t } from "./strings";
+import { t } from "./i18n.svelte";
 
 async function check<T>(p: Promise<{ status: "ok"; data: T } | { status: "error"; error: { message: string } }>): Promise<T | null> {
   const r = await p;

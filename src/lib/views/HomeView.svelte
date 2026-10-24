@@ -3,7 +3,7 @@
   import { commands, type Page, type Section } from "../bindings";
   import { Resource } from "../resource.svelte";
   import { auth } from "../stores/auth.svelte";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import TileGrid from "../components/wmp/TileGrid.svelte";
   import Loading from "../components/xp/Loading.svelte";
 

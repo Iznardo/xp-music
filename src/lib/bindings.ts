@@ -242,6 +242,8 @@ export type HotkeySettings = {
 
 export type InsertPosition = "Next" | "End";
 
+export type Language = "en" | "es";
+
 export type LikeStatus = "Like" | "Dislike" | "Indifferent";
 
 /**  Elemento de una sección de Inicio, de artista o de búsqueda. */
@@ -328,6 +330,8 @@ export type SessionAccount = {
 
 export type Settings = {
 	theme: Theme,
+	/**  `None` = follow the system language. */
+	language: Language | null,
 	/**  0.0..=1.0 */
 	volume: number | null,
 	normalizeVolume: boolean,

@@ -4,7 +4,7 @@
   import { artistNames, fmtTime, hintTrack, playTracks, trackMenu } from "../../actions";
   import { player } from "../../stores/player.svelte";
   import { ui } from "../../stores/ui.svelte";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
   import ListView from "../xp/ListView.svelte";
   import type { Column } from "../xp/types";
 

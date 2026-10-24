@@ -1,7 +1,7 @@
 <script lang="ts">
   // Cuadro de mensaje y cuadro de texto XP (FR-004-15). Se controlan desde `ui`.
   import { ui } from "../../stores/ui.svelte";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
   import DialogFrame from "./DialogFrame.svelte";
   import { focusOnMount } from "../../focus";
 

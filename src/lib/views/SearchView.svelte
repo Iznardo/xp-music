@@ -4,7 +4,7 @@
   import { commands, type MediaItem, type Page, type SearchFilter, type Track } from "../bindings";
   import { Resource } from "../resource.svelte";
   import { router } from "../router.svelte";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
   import TileGrid from "../components/wmp/TileGrid.svelte";
   import TrackTable from "../components/wmp/TrackTable.svelte";
   import Loading from "../components/xp/Loading.svelte";

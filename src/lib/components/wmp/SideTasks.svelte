@@ -4,7 +4,7 @@
   import { router } from "../../router.svelte";
   import { auth } from "../../stores/auth.svelte";
   import { ui } from "../../stores/ui.svelte";
-  import { t } from "../../strings";
+  import { t } from "../../i18n.svelte";
 
   let query = $state("");
   let searchEl = $state<HTMLInputElement>();

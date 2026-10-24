@@ -10,7 +10,7 @@
   import { thumbSrc } from "../thumb";
   import { artistNames, fmtTime } from "../actions";
   import { appWindow } from "../platform";
-  import { t } from "../strings";
+  import { t } from "../i18n.svelte";
 
   const st = $derived(player.state);
   const playing = $derived(st?.status === "Playing" || st?.status === "Buffering");
