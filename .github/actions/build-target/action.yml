@@ -1,6 +1,6 @@
 name: Compilar, probar y reunir un target de XP Music
 description: >-
-  Instala dependencias, ejecuta las comprobaciones, empaqueta, prueba el
+  Instala dependencias, ejecuta las comprobaciones (si `checks`), empaqueta, prueba el
   arranque de los paquetes y reúne los archivos de release de UN target
   (sistema y arquitectura del runner). Con `tag` firma además los artefactos
   del updater (release); sin él compila sin claves (PR, push y dry run).
@@ -18,6 +18,12 @@ inputs:
     description: "Tag del draft si es release; vacío en PR, push y dry run"
     required: false
     default: ""
+  checks:
+    description: >-
+      "true" ejecuta `npm run check` (svelte-check, rustfmt, Clippy y tests);
+      basta con un target por sistema
+    required: false
+    default: "false"
   updater-pubkey:
     description: "Clave pública del updater (solo release)"
     required: false
@@ -80,12 +86,24 @@ runs:
           librsvg2-dev patchelf libasound2-dev libdbus-1-dev libssl-dev \
           xvfb xauth xdotool dbus-x11 openbox gnome-keyring \
           pulseaudio libasound2-plugins
-    - name: Dependencias y comprobaciones
+    # Caché de compilación de Rust solo fuera de las releases: lo que se firma y
+    # publica se compila siempre desde cero. Solo `main` la guarda; los PR la leen.
+    # Swatinem/rust-cache v2.9.2
+    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      if: inputs.tag == ''
+      with:
+        workspaces: src-tauri -> target
+        key: ${{ inputs.target }}
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+    - name: Dependencias
       shell: bash
       run: |
         npm ci
         npm run fetch-tools
-        npm run check
+    - name: Comprobaciones
+      if: inputs.checks == 'true'
+      shell: bash
+      run: npm run check
 
     # Windows (x64 y ARM64): el instalador lo firma el mantenedor en local y
     # aquí solo se reutiliza byte a byte.

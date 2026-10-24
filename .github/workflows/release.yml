@@ -119,15 +119,20 @@ jobs:
           # Etiquetas de runner de repositorios públicos (docs de GitHub):
           # windows-11-arm, ubuntu-24.04-arm y macos-15-intel existen
           # desde 2025.
+          # checks: `npm run check` en un target por sistema (el código con
+          # #[cfg] cambia por SO, no por arquitectura); el resto solo empaqueta
+          # y prueba el arranque.
           - target: windows-x86_64
             os: windows-2022
             bundles: nsis
+            checks: true
           - target: windows-aarch64
             os: windows-11-arm
             bundles: nsis
           - target: linux-x86_64
             os: ubuntu-24.04
             bundles: deb,appimage,rpm
+            checks: true
           - target: linux-aarch64
             os: ubuntu-24.04-arm
             bundles: deb,appimage,rpm
@@ -137,6 +142,7 @@ jobs:
           - target: darwin-aarch64
             os: macos-15
             bundles: app,dmg
+            checks: true
     runs-on: ${{ matrix.os }}
     # La clave del updater y los certificados de Apple solo existen en el
     # environment `release`, que exige la aprobación del mantenedor. Solo lo
@@ -158,6 +164,7 @@ jobs:
           target: ${{ matrix.target }}
           bundles: ${{ matrix.bundles }}
           tag: ${{ inputs.tag }}
+          checks: ${{ matrix.checks || false }}
           updater-pubkey: ${{ inputs.tag && vars.XP_MUSIC_UPDATER_PUBKEY }}
           # Solo Linux firma en CI: Windows se firma en local y macOS no tiene
           # updater (experimental).
