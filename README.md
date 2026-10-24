@@ -1,42 +1,57 @@
-# XP Music
+<p align="right"><b>English</b> · <a href="README.es.md">Español</a></p>
 
-Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media Player 9 en Windows XP. Para Windows 10/11 (x64 y ARM64), con soporte experimental para Linux (x64 y ARM64) y macOS (Intel y Apple Silicon).
+<div align="center">
+<img src="src-tauri/icons/128x128@2x.png" alt="XP Music icon" width="128">
+<h1>XP Music</h1>
+<p><b>A YouTube Music desktop player that looks like Windows Media Player 9 on Windows XP.</b></p>
+<p>
+  <a href="https://github.com/Iznardo/xp-music/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Iznardo/xp-music?label=release"></a>
+  <a href="https://github.com/Iznardo/xp-music/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Iznardo/xp-music/total?label=downloads"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/Iznardo/xp-music"></a>
+  <img alt="Platforms: Windows, macOS, Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0053ee">
+  <a href="https://github.com/Iznardo/xp-music/actions/workflows/release.yml"><img alt="Build status" src="https://github.com/Iznardo/xp-music/actions/workflows/release.yml/badge.svg"></a>
+  <a href="https://iznardo.github.io/xp-music/"><img alt="Website" src="https://img.shields.io/badge/Website-iznardo.github.io%2Fxp--music-3a9d23"></a>
+</p>
+</div>
 
-![Biblioteca de XP Music](docs/biblioteca.jpg)
+For Windows 10/11 (x64 and ARM64), with experimental support for Linux (x64 and ARM64) and macOS (Intel and Apple Silicon).
 
-![Reproduciendo con visualización](docs/reproduciendo.jpg)
+![XP Music library](docs/library.jpg)
 
-- Inicio, búsqueda, biblioteca, «Me gusta», historial y radio de tu cuenta de YouTube Music.
-- Listas de reproducción: crear, añadir canciones y reproducirlas.
-- Visualizaciones que siguen el ritmo de la música.
-- Modo compacto y **máscaras de Windows Media Player** (`.wmz`).
-- Teclas multimedia, icono en la bandeja, controles en la miniatura de la barra de tareas y actualizaciones automáticas.
+![Now Playing with a visualization](docs/now-playing.jpg)
 
-> XP Music no está afiliado, patrocinado ni respaldado por Google, YouTube ni Microsoft. «YouTube Music», «Windows Media Player» y «Windows XP» son marcas de sus respectivos dueños. La app usa tu propia cuenta para lo que tú harías desde el navegador.
+- Home, search, library, "Liked", history and radio from your YouTube Music account.
+- Playlists: create them, add songs and play them.
+- Visualizations that follow the beat of the music.
+- Compact mode and **Windows Media Player skins** (`.wmz`).
+- Media keys, tray icon, taskbar thumbnail controls and automatic updates.
+- English and Spanish interface, following your system language.
 
-**Web:** [iznardo.github.io/xp-music](https://iznardo.github.io/xp-music/)
+> XP Music is not affiliated with, sponsored by or endorsed by Google, YouTube or Microsoft. "YouTube Music", "Windows Media Player" and "Windows XP" are trademarks of their respective owners. The app uses your own account for what you would do from the browser.
 
-## Instalar
+**Website:** [iznardo.github.io/xp-music](https://iznardo.github.io/xp-music/)
 
-Descarga la última versión desde [Releases](https://github.com/Iznardo/xp-music/releases/latest):
-el instalador `.exe` para Windows, el `.deb` / `.rpm` / `.AppImage` para Linux o el `.dmg` para macOS. En Arch hay un `PKGBUILD` y en NixOS un flake.
-Los detalles (avisos de SmartScreen y Gatekeeper, requisitos en Linux, Arch, Nix, actualizaciones) están en [docs/instalar.md](docs/instalar.md).
+## Install
 
-## Documentación
+Download the latest version from [Releases](https://github.com/Iznardo/xp-music/releases/latest):
+the `.exe` installer for Windows, the `.deb` / `.rpm` / `.AppImage` for Linux or the `.dmg` for macOS. On Arch there is a `PKGBUILD` and on NixOS a flake.
+The details (SmartScreen and Gatekeeper warnings, Linux requirements, Arch, Nix, updates) are in [docs/install.md](docs/install.md).
 
-- [Instalar](docs/instalar.md)
-- [Uso](docs/uso.md): vistas, atajos, visualizaciones y opciones.
-- [Máscaras de Windows Media Player](docs/mascaras.md)
-- [Preguntas frecuentes](docs/preguntas-frecuentes.md)
-- [Compilar](docs/compilar.md)
-- [Publicar una versión](docs/publicar.md) (mantenedor)
+## Documentation
 
-## Terceros
+- [Install](docs/install.md)
+- [Usage](docs/usage.md): views, shortcuts, visualizations and options.
+- [Windows Media Player skins](docs/skins.md)
+- [FAQ](docs/faq.md)
+- [Building](docs/building.md)
+- [Releasing](docs/releasing.md) (maintainer)
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) y [Deno](https://deno.com) (MIT) van incluidos en los instaladores y paquetes de las releases para obtener el audio.
-- [ytmapi-rs](https://github.com/nick42d/youtui) (MIT), con un parche, en `vendor/` (ver `vendor/README.md`).
-- [Tauri](https://tauri.app), [Svelte](https://svelte.dev) y el resto de dependencias de `Cargo.toml` y `package.json`, cada una con su licencia.
+## Third-party software
 
-## Licencia
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) and [Deno](https://deno.com) (MIT) are bundled in the release installers and packages to get the audio.
+- [ytmapi-rs](https://github.com/nick42d/youtui) (MIT), with a patch, in `vendor/` (see `vendor/README.md`).
+- [Tauri](https://tauri.app), [Svelte](https://svelte.dev) and the rest of the dependencies in `Cargo.toml` and `package.json`, each under its own license.
+
+## License
 
 [MIT](LICENSE) © 2026 iznardo.

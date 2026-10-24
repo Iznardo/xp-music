@@ -1,11 +1,13 @@
-# Documentación
+# Documentation
 
-Guías de XP Music. También se leen en la web del proyecto.
+XP Music guides. They are also available on the project website.
 
-- [Instalar](instalar.md): Windows, Linux y macOS, y cómo se actualiza.
-- [Uso](uso.md): vistas, atajos de teclado, visualizaciones y opciones.
-- [Máscaras de Windows Media Player](mascaras.md): cargar archivos `.wmz`.
-- [Preguntas frecuentes](preguntas-frecuentes.md): avisos de Windows y macOS, sesión y problemas habituales.
-- [Compilar](compilar.md): preparar el entorno y ejecutar la app desde el código.
+Also available in: [Español](es/README.md).
 
-¿Falta algo? Abre una *issue* o un *pull request* en [GitHub](https://github.com/Iznardo/xp-music).
+- [Install](install.md): Windows, Linux and macOS, and how updates work.
+- [Usage](usage.md): views, keyboard shortcuts, visualizations and options.
+- [Windows Media Player skins](skins.md): loading `.wmz` files.
+- [FAQ](faq.md): Windows and macOS warnings, sign-in and common problems.
+- [Building](building.md): set up the environment and run the app from source.
+
+Missing something? Open an *issue* or a *pull request* on [GitHub](https://github.com/Iznardo/xp-music).
