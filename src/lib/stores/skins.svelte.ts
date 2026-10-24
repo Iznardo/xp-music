@@ -1,12 +1,13 @@
 // Máscaras de WMP (skins .wmz): la lista de la carpeta, la elegida y si la app
 // está en modo máscara. Lo elegido se recuerda en este equipo.
 
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { commands, type SkinInfo } from "../bindings";
 import { isTauri } from "../platform";
 import { ui } from "./ui.svelte";
 
-/// Dónde sirve el backend el motor y los .wmz (en la vista previa, Vite).
-export const SKIN_BASE = isTauri ? "http://skin.localhost" : "/skin";
+/// Dónde sirve el backend el motor y los .wmz (en la vista previa, Vite), sin `/` final.
+export const SKIN_BASE = isTauri ? convertFileSrc("", "skin").replace(/\/$/, "") : "/skin";
 
 const KEY = "xpm.skin";
 const MODE = "xpm.skinMode.v2";

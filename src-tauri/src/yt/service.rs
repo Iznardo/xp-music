@@ -513,7 +513,9 @@ impl YtService {
         Ok(self.status())
     }
 
-    pub async fn logout(&self) {
+    pub async fn logout(&self) -> AppResult<()> {
+        // No anunciar desconexión si las credenciales persistidas siguen accesibles.
+        self.store.clear()?;
         let was_app = self
             .session
             .read()
@@ -524,12 +526,12 @@ impl YtService {
             // Cerrar sesión de verdad: fuera también el perfil de la ventana de Google.
             let _ = tokio::task::spawn_blocking(super::login::forget).await;
         }
-        self.store.clear();
         *self.session.write().unwrap() = None;
         *self.expired.write().unwrap() = false;
         *self.client.lock().await = None;
         self.clear_cache();
         self.emit_status();
+        Ok(())
     }
 
     // ------------------------------------------------------------ caché

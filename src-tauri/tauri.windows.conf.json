@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": {
+      "../tools/deno.exe": "tools/deno.exe",
+      "../tools/yt-dlp/": "tools/yt-dlp/"
+    }
+  }
+}

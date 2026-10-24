@@ -1,22 +1,28 @@
-//! Controles multimedia del sistema (SMTC) y bloqueo de sesión (FR-006-04/09).
+//! Controles multimedia del sistema (SMTC en Windows, MPRIS en Linux).
 //!
-//! SMTC necesita una ventana: se crea una propia, oculta y en su propio hilo,
-//! que vive todo el proceso. Así las teclas multimedia y el panel de volumen de
-//! Windows funcionan aunque la WebView esté destruida (en la bandeja).
+//! En Windows, una ventana oculta en su propio hilo mantiene SMTC y los avisos
+//! de bloqueo de sesión aunque la WebView esté destruida (en la bandeja).
+//! En Linux, MPRIS no necesita ventana; la pausa al bloquear no está soportada.
 
+use std::sync::Arc;
+#[cfg(windows)]
+use std::sync::OnceLock;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
-use std::sync::{Arc, OnceLock};
 use std::thread;
 use std::time::Duration;
 
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
+#[cfg(windows)]
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+#[cfg(windows)]
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+#[cfg(windows)]
 use windows_sys::Win32::System::RemoteDesktop::{
     NOTIFY_FOR_THIS_SESSION, WTSRegisterSessionNotification,
 };
+#[cfg(windows)]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, MSG, PM_REMOVE, PeekMessageW,
     RegisterClassW, TranslateMessage, WM_WTSSESSION_CHANGE, WNDCLASSW,
@@ -25,11 +31,14 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use crate::player::service::PlayerService;
 use crate::player::types::{PlaybackStatus, PlayerState};
 
+#[cfg(windows)]
 const WTS_SESSION_LOCK: usize = 0x7;
 
 /// Qué hacer al bloquearse la sesión (lo fija `start`).
+#[cfg(windows)]
 static ON_LOCK: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
+#[cfg(windows)]
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == WM_WTSSESSION_CHANGE && wparam == WTS_SESSION_LOCK {
         if let Some(f) = ON_LOCK.get() {
@@ -41,11 +50,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
+#[cfg(windows)]
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 /// Ventana oculta (sin mostrar nunca) para SMTC y avisos de sesión.
+#[cfg(windows)]
 fn create_hidden_window() -> Option<HWND> {
     let class = wide("XpMusicHidden");
     // SAFETY: estructuras inicializadas y cadenas terminadas en 0 que viven durante las llamadas.
@@ -77,24 +88,34 @@ fn create_hidden_window() -> Option<HWND> {
     }
 }
 
-/// Lo que el reproductor manda al hilo de SMTC.
+/// Lo que el reproductor manda al hilo de controles multimedia.
 pub enum MediaMsg {
     State(Box<PlayerState>),
 }
 
-/// Arranca el hilo. `pause_on_lock` se consulta en cada bloqueo (ajuste vivo).
+/// Arranca el hilo. En Windows, `pause_on_lock` se consulta en cada bloqueo.
 pub fn start(
     player: Arc<PlayerService>,
     pause_on_lock: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Sender<MediaMsg> {
     let (tx, rx) = channel::<MediaMsg>();
-    let lock_player = Arc::clone(&player);
-    let _ = ON_LOCK.set(Box::new(move || {
-        if pause_on_lock() {
-            tracing::info!("sesión bloqueada: pausa");
-            lock_player.pause();
-        }
-    }));
+    #[cfg(windows)]
+    {
+        let lock_player = Arc::clone(&player);
+        let _ = ON_LOCK.set(Box::new(move || {
+            if pause_on_lock() {
+                tracing::info!("sesión bloqueada: pausa");
+                lock_player.pause();
+            }
+        }));
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pause_on_lock;
+        tracing::info!(
+            "pausa al bloquear la sesión no soportada en esta plataforma (solo Windows)"
+        );
+    }
     thread::Builder::new()
         .name("os-media".into())
         .spawn(move || run(player, rx))
@@ -103,22 +124,28 @@ pub fn start(
 }
 
 fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
-    let Some(hwnd) = create_hidden_window() else {
-        tracing::error!("no se pudo crear la ventana oculta; sin teclas multimedia");
-        return;
+    #[cfg(windows)]
+    let hwnd = {
+        let Some(hwnd) = create_hidden_window() else {
+            tracing::error!("no se pudo crear la ventana oculta; sin teclas multimedia");
+            return;
+        };
+        // SAFETY: hwnd válido, creado en este hilo.
+        unsafe { WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION) };
+        Some(hwnd as *mut _)
     };
-    // SAFETY: hwnd válido, creado en este hilo.
-    unsafe { WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION) };
+    #[cfg(not(windows))]
+    let hwnd = None;
 
     let config = PlatformConfig {
         display_name: "XP Music",
         dbus_name: "xp_music",
-        hwnd: Some(hwnd as *mut _),
+        hwnd,
     };
     let mut controls = match MediaControls::new(config) {
         Ok(c) => Some(c),
         Err(e) => {
-            tracing::warn!(error = ?e, "SMTC no disponible");
+            tracing::warn!(error = ?e, "controles multimedia del sistema no disponibles");
             None
         }
     };
@@ -146,6 +173,7 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
     loop {
         // Mensajes de la ventana oculta (bloqueo de sesión).
         // SAFETY: bucle de mensajes estándar del hilo dueño de la ventana.
+        #[cfg(windows)]
         unsafe {
             let mut msg: MSG = std::mem::zeroed();
             while PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
@@ -166,7 +194,7 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
                             .map(|a| a.name.as_str())
                             .collect::<Vec<_>>()
                             .join(", ");
-                        // La portada mayor, directamente de YouTube (Windows la descarga).
+                        // La portada mayor, directamente de YouTube.
                         let cover = t
                             .thumbnails
                             .iter()

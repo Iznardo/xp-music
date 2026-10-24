@@ -41,18 +41,23 @@ symphonia = { version = "0.6", default-features = false, features = ["aac", "iso
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 ytmapi-rs = { version = "0.3.3", default-features = false, features = ["rustls", "simplified-queries"] }
 tokio = { version = "1.54.0", features = ["sync", "time", "macros", "rt"] }
-windows-sys = { version = "0.61.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_System_RemoteDesktop", "Win32_UI_Shell", "Win32_Graphics_Gdi", "Win32_System_Com"] }
 rand = "0.9"
 rustfft = "6.4.1"
 tauri-plugin-notification = "2.7.0"
 tauri-plugin-autostart = "2.7.0"
 tauri-plugin-global-shortcut = "2.4.1"
 souvlaki = "0.8.3"
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_System_Com", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
 zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 sha2 = "0.11.1"
 url = "2"
 tauri-plugin-updater = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_System_RemoteDesktop", "Win32_UI_Shell", "Win32_Graphics_Gdi", "Win32_System_Com"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_System_Com", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"] }
 
 [profile.release]
 codegen-units = 1

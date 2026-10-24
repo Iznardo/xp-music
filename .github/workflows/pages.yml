@@ -1,0 +1,67 @@
+# Web del proyecto (site/) con la documentación de docs/, en GitHub Pages.
+# Requiere una vez: Settings → Pages → Source: «GitHub Actions».
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "docs/**"
+      # Lo que la web reutiliza de la app.
+      - "src/styles/**"
+      - "src/lib/skin.ts"
+      - "src/lib/strings.ts"
+      - "src/lib/viz/**"
+      - "src/lib/components/xp/**"
+      - "src/assets/**"
+      - "src-tauri/icons/32x32.png"
+      - "src-tauri/icons/128x128@2x.png"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run site:build
+      # configure-pages v6.0.0
+      - uses:
+          actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
+      # upload-pages-artifact v5.0.0
+      - uses:
+          actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # deploy-pages v5.0.1
+      - id: deployment
+        uses:
+          actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346

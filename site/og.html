@@ -1,0 +1,108 @@
+<!doctype html>
+<!--
+  Plantilla de la imagen para redes (site/public/og.png, 1200×630). No forma parte
+  de la web. Para regenerarla, abre este archivo directamente en el navegador
+  (file://, para que carguen las rutas relativas) a 1200×630 y haz una captura.
+-->
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        /* Velo de cielo detrás del texto: las nubes no deben cruzarse con las letras. */
+        background:
+          radial-gradient(ellipse 600px 175px at 300px 150px, #1857dc 0%, rgb(24 87 220 / 0.9) 60%, rgb(24 87 220 / 0) 100%),
+          url("src/desktop.svg") center 38% / cover;
+        font-family: Tahoma, sans-serif;
+      }
+      .text {
+        position: absolute;
+        left: 64px;
+        top: 46px;
+        width: 470px;
+        color: #fff;
+        text-shadow: 0 2px 6px rgb(0 20 80 / 0.55);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .brand img {
+        width: 96px;
+        height: 96px;
+        filter: drop-shadow(0 4px 8px rgb(0 20 80 / 0.5));
+      }
+      h1 {
+        margin: 0;
+        font: bold 76px/1 "Trebuchet MS", sans-serif;
+        letter-spacing: -1px;
+      }
+      p {
+        margin: 20px 0 0;
+        font: bold 30px/1.3 "Trebuchet MS", sans-serif;
+      }
+      .tags {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      .tags span {
+        padding: 6px 14px;
+        border: 1px solid rgb(255 255 255 / 0.7);
+        border-radius: 16px;
+        background: rgb(10 40 140 / 0.45);
+        font-size: 19px;
+        text-shadow: none;
+      }
+      /* Ventana de XP con la captura, cortada por la derecha. */
+      .win {
+        position: absolute;
+        left: 590px;
+        top: 96px;
+        width: 760px;
+        border: 3px solid #0831d9;
+        border-top: 0;
+        border-radius: 9px 9px 0 0;
+        background: #ece9d8;
+        box-shadow: 0 14px 40px rgb(0 0 0 / 0.5);
+      }
+      .bar {
+        height: 30px;
+        margin: 0 -3px;
+        padding: 0 10px;
+        border-radius: 8px 8px 0 0;
+        background: linear-gradient(to bottom, #0997ff 0%, #0053ee 8%, #0050ee 40%, #0066ff 88%, #005bff 95%, #003dd7 100%);
+        color: #fff;
+        font: bold 15px/30px "Trebuchet MS", sans-serif;
+        text-shadow: 1px 1px #0f1089;
+      }
+      .win img {
+        display: block;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="text">
+      <div class="brand">
+        <img src="../src/assets/logo.webp" alt="" />
+        <h1>XP Music</h1>
+      </div>
+      <p>YouTube Music con el aspecto de Windows Media Player&nbsp;9</p>
+      <div class="tags"><span>Windows 10/11</span><span>Linux</span><span>Gratis · MIT</span></div>
+    </div>
+    <div class="win">
+      <div class="bar">Reproduciendo - XP Music</div>
+      <img src="../docs/reproduciendo.jpg" alt="" />
+    </div>
+  </body>
+</html>

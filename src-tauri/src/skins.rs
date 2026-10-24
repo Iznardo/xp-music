@@ -23,8 +23,8 @@ const MAX_WMZ: u64 = 64 * 1024 * 1024;
 /// Profundidad máxima de subcarpetas al buscar máscaras.
 const MAX_DEPTH: usize = 4;
 
-const CSP: &str = "default-src 'none'; script-src http://skin.localhost 'unsafe-eval'; \
-style-src 'unsafe-inline'; img-src blob: data: http://thumb.localhost; connect-src http://skin.localhost";
+const CSP: &str = "default-src 'none'; script-src skin: http://skin.localhost 'unsafe-eval'; \
+style-src 'unsafe-inline'; img-src blob: data: thumb: http://thumb.localhost; connect-src skin: http://skin.localhost";
 
 /// El motor del marco, embebido en el ejecutable.
 const FRAME: &[(&str, &str)] = &[
@@ -148,7 +148,11 @@ pub fn skins_list() -> AppResult<Vec<SkinInfo>> {
 #[tauri::command]
 #[specta::specta]
 pub fn skins_open_dir() -> AppResult<()> {
-    std::process::Command::new("explorer.exe")
+    #[cfg(target_os = "windows")]
+    let opener = "explorer.exe";
+    #[cfg(target_os = "linux")]
+    let opener = "xdg-open";
+    std::process::Command::new(opener)
         .arg(dir()?)
         .spawn()
         .map(|_| ())
@@ -242,6 +246,30 @@ mod tests {
         assert!(resolve(&d, "C:/Windows/win.ini").is_none());
         assert!(resolve(&d, "/etc/x.wmz").is_none());
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn csp_aislada_en_linux_y_windows() {
+        for base in ["skin://localhost", "http://skin.localhost"] {
+            let req = Request::builder()
+                .uri(format!("{base}/frame/index.html"))
+                .body(Vec::new())
+                .unwrap();
+            let res = handle(&req);
+            assert_eq!(res.status(), StatusCode::OK);
+            let csp = res.headers()["Content-Security-Policy"].to_str().unwrap();
+            assert_eq!(
+                csp.split("; ").collect::<Vec<_>>(),
+                [
+                    "default-src 'none'",
+                    "script-src skin: http://skin.localhost 'unsafe-eval'",
+                    "style-src 'unsafe-inline'",
+                    "img-src blob: data: thumb: http://thumb.localhost",
+                    "connect-src skin: http://skin.localhost",
+                ]
+            );
+            assert_eq!(res.headers()["Access-Control-Allow-Origin"], "*");
+        }
     }
 
     #[test]

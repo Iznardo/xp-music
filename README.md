@@ -1,6 +1,6 @@
 # XP Music
 
-Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media Player 9 en Windows XP. Solo para Windows 10 y 11.
+Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media Player 9 en Windows XP. Para Windows 10/11 y Linux x86_64 (soporte experimental).
 
 ![Biblioteca de XP Music](docs/biblioteca.jpg)
 
@@ -14,37 +14,22 @@ Reproductor de escritorio para **YouTube Music** con el aspecto de Windows Media
 
 > XP Music no está afiliado, patrocinado ni respaldado por Google, YouTube ni Microsoft. «YouTube Music», «Windows Media Player» y «Windows XP» son marcas de sus respectivos dueños. La app usa tu propia cuenta para lo que tú harías desde el navegador.
 
+**Web:** [iznardo.github.io/xp-music](https://iznardo.github.io/xp-music/)
+
 ## Instalar
 
-1. Descarga el instalador (`XP Music_x.y.z_x64-setup.exe`) de la página de *releases*.
-2. Ábrelo. Como no lleva una firma comercial, Windows SmartScreen puede avisar la primera vez: «Más información» → «Ejecutar de todas formas».
-3. Inicia sesión con tu cuenta de Google desde la propia app.
+Descarga la última versión desde [Releases](https://github.com/Iznardo/xp-music/releases):
+el instalador `.exe` para Windows, o el `.deb` / `.AppImage` para Linux. En NixOS hay un flake.
+Los detalles (avisos de SmartScreen, requisitos en Linux, Nix, actualizaciones) están en [docs/instalar.md](docs/instalar.md).
 
-La app se actualiza sola: cuando hay una versión nueva, te lo ofrece al arrancar.
+## Documentación
 
-## Máscaras de Windows Media Player
-
-XP Music lee las máscaras originales de WMP (`.wmz`). No incluye ninguna: copia las que tengas en la carpeta de máscaras (menú **Ver → Selector de máscaras… → Abrir carpeta**, que es `%APPDATA%\xp-music\skins`) y pulsa **Actualizar**.
-
-Para volver al aspecto normal: **Ctrl+1**, clic derecho sobre la máscara → «Volver al modo completo», o desde el icono de la bandeja.
-
-Los scripts de cada máscara se ejecutan aislados, sin acceso a tu cuenta ni a tus archivos. Las ventanas secundarias (ecualizador, lista aparte) todavía no se abren.
-
-## Compilar
-
-Requisitos: Windows, [Rust](https://rustup.rs) estable, Node.js 20 o posterior y WebView2 (viene con Windows 11).
-
-```bash
-npm install
-npm run fetch-tools    # descarga yt-dlp y deno en tools/ (versiones fijadas en tools.lock.json)
-npm run tauri dev      # la app en modo desarrollo
-```
-
-Otras órdenes útiles:
-
-- `npm run dev:mock`: la interfaz en el navegador con datos simulados, sin backend.
-- `npm run check`: comprobaciones de TypeScript, formato, Clippy y tests de Rust.
-- `npm run release`: compila, firma y publica una versión (ver `scripts/release.ps1`).
+- [Instalar](docs/instalar.md)
+- [Uso](docs/uso.md): vistas, atajos, visualizaciones y opciones.
+- [Máscaras de Windows Media Player](docs/mascaras.md)
+- [Preguntas frecuentes](docs/preguntas-frecuentes.md)
+- [Compilar](docs/compilar.md)
+- [Publicar una versión](docs/publicar.md) (mantenedor)
 
 ## Terceros
 

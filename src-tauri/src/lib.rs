@@ -130,6 +130,22 @@ fn export_bindings(builder: &Builder<tauri::Wry>) {
         .expect("no se pudieron exportar los bindings TS");
 }
 
+/// Tamaño y posición se recuerdan; el estado «maximizada», solo en Windows. En Linux los
+/// gestores de ventanas con teselado (Hyprland, sway…) marcan como maximizada cualquier
+/// ventana teselada: guardarlo la dejaría para siempre con el aspecto maximizado (sin
+/// el contorno de WMP) aunque luego flote.
+fn window_state() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    use tauri_plugin_window_state::StateFlags;
+    let flags = if cfg!(windows) {
+        StateFlags::all()
+    } else {
+        StateFlags::all() - StateFlags::MAXIMIZED
+    };
+    tauri_plugin_window_state::Builder::default()
+        .with_state_flags(flags)
+        .build()
+}
+
 /// yt-dlp con caché; si faltan las herramientas, un resolvedor que lo explica.
 fn build_resolver(db: Arc<storage::Db>, yt: Arc<YtService>) -> Arc<dyn StreamResolver> {
     match ToolPaths::locate() {
@@ -141,7 +157,7 @@ fn build_resolver(db: Arc<storage::Db>, yt: Arc<YtService>) -> Arc<dyn StreamRes
             Arc::new(cached)
         }
         None => {
-            tracing::error!("no se encuentran yt-dlp.exe y deno.exe");
+            tracing::error!("no se encuentran yt-dlp y deno");
             Arc::new(MissingTools)
         }
     }
@@ -173,7 +189,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             os::show_main(app)
         }))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(window_state())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -205,6 +221,9 @@ pub fn run() {
         .setup(move |app| {
             builder.mount_events(app);
             let handle = app.handle().clone();
+            if let Ok(dir) = app.path().resource_dir() {
+                crate::tools::set_resource_dir(dir);
+            }
             let yt = YtService::new(Some(handle.clone()), Arc::clone(&db), data_dir);
             let reporter = YtReporter::new(Arc::clone(&yt), Arc::clone(&db));
             let player = PlayerService::start(
@@ -226,7 +245,7 @@ pub fn run() {
             tools::spawn_daily_check();
             updater::spawn_startup_check(handle.clone(), Arc::clone(&db));
 
-            // --- Integración con Windows (006) ---
+            // --- Integración con el sistema (006) ---
             if let Err(e) = os::tray::create(&handle, Arc::clone(&player), Arc::clone(&yt)) {
                 tracing::error!(error = %e, "no se pudo crear el icono de la bandeja");
             }
@@ -236,24 +255,30 @@ pub fn run() {
                     .map(|s| s.pause_on_lock)
                     .unwrap_or(false)
             });
-            let tb_player = Arc::clone(&player);
-            os::taskbar::set_handler(move |id| match id {
-                os::taskbar::BTN_PREV => tb_player.previous(),
-                os::taskbar::BTN_TOGGLE => tb_player.toggle(),
-                os::taskbar::BTN_NEXT => tb_player.next(),
-                _ => {}
-            });
+            #[cfg(windows)]
+            {
+                let tb_player = Arc::clone(&player);
+                os::taskbar::set_handler(move |id| match id {
+                    os::taskbar::BTN_PREV => tb_player.previous(),
+                    os::taskbar::BTN_TOGGLE => tb_player.toggle(),
+                    os::taskbar::BTN_NEXT => tb_player.next(),
+                    _ => {}
+                });
+            }
             let obs_app = handle.clone();
             let obs_db = Arc::clone(&db);
             let last_track = std::sync::Mutex::new(None::<String>);
             player.observe(Box::new(move |s| {
                 let _ = media.send(os::media::MediaMsg::State(Box::new(s.clone())));
-                let playing = matches!(
-                    s.status,
-                    player::types::PlaybackStatus::Playing
-                        | player::types::PlaybackStatus::Buffering
-                );
-                let _ = obs_app.run_on_main_thread(move || os::taskbar::set_playing(playing));
+                #[cfg(windows)]
+                {
+                    let playing = matches!(
+                        s.status,
+                        player::types::PlaybackStatus::Playing
+                            | player::types::PlaybackStatus::Buffering
+                    );
+                    let _ = obs_app.run_on_main_thread(move || os::taskbar::set_playing(playing));
+                }
                 // "Reproduciendo ahora" si la ventana no está a la vista (FR-006-07).
                 let id = s.track.as_ref().map(|t| t.id.0.clone());
                 let mut last = last_track.lock().unwrap();
