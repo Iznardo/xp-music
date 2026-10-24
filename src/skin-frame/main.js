@@ -3,6 +3,7 @@
 
 import { openZip } from "./zip.js";
 import { Runtime } from "./runtime.js";
+import { setLanguage } from "./objects.js";
 
 const host = window.parent;
 
@@ -51,8 +52,9 @@ window.addEventListener("message", (e) => {
 window.addEventListener("error", (e) => send({ t: "log", level: "warn", msg: String(e.message).slice(0, 300) }));
 window.addEventListener("unhandledrejection", (e) => send({ t: "log", level: "warn", msg: String(e.reason).slice(0, 300) }));
 
-/** @param {{ url: string, prefs?: Record<string, string>, state?: any, queue?: any }} m */
+/** @param {{ url: string, lang?: string, prefs?: Record<string, string>, state?: any, queue?: any }} m */
 async function init(m) {
+  setLanguage(m.lang);
   // Active check: the app IPC must not respond from here.
   fetch("http://ipc.localhost/plugin%3Aapp%7Cversion", { method: "POST", body: "{}" })
     .then((r) => send({ t: "log", level: "error", msg: `isolation: the IPC responded from the frame (${r.status})` }))

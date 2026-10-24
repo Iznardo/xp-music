@@ -12,7 +12,7 @@
   import { thumbSrc } from "../thumb";
   import { handleShortcut } from "../menus";
   import { vizVisible } from "../viz/active";
-  import { t } from "../i18n.svelte";
+  import { language, t } from "../i18n.svelte";
 
   let { id }: { id: string } = $props();
 
@@ -217,7 +217,7 @@
   }
 
   function init() {
-    post({ t: "init", url: `${SKIN_BASE}/wmz/${encodeURIComponent(id)}`, prefs: skinPrefs(id), state: skinState(), queue: skinQueue() });
+    post({ t: "init", lang: language(), url: `${SKIN_BASE}/wmz/${encodeURIComponent(id)}`, prefs: skinPrefs(id), state: skinState(), queue: skinQueue() });
   }
 
   onMount(() => {

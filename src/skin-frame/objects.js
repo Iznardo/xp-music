@@ -7,14 +7,16 @@ import { wmpObject, bool, num, timeString } from "./util.js";
 /** @typedef {{ title: string, artist: string, album: string, durationMs: number | null }} Item */
 
 const PLAYSTATE = /** @type {Record<string, number>} */ ({ Idle: 1, Loading: 9, Buffering: 6, Playing: 3, Paused: 2, Error: 1 });
-const STATUS = /** @type {Record<string, string>} */ ({
-  Idle: "Detenido",
-  Loading: "Conectando…",
-  Buffering: "Almacenando en búfer…",
-  Playing: "Reproduciendo",
-  Paused: "En pausa",
-  Error: "Error",
-});
+// Texts skins can show. The frame has no access to the app's i18n, so the host sends the
+// language in `init` and the few strings live here.
+const TEXT = {
+  en: { Idle: "Stopped", Loading: "Connecting…", Buffering: "Buffering…", Playing: "Playing", Paused: "Paused", Error: "Error", queue: "Current playlist" },
+  es: { Idle: "Detenido", Loading: "Conectando…", Buffering: "Almacenando en búfer…", Playing: "Reproduciendo", Paused: "En pausa", Error: "Error", queue: "Lista de reproducción actual" },
+};
+let lang = /** @type {"en" | "es"} */ ("en");
+/** @param {string | undefined} l */
+export const setLanguage = (l) => (lang = l === "es" ? "es" : "en");
+export const queueName = () => TEXT[lang].queue;
 
 class Media {
   /** @param {Item | null} item */
@@ -221,7 +223,7 @@ class PlaylistObj {
     this._rt = rt;
   }
   get name() {
-    return this._rt.queue.name || "Cola de reproducción";
+    return this._rt.queue.name || queueName();
   }
   set name(_v) {}
   get count() {
@@ -284,7 +286,7 @@ class Player {
     return this._rt.state.hasTrack ? 13 : 0;
   }
   get status() {
-    return STATUS[this._rt.state.status] ?? "";
+    return /** @type {Record<string, string>} */ (TEXT[lang])[this._rt.state.status] ?? "";
   }
   get url() {
     return "";

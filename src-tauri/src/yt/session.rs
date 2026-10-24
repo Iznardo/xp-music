@@ -259,14 +259,14 @@ pub fn logged_in_containers(profile: &Path) -> AppResult<Vec<Container>> {
         .filter(|id| id.is_empty() || id.starts_with("^userContextId="))
         .map(|id| {
             let name = if id.is_empty() {
-                "Sin contenedor".to_owned()
+                tr!("No container", "Sin contenedor")
             } else {
                 let n = id.trim_start_matches("^userContextId=");
                 names
                     .iter()
                     .find(|(k, _)| k == n)
                     .map(|(_, v)| v.clone())
-                    .unwrap_or_else(|| format!("Contenedor {n}"))
+                    .unwrap_or_else(|| tr!("Container {n}", "Contenedor {n}", n = n))
             };
             Container { id, name }
         })
@@ -293,16 +293,13 @@ fn container_names(profile: &Path) -> Vec<(String, String)> {
                         .map(str::to_owned)
                         .or_else(|| {
                             let key = i.get("l10nId")?.as_str()?;
-                            Some(
-                                match key {
-                                    k if k.contains("personal") => "Personal",
-                                    k if k.contains("work") => "Trabajo",
-                                    k if k.contains("banking") => "Banca",
-                                    k if k.contains("shopping") => "Compras",
-                                    _ => return None,
-                                }
-                                .to_owned(),
-                            )
+                            Some(match key {
+                                k if k.contains("personal") => tr!("Personal", "Personal"),
+                                k if k.contains("work") => tr!("Work", "Trabajo"),
+                                k if k.contains("banking") => tr!("Banking", "Banca"),
+                                k if k.contains("shopping") => tr!("Shopping", "Compras"),
+                                _ => return None,
+                            })
                         })?;
                     Some((id, name))
                 })
