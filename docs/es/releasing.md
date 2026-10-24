@@ -48,7 +48,7 @@ ni en el dry run, y solo a los jobs de Linux (clave del updater) y macOS (certif
 de Apple); cada release se detiene hasta que apruebes el environment `release` en
 Actions → Review deployments. Windows no necesita ninguno: llega firmado desde tu equipo.
 Sin `APPLE_CERTIFICATE` y `APPLE_SIGNING_IDENTITY`, macOS se firma *ad hoc* (los usuarios
-deben saltarse Gatekeeper, ver [Instalar](instalar.md)); con ellos se firma con Developer ID,
+deben saltarse Gatekeeper, ver [Instalar](install.md)); con ellos se firma con Developer ID,
 y se notariza si además están `APPLE_ID`, `APPLE_PASSWORD` y `APPLE_TEAM_ID`.
 
 ## Lanzar la release

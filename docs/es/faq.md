@@ -10,7 +10,7 @@ El instalador está firmado, pero no con un certificado comercial, así que Smar
 
 ## macOS dice que no puede abrir la app
 
-La app de macOS es experimental y lleva una firma *ad hoc*, sin certificado de Apple ni notarización, así que Gatekeeper la bloquea la primera vez. En macOS 15 o posterior, intenta abrirla y luego ve a **Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente»**; en versiones anteriores, clic derecho → **Abrir**. Más detalles en [Instalar](instalar.md).
+La app de macOS es experimental y lleva una firma *ad hoc*, sin certificado de Apple ni notarización, así que Gatekeeper la bloquea la primera vez. En macOS 15 o posterior, intenta abrirla y luego ve a **Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente»**; en versiones anteriores, clic derecho → **Abrir**. Más detalles en [Instalar](install.md).
 
 ## En macOS no me llegan las actualizaciones
 
@@ -31,6 +31,10 @@ Es intencionado: en muchos escritorios (como GNOME sin extensión AppIndicator) 
 ## Una canción no suena
 
 XP Music obtiene el audio con [yt-dlp](https://github.com/yt-dlp/yt-dlp). Si YouTube cambia algo, prueba **Opciones → Acerca de → Buscar actualización de yt-dlp**. Si sigue fallando, abre la carpeta de registros desde el mismo sitio y adjunta el archivo al abrir una *issue*.
+
+## ¿Cómo cambio el idioma?
+
+XP Music sigue el idioma de tu sistema (español si es español, inglés en cualquier otro caso). Para cambiarlo, ve a **Opciones → Reproductor → Idioma**.
 
 ## ¿Dónde informo de un error?
 
