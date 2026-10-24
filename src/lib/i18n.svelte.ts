@@ -2,16 +2,11 @@
 // active dictionary on every access, so templates and `$derived` that use it
 // update live when the language changes.
 
-import type { Language } from "./bindings";
+import { languageFromTag, type Language } from "./locale";
 import { en, type Dict } from "./locales/en";
 import { es } from "./locales/es";
 
 const dicts: Record<Language, Dict> = { en, es };
-
-/** `es`, `es-ES`, `es_MX.UTF-8`… are Spanish; anything else is English. */
-export function languageFromTag(tag: string | undefined | null): Language {
-  return /^es([-_.@:]|$)/i.test((tag ?? "").trim()) ? "es" : "en";
-}
 
 const system = languageFromTag(typeof navigator === "undefined" ? "" : navigator.language);
 

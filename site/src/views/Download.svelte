@@ -1,27 +1,22 @@
 <script lang="ts">
-  // Descargas de la última release (API de GitHub), con la forma de la Biblioteca.
-  // Una tarjeta por sistema con lo que traiga la release; la del visitante, la primera.
+  // Downloads of the latest release (GitHub API), shaped like the Library.
+  // One card per system with whatever the release has; the visitor's first.
   import logo from "../../../src/assets/logo.webp";
   import { RELEASES, REPO } from "../content";
   import { release, type Asset } from "../state.svelte";
-  import { OS_NAME, archName, detectOs, type Os } from "../builds";
+  import { OS_NAME, archName, detectOs, kindLabel, type Os } from "../builds";
+  import { locale, t } from "../i18n.svelte";
 
   const mine = detectOs(navigator.userAgent);
   const ALL: Os[] = ["windows", "macos", "linux"];
   const order = mine ? [mine, ...ALL.filter((o) => o !== mine)] : ALL;
-
-  const INTRO: Record<Os, string> = {
-    windows: "Instalador para Windows 10/11. Se actualiza solo: al arrancar te avisa si hay una versión nueva.",
-    macos: "Experimental. Imagen de disco: ábrela y arrastra XP Music a Aplicaciones. No se actualiza sola: para cambiar de versión, descarga el .dmg nuevo.",
-    linux: "Experimental. Necesita una sesión con audio y un Secret Service (GNOME Keyring o KeePassXC).",
-  };
 
   const assets = $derived(release.data?.assets ?? []);
   const cards = $derived(
     order
       .map((os) => {
         const own = assets.filter((a) => a.os === os);
-        // En macOS, Apple Silicon primero: es lo que llevan los Mac actuales.
+        // On macOS, Apple Silicon first: it is what current Macs have.
         const arches = (os === "macos" ? (["arm64", "x64"] as const) : (["x64", "arm64"] as const))
           .map((arch) => ({ arch, files: own.filter((a) => a.arch === arch) }))
           .filter((r) => r.files.length);
@@ -31,57 +26,58 @@
   );
   const table = $derived(cards.flatMap((c) => c.arches.flatMap((r) => r.files)));
   const mb = (a: Asset) => `${(a.size / 1048576).toFixed(1)} MB`;
+  const date = (iso: string) => new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" });
 </script>
 
 <div class="view">
   <header class="vhead">
     <img src={logo} alt="" width="40" height="40" />
     <div>
-      <h1>Descargar XP Music</h1>
+      <h1>{t.download.title}</h1>
       <span class="muted">
-        {#if release.data}Versión {release.data.tag} · {release.data.date}{:else if release.failed}No se pudo consultar la última versión.{:else}Buscando la última versión…{/if}
+        {#if release.data}{t.download.version(release.data.tag, date(release.data.published))}{:else if release.failed}{t.download.failed}{:else}{t.download.loading}{/if}
       </span>
     </div>
     <span class="grow"></span>
-    <a class="xp-btn" href={release.data?.url ?? RELEASES}>Notas de la versión</a>
+    <a class="xp-btn" href={release.data?.url ?? RELEASES}>{t.download.notes}</a>
   </header>
 
   {#if cards.length}
     <div class="cards">
       {#each cards as c (c.os)}
         <fieldset class:mine={c.os === mine}>
-          <legend>{OS_NAME[c.os]}{c.os === mine ? " · tu sistema" : ""}</legend>
-          <p>{INTRO[c.os]}</p>
+          <legend>{OS_NAME[c.os]}{c.os === mine ? t.download.mine : ""}</legend>
+          <p>{t.download.intro[c.os]}</p>
           {#each c.arches as r (r.arch)}
             <div class="arch">
               <span class="arch-name">{archName(c.os, r.arch)}</span>
               <div class="row">
                 {#each r.files as a (a.name)}
-                  <a class="xp-btn big" href={a.url} title={a.name}>{a.kind} <span class="size">{mb(a)}</span></a>
+                  <a class="xp-btn big" href={a.url} title={a.name}>{kindLabel(a.kind, t.download.installer)} <span class="size">{mb(a)}</span></a>
                 {/each}
               </div>
             </div>
           {/each}
           <p class="hint">
-            {#if c.os === "windows"}Si SmartScreen avisa: «Más información» → «Ejecutar de todas formas».{:else if c.os === "macos"}La primera vez macOS la bloquea: Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente».{/if}
-            <a href="#/docs/instalar">Instrucciones de instalación</a>
+            {#if c.os === "windows"}{t.download.smartScreen}{:else if c.os === "macos"}{t.download.gatekeeper}{/if}
+            <a href="#/docs/install">{t.download.instructions}</a>
           </p>
         </fieldset>
       {/each}
     </div>
   {:else if release.data || release.failed}
     <fieldset>
-      <legend>Descargas</legend>
-      <p>No se pudo leer la lista de archivos. Están todos en la página de la última versión.</p>
-      <a class="xp-btn big" href={RELEASES}>Abrir la última versión en GitHub</a>
+      <legend>{t.download.downloads}</legend>
+      <p>{t.download.listFailed}</p>
+      <a class="xp-btn big" href={RELEASES}>{t.download.openRelease}</a>
     </fieldset>
   {/if}
 
   {#if table.length}
-    <h2>Todos los archivos</h2>
+    <h2>{t.download.all}</h2>
     <div class="scroll">
       <table class="lv">
-        <thead><tr><th>Sistema</th><th>Archivo</th><th class="num">Tamaño</th><th>SHA-256</th></tr></thead>
+        <thead><tr><th>{t.download.colSystem}</th><th>{t.download.colFile}</th><th class="num">{t.download.colSize}</th><th>SHA-256</th></tr></thead>
         <tbody>
           {#each table as a (a.name)}
             <tr>
@@ -95,7 +91,7 @@
       </table>
     </div>
   {/if}
-  <p class="muted">Versiones anteriores y código fuente en <a href="{REPO}/releases">GitHub Releases</a>.</p>
+  <p class="muted">{t.download.older} <a href="{REPO}/releases">GitHub Releases</a>.</p>
 </div>
 
 <style>
@@ -108,7 +104,7 @@
   fieldset {
     background: var(--surface-light);
   }
-  /* Borde más grueso, no box-shadow: la sombra no deja hueco para la leyenda y la tacha. */
+  /* Thicker border, not box-shadow: the shadow leaves no gap for the legend and strikes it through. */
   fieldset.mine {
     border: 2px solid var(--selection);
   }
@@ -153,7 +149,7 @@
   .lv {
     max-width: none;
   }
-  /* Clic = seleccionar el hash entero, para copiarlo y compararlo. */
+  /* Click = select the whole hash, to copy and compare it. */
   .sha {
     font: 11px Consolas, "Lucida Console", monospace;
     user-select: all;

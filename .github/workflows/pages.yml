@@ -1,6 +1,6 @@
-# Web del proyecto (site/) con la documentación de docs/, en GitHub Pages.
-# Requiere una vez: Settings → Pages → Source: «GitHub Actions».
-# En los PR solo se compila (sin desplegar), para que un cambio no rompa la web.
+# Project website (site/) with the documentation from docs/, on GitHub Pages.
+# Needs once: Settings → Pages → Source: "GitHub Actions".
+# On PRs it only builds (without deploying), so a change cannot break the site.
 name: Pages
 
 on:
@@ -9,10 +9,11 @@ on:
     paths:
       - "site/**"
       - "docs/**"
-      # Lo que la web reutiliza de la app.
+      # What the website reuses from the app.
       - "src/styles/**"
       - "src/lib/skin.ts"
-      - "src/lib/strings.ts"
+      - "src/lib/locale.ts"
+      - "src/lib/locales/**"
       - "src/lib/viz/**"
       - "src/lib/components/xp/**"
       - "src/assets/**"

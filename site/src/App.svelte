@@ -1,6 +1,6 @@
 <script lang="ts">
-  // La web es una ventana de XP Music sobre un escritorio de XP: la misma carcasa
-  // de WMP 9 que dibuja la app (src/lib/skin.ts), con las secciones como tareas.
+  // The website is an XP Music window on an XP desktop: the same WMP 9 shell the app
+  // draws (src/lib/skin.ts), with the sections as tasks.
   import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "../../src/lib/skin";
   import DialogFrame from "../../src/lib/components/xp/DialogFrame.svelte";
   import logo from "../../src/assets/logo.webp";
@@ -12,17 +12,19 @@
   import Docs from "./views/Docs.svelte";
   import { REPO, SECTIONS } from "./content";
   import { route, setTheme, site, type Theme } from "./state.svelte";
+  import { i18n, language, locale, setLanguage, t } from "./i18n.svelte";
+  import type { Language } from "../../src/lib/locale";
   import { current, next, pause, player, toggle } from "./player.svelte";
 
   const r = $derived(route(site.hash));
-  const label = $derived(SECTIONS.find((s) => s.id === r.section)?.label ?? "Inicio");
-  // Como WMP: "Título - XP Music" mientras suena algo.
+  const label = $derived(t.sections[SECTIONS.find((s) => s.id === r.section)?.key ?? "home"]);
+  // Like WMP: "Title - XP Music" while something plays.
   $effect(() => {
     document.title = player.playing
       ? `${current().title} - XP Music`
       : r.section
         ? `${label} - XP Music`
-        : "XP Music: YouTube Music con el aspecto de Windows Media Player 9";
+        : t.title;
   });
 
   let deskW = $state(0);
@@ -30,7 +32,7 @@
   let winW = $state(0);
   let winH = $state(0);
   let win = $state<"normal" | "max" | "min" | "closed">("normal");
-  // Pantallas pequeñas: sin escritorio ni carcasa, una columna.
+  // Small screens: no desktop or shell, a single column.
   const mobile = $derived(deskW > 0 && (deskW < 760 || deskH < 500));
   const shown = $derived(mobile || win === "normal" || win === "max");
   const L = $derived(!mobile && winW && winH ? skinLayout(winW, winH, !site.sideCollapsed) : null);
@@ -46,11 +48,9 @@
     return () => clearInterval(id);
   });
 
-  const themes: [Theme, string][] = [
-    ["blue", "Azul (predeterminado)"],
-    ["olive", "Verde oliva"],
-    ["silver", "Plateado"],
-  ];
+  const themes = $derived(Object.entries(t.options.themes) as [Theme, string][]);
+  // Each language is named in itself, so it can be found whatever the current one is.
+  const languages: [Language, string][] = [["en", "English"], ["es", "Español"]];
 </script>
 
 <svelte:window
@@ -60,9 +60,9 @@
 />
 
 {#snippet view()}
-  {#if r.section === "descargar"}
+  {#if r.section === "download"}
     <Download />
-  {:else if r.section === "capturas"}
+  {:else if r.section === "screenshots"}
     <Screens />
   {:else if r.section === "docs"}
     <Docs slug={r.doc} />
@@ -73,7 +73,7 @@
 
 <div class="desktop" class:mobile bind:clientWidth={deskW} bind:clientHeight={deskH}>
   {#if !mobile}
-    <button class="desk-icon" ondblclick={() => (win = "normal")} onkeydown={(e) => e.key === "Enter" && (win = "normal")} title="Doble clic para abrir">
+    <button class="desk-icon" ondblclick={() => (win = "normal")} onkeydown={(e) => e.key === "Enter" && (win = "normal")} title={t.window.open}>
       <img src={logo} alt="" width="32" height="32" />
       <span>XP Music</span>
     </button>
@@ -86,22 +86,22 @@
           <img src={logo} alt="" width="22" height="22" />
           <b>XP Music</b>
           <span class="grow"></span>
-          <button class="round" title="Opciones" aria-label="Opciones" onclick={() => (site.optionsOpen = true)}>
+          <button class="round" title={t.nav.options} aria-label={t.nav.options} onclick={() => (site.optionsOpen = true)}>
             <svg viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.6" /><circle cx="6" cy="4" r="1.6" /><circle cx="10" cy="8" r="1.6" /><circle cx="6" cy="12" r="1.6" /></svg>
           </button>
         </header>
         <div class="m-side"><Side row section={r.section} /></div>
         <main class="content m-content" class:dark={r.section === ""}>{@render view()}</main>
         <footer class="m-bar">
-          <button class="round m-play" aria-label={player.playing ? "Pausa" : "Reproducir"} onclick={toggle}>
+          <button class="round m-play" aria-label={player.playing ? t.player.pause : t.player.play} onclick={toggle}>
             {#if player.playing}
               <svg viewBox="0 0 16 16"><rect x="4" y="3" width="3" height="10" /><rect x="9" y="3" width="3" height="10" /></svg>
             {:else}
               <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" /></svg>
             {/if}
           </button>
-          <span class="m-lcd">{player.playing ? `${current().artist}: ${current().title}` : "Pulsa ▶ para escuchar"}</span>
-          <button class="round" aria-label="Siguiente" onclick={() => next(1)}>
+          <span class="m-lcd">{player.playing ? `${current().artist}: ${current().title}` : t.player.pressPlay}</span>
+          <button class="round" aria-label={t.player.next} onclick={() => next(1)}>
             <svg viewBox="0 0 16 16"><path d="M3 4v8l7-4z" /><rect x="11" y="4" width="2" height="8" /></svg>
           </button>
         </footer>
@@ -142,19 +142,19 @@
         {/if}
 
         <header class="topbar" style={place(L.topBar)}>
-          <a class="menu" href="#/" title="Inicio" aria-label="Inicio">
+          <a class="menu" href="#/" title={t.nav.home} aria-label={t.nav.home}>
             <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" /><circle cx="8" cy="8" r="1.4" /></svg>
           </a>
           <span class="grow"></span>
           <div class="rounds">
             <button
-              title={site.sideCollapsed ? "Mostrar la barra lateral" : "Ocultar la barra lateral"}
-              aria-label={site.sideCollapsed ? "Mostrar la barra lateral" : "Ocultar la barra lateral"}
+              title={site.sideCollapsed ? t.nav.showSide : t.nav.hideSide}
+              aria-label={site.sideCollapsed ? t.nav.showSide : t.nav.hideSide}
               onclick={() => (site.sideCollapsed = !site.sideCollapsed)}
             >
               <svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.4" /><rect x="3" y="3.5" width="3.5" height="9" /></svg>
             </button>
-            <button title="Opciones" aria-label="Opciones" onclick={() => (site.optionsOpen = true)}>
+            <button title={t.nav.options} aria-label={t.nav.options} onclick={() => (site.optionsOpen = true)}>
               <svg viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.6" /><circle cx="6" cy="4" r="1.6" /><circle cx="10" cy="8" r="1.6" /><circle cx="6" cy="12" r="1.6" /></svg>
             </button>
           </div>
@@ -175,26 +175,26 @@
               <ul class="menu-list" role="menu">
                 {#each SECTIONS as s (s.id)}
                   <li role="none">
-                    <a role="menuitemradio" aria-checked={s.id === r.section} href="#/{s.id}" onclick={() => (comboOpen = false)}>{s.label}</a>
+                    <a role="menuitemradio" aria-checked={s.id === r.section} href="#/{s.id}" onclick={() => (comboOpen = false)}>{t.sections[s.key]}</a>
                   </li>
                 {/each}
                 <li class="sep" role="separator"></li>
-                <li role="none"><a role="menuitem" href={REPO}>Ver en GitHub</a></li>
+                <li role="none"><a role="menuitem" href={REPO}>{t.nav.viewOnGithub}</a></li>
               </ul>
             {/if}
           </div>
           <div class="win">
-            <button title="Minimizar" aria-label="Minimizar" onclick={() => (win = "min")}>
+            <button title={t.window.minimize} aria-label={t.window.minimize} onclick={() => (win = "min")}>
               <svg viewBox="0 0 9 9"><path d="M1 7h7" stroke="currentColor" stroke-width="1.6" /></svg>
             </button>
             <button
-              title={win === "max" ? "Restaurar" : "Maximizar"}
-              aria-label={win === "max" ? "Restaurar" : "Maximizar"}
+              title={win === "max" ? t.window.restore : t.window.maximize}
+              aria-label={win === "max" ? t.window.restore : t.window.maximize}
               onclick={() => (win = win === "max" ? "normal" : "max")}
             >
               <svg viewBox="0 0 9 9"><rect x="1" y="1.5" width="7" height="6" fill="none" stroke="currentColor" stroke-width="1.3" /></svg>
             </button>
-            <button class="close" title="Cerrar" aria-label="Cerrar" onclick={() => {
+            <button class="close" title={t.window.close} aria-label={t.window.close} onclick={() => {
                 win = "closed";
                 pause();
               }}
@@ -207,8 +207,8 @@
         <button
           class="handle"
           style="left:{Math.max(0, L.content.x - 9)}px;top:{L.content.y + L.content.h / 2 - 22}px"
-          title={site.sideCollapsed ? "Mostrar la barra lateral" : "Ocultar la barra lateral"}
-          aria-label={site.sideCollapsed ? "Mostrar la barra lateral" : "Ocultar la barra lateral"}
+          title={site.sideCollapsed ? t.nav.showSide : t.nav.hideSide}
+          aria-label={site.sideCollapsed ? t.nav.showSide : t.nav.hideSide}
           onclick={() => (site.sideCollapsed = !site.sideCollapsed)}
         >
           <svg viewBox="0 0 6 10"><path d={site.sideCollapsed ? "M1 1l4 4-4 4" : "M5 1L1 5l4 4"} fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
@@ -229,7 +229,7 @@
         <path d="M1 3.2l6-.9v5.4H1z" fill="#f65314" /><path d="M8 2.2l7-1v6.5H8z" fill="#7cbb00" />
         <path d="M1 8.6h6V14l-6-.9z" fill="#00a1f1" /><path d="M8 8.6h7v6.4l-7-1z" fill="#ffbb00" />
       </svg>
-      inicio
+      {t.window.start}
     </button>
     {#if win !== "closed"}
       <button class="task" class:active={win !== "min"} onclick={() => (win = win === "min" ? "normal" : "min")}>
@@ -239,23 +239,30 @@
     {/if}
     <span class="grow"></span>
     <div class="tray">
-      <a href={REPO} title="XP Music en GitHub" aria-label="XP Music en GitHub">
+      <a href={REPO} title={t.window.github} aria-label={t.window.github}>
         <svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.4.7 0-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 0z" /></svg>
       </a>
-      <time>{clock.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</time>
+      <time>{clock.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
     </div>
   </footer>
 {/if}
 
 {#if site.optionsOpen}
-  <DialogFrame title="Opciones" onclose={() => (site.optionsOpen = false)} width={300}>
+  <DialogFrame title={t.options.title} onclose={() => (site.optionsOpen = false)} width={300}>
     <fieldset>
-      <legend>Combinación de colores</legend>
+      <legend>{t.options.theme}</legend>
       {#each themes as [id, name] (id)}
         <label class="radio"><input type="radio" name="theme" checked={site.theme === id} onchange={() => setTheme(id)} /> {name}</label>
       {/each}
     </fieldset>
-    <div class="dialog-buttons"><button class="xp-btn" onclick={() => (site.optionsOpen = false)}>Aceptar</button></div>
+    <fieldset>
+      <legend>{t.options.language}</legend>
+      <select class="xp-input" value={i18n.choice ?? ""} onchange={(e) => setLanguage((e.currentTarget.value || null) as Language | null)}>
+        <option value="">{t.options.languageAuto}</option>
+        {#each languages as [id, name] (id)}<option value={id}>{name}</option>{/each}
+      </select>
+    </fieldset>
+    <div class="dialog-buttons"><button class="xp-btn" onclick={() => (site.optionsOpen = false)}>{t.options.ok}</button></div>
   </DialogFrame>
 {/if}
 
@@ -367,7 +374,7 @@
     filter: brightness(1.1);
   }
 
-  /* Pestaña de arriba a la derecha: desplegable de secciones y botones de ventana. */
+  /* Tab at the top right: sections dropdown and window buttons. */
   .tab {
     z-index: 6;
     display: flex;
@@ -425,7 +432,7 @@
     height: 5px;
     fill: var(--btn-ink);
   }
-  /* Menú de XP. */
+  /* XP menu. */
   .menu-list {
     position: absolute;
     top: 24px;
@@ -522,7 +529,7 @@
     border-color: #000;
   }
 
-  /* Móvil: una columna con la cabecera del skin y las tareas en fila. */
+  /* Mobile: a single column with the skin header and the tasks in a row. */
   .mobile .window {
     inset: 0;
     display: flex;
@@ -587,7 +594,7 @@
     box-shadow: none;
   }
 
-  /* Barra de tareas de XP. */
+  /* XP taskbar. */
   .taskbar {
     flex: none;
     display: flex;

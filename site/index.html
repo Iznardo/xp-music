@@ -1,26 +1,28 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>XP Music: YouTube Music con el aspecto de Windows Media Player 9</title>
-    <meta name="description" content="Reproductor de escritorio gratuito y de código abierto para YouTube Music con el aspecto de Windows Media Player 9 en Windows XP: visualizaciones, máscaras .wmz y modo compacto. Para Windows 10/11, Linux y macOS." />
+    <title>XP Music: YouTube Music with the look of Windows Media Player 9</title>
+    <meta name="description" content="Free, open-source desktop player for YouTube Music with the look of Windows Media Player 9 on Windows XP: visualizations, .wmz skins and compact mode. For Windows 10/11, Linux and macOS." />
     <link rel="canonical" href="https://iznardo.github.io/xp-music/" />
     <meta name="theme-color" content="#0053ee" />
     <link rel="icon" type="image/png" href="../src-tauri/icons/32x32.png" />
     <link rel="apple-touch-icon" href="../src-tauri/icons/128x128@2x.png" />
 
-    <!-- Redes (Open Graph y X). La imagen sale de site/og.html. Las URL han de ser absolutas. -->
+    <!-- Social networks (Open Graph and X). The image comes from site/og.html. URLs must be absolute.
+         Crawlers do not run JavaScript, so this metadata is English, the base language. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="XP Music" />
-    <meta property="og:locale" content="es_ES" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="es_ES" />
     <meta property="og:url" content="https://iznardo.github.io/xp-music/" />
-    <meta property="og:title" content="XP Music: YouTube Music con el aspecto de Windows Media Player 9" />
-    <meta property="og:description" content="Reproductor gratuito para YouTube Music con la estética de Windows XP. Para Windows 10/11, Linux y macOS." />
+    <meta property="og:title" content="XP Music: YouTube Music with the look of Windows Media Player 9" />
+    <meta property="og:description" content="Free player for YouTube Music with the Windows XP look. For Windows 10/11, Linux and macOS." />
     <meta property="og:image" content="https://iznardo.github.io/xp-music/og.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="XP Music: la ventana de Windows Media Player 9 con una visualización, sobre un escritorio de Windows XP." />
+    <meta property="og:image:alt" content="XP Music: the Windows Media Player 9 window with a visualization, on a Windows XP desktop." />
     <meta name="twitter:card" content="summary_large_image" />
 
     <script type="application/ld+json">
@@ -28,29 +30,33 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "XP Music",
-        "description": "Reproductor de escritorio para YouTube Music con el aspecto de Windows Media Player 9 en Windows XP.",
+        "description": "Desktop player for YouTube Music with the look of Windows Media Player 9 on Windows XP.",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Windows 10, Windows 11, Linux, macOS",
         "url": "https://iznardo.github.io/xp-music/",
         "downloadUrl": "https://github.com/Iznardo/xp-music/releases/latest",
         "screenshot": "https://iznardo.github.io/xp-music/og.jpg",
         "license": "https://opensource.org/licenses/MIT",
-        "inLanguage": "es",
+        "inLanguage": ["en", "es"],
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
         "author": { "@type": "Person", "name": "iznardo", "url": "https://github.com/Iznardo" }
       }
     </script>
     <script>
-      // Tema antes de pintar, para que no parpadee.
+      // Theme and language before painting, so they do not flicker. The language logic
+      // mirrors src/lib/locale.ts and src/i18n.svelte.ts, which take over once loaded.
       document.documentElement.dataset.theme = { olive: "olive", silver: "silver" }[localStorage.getItem("xp-theme")] || "blue";
+      var saved = localStorage.getItem("xp-lang");
+      document.documentElement.lang = saved === "en" || saved === "es" ? saved : /^es([-_.@:]|$)/i.test((navigator.languages || [navigator.language])[0] || "") ? "es" : "en";
     </script>
   </head>
   <body>
     <div id="app"></div>
     <noscript>
       <h1>XP Music</h1>
-      <p>Reproductor de escritorio para YouTube Music con el aspecto de Windows Media Player 9 en Windows XP. Para Windows 10/11 y Linux.</p>
-      <p><a href="https://github.com/Iznardo/xp-music/releases/latest">Descargar</a> · <a href="https://github.com/Iznardo/xp-music">Código fuente y documentación</a></p>
+      <p>Desktop player for YouTube Music with the look of Windows Media Player 9 on Windows XP. For Windows 10/11, Linux and macOS.</p>
+      <p><a href="https://github.com/Iznardo/xp-music/releases/latest">Download</a> · <a href="https://github.com/Iznardo/xp-music">Source code and documentation</a></p>
+      <p lang="es">Reproductor de escritorio para YouTube Music con el aspecto de Windows Media Player 9 en Windows XP. <a href="https://github.com/Iznardo/xp-music/releases/latest">Descargar</a> · <a href="https://github.com/Iznardo/xp-music/blob/main/README.es.md">Código fuente y documentación</a></p>
     </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>

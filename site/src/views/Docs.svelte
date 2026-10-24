@@ -1,25 +1,27 @@
 <script lang="ts">
-  // Documentación (los .md de docs/): árbol a la izquierda, como la Biblioteca.
+  // Documentation (the .md files in docs/ or docs/es/): tree on the left, like the Library.
   import TreeView from "../../../src/lib/components/xp/TreeView.svelte";
   import type { TreeNode } from "../../../src/lib/components/xp/types";
-  import { docs } from "../docs";
+  import { docs, sourcePath } from "../docs";
   import { REPO } from "../content";
+  import { language, t } from "../i18n.svelte";
 
   let { slug }: { slug: string } = $props();
 
   const go = (s: string) => (location.hash = s ? `#/docs/${s}` : "#/docs");
-  const index = docs.find((d) => d.slug === "")!;
-  // El TreeView abre de inicio el nodo "library".
-  const nodes: TreeNode[] = [
+  const pages = $derived(docs[language()]);
+  const index = $derived(pages.find((d) => d.slug === "")!);
+  // The TreeView opens the "library" node at the start.
+  const nodes = $derived<TreeNode[]>([
     {
       id: "library",
       label: index.title,
       icon: "library",
       onselect: () => go(""),
-      children: docs.filter((d) => d.slug).map((d) => ({ id: d.slug, label: d.title, icon: "playlist", onselect: () => go(d.slug) })),
+      children: pages.filter((d) => d.slug).map((d) => ({ id: d.slug, label: d.title, icon: "playlist", onselect: () => go(d.slug) })),
     },
-  ];
-  const doc = $derived(docs.find((d) => d.slug === slug) ?? index);
+  ]);
+  const doc = $derived(pages.find((d) => d.slug === slug) ?? index);
 
   let article = $state<HTMLElement>();
   $effect(() => {
@@ -34,7 +36,7 @@
     <header class="vhead">
       <div><h1>{doc.title}</h1></div>
       <span class="grow"></span>
-      <a class="muted" href="{REPO}/edit/main/docs/{doc.file}">Editar en GitHub</a>
+      <a class="muted" href="{REPO}/edit/main/docs/{sourcePath(language(), doc.file)}">{t.docs.edit}</a>
     </header>
     <div class="md">{@html doc.html}</div>
   </article>

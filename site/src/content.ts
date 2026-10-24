@@ -1,23 +1,24 @@
-// Textos de la web que no son documentación (la documentación está en ../docs).
+// Website constants that are not translated text (texts are in locales/, documentation in ../../docs).
 
 export const REPO = "https://github.com/Iznardo/xp-music";
-/** Siempre la última versión publicada (GitHub redirige a su etiqueta). */
+/** Always the latest published release (GitHub redirects to its tag). */
 export const RELEASES = `${REPO}/releases/latest`;
 
+/** `id` is the route (`#/<id>`); `key` picks the label in `t.sections`. */
 export const SECTIONS = [
-  { id: "", label: "Inicio" },
-  { id: "descargar", label: "Descargar" },
-  { id: "capturas", label: "Capturas" },
-  { id: "docs", label: "Documentación" },
+  { id: "", key: "home" },
+  { id: "download", key: "download" },
+  { id: "screenshots", key: "screenshots" },
+  { id: "docs", key: "docs" },
 ] as const;
 
 const OGA = "https://opengameart.org/content/";
 const FMA = "https://freemusicarchive.org/music/Loyalty_Freak_Music/ROLLER_DISCO_DANCE_DANCE/";
 
 /**
- * Música de la portada: todas las pistas son CC0 (dominio público), comprobado en su
- * página de origen (`src`). Archivos en site/public/music/, recodificados a MP3 de
- * 80 kbps con el volumen igualado (ffmpeg loudnorm, -16 LUFS). `dur` en segundos.
+ * Home page music: every track is CC0 (public domain), checked on its source page
+ * (`src`). Files in site/public/music/, re-encoded to 80 kbps MP3 with the volume
+ * evened out (ffmpeg loudnorm, -16 LUFS). `dur` is in seconds.
  */
 export const TRACKS = [
   { file: "dance-robot-activate", title: "Dance Robot ACTIVATE", artist: "Loyalty Freak Music", dur: 159, src: FMA },

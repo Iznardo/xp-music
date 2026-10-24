@@ -1,32 +1,27 @@
 <script lang="ts">
-  // Tareas de la barra lateral de WMP 9 (como SideTasks de la app), aquí con las secciones de la web.
-  import { RELEASES, REPO } from "./content";
+  // WMP 9 side bar tasks (like SideTasks in the app), here with the website sections.
+  import { RELEASES, REPO, SECTIONS } from "./content";
+  import { t } from "./i18n.svelte";
   import { release, site } from "./state.svelte";
 
   let { section, row = false }: { section: string; row?: boolean } = $props();
 
-  const tasks = [
-    { label: "Inicio", id: "" },
-    { label: "Descargar", id: "descargar" },
-    { label: "Capturas", id: "capturas" },
-    { label: "Documentación", id: "docs" },
-  ];
 </script>
 
-<nav class="side" class:row aria-label="Secciones">
+<nav class="side" class:row aria-label={t.nav.label}>
   {#if !row}
     <div class="user">
-      <a class="account" href={release.data?.url ?? RELEASES} title="Última versión">
+      <a class="account" href={release.data?.url ?? RELEASES} title={t.nav.latest}>
         <span class="dot"></span>{release.data?.tag ?? "XP Music"}
       </a>
     </div>
   {/if}
-  {#each tasks as t (t.id)}
-    <a class="task" class:active={section === t.id} aria-current={section === t.id ? "page" : undefined} href="#/{t.id}">{t.label}</a>
+  {#each SECTIONS as s (s.id)}
+    <a class="task" class:active={section === s.id} aria-current={section === s.id ? "page" : undefined} href="#/{s.id}">{t.sections[s.key]}</a>
   {/each}
-  <a class="task" href={REPO}>Código fuente</a>
+  <a class="task" href={REPO}>{t.nav.source}</a>
   {#if !row}
-    <button class="task" onclick={() => (site.optionsOpen = true)}>Opciones</button>
+    <button class="task" onclick={() => (site.optionsOpen = true)}>{t.nav.options}</button>
   {/if}
 </nav>
 
@@ -89,7 +84,7 @@
     border-radius: 50%;
     background: radial-gradient(circle at 35% 35%, #c8ffc8, #2fb52f 60%, #1a7a1a);
   }
-  /* En móvil: en fila, con desplazamiento horizontal. */
+  /* On mobile: in a row, scrolling horizontally. */
   .row {
     flex-direction: row;
     padding: 0 4px;

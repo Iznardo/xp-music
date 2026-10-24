@@ -1,11 +1,12 @@
 <script lang="ts">
-  // Portada con la forma de «Reproduciendo»: visualización a la izquierda y, en la
-  // lista de reproducción, música CC0 que suena de verdad.
+  // Home page shaped like "Now Playing": visualization on the left and, in the
+  // playlist, CC0 music that really plays.
   import Viz from "../Viz.svelte";
   import { PRESETS } from "../viz";
   import { TRACKS, fmt } from "../content";
   import { release, site } from "../state.svelte";
   import { current, play, player } from "../player.svelte";
+  import { t } from "../i18n.svelte";
 
   const total = TRACKS.reduce((s, f) => s + f.dur, 0);
   const track = $derived(current());
@@ -15,52 +16,49 @@
 <div class="now">
   <div class="center">
     <div class="head">
-      <span class="artist">YouTube Music · Windows Media Player 9 · Windows XP</span>
+      <span class="artist">{t.home.kicker}</span>
       <h1 class="title">XP Music</h1>
     </div>
     <div class="stage">
       {#key site.preset}<Viz make={PRESETS[site.preset]!.make} />{/key}
       <div class="pitch">
-        <p>Reproductor de escritorio para <b>YouTube Music</b> con el aspecto de <b>Windows Media Player 9</b> en Windows XP.</p>
-        <p class="sub">
-          Inicio, búsqueda, biblioteca, «Me gusta», historial y radio de tu cuenta; visualizaciones, modo compacto y máscaras de WMP.
-          Para Windows 10/11, y en pruebas para Linux y macOS. Gratis y de código abierto.
-        </p>
+        <p>{@html t.home.pitch}</p>
+        <p class="sub">{t.home.sub}</p>
         <div class="cta">
-          <a class="xp-btn" href="#/descargar">Descargar{release.data ? ` ${release.data.tag}` : ""}</a>
-          <a class="xp-btn" href="#/capturas">Ver capturas</a>
+          <a class="xp-btn" href="#/download">{t.home.download}{release.data ? ` ${release.data.tag}` : ""}</a>
+          <a class="xp-btn" href="#/screenshots">{t.home.screenshots}</a>
         </div>
       </div>
     </div>
     <div class="vizbar">
       <div class="steps">
-        <button title="Visualización anterior" aria-label="Visualización anterior" onclick={() => step(-1)}>
+        <button title={t.home.prevViz} aria-label={t.home.prevViz} onclick={() => step(-1)}>
           <svg viewBox="0 0 10 10"><path d="M7 1v8L2 5z" /></svg>
         </button>
-        <button title="Visualización siguiente" aria-label="Visualización siguiente" onclick={() => step(1)}>
+        <button title={t.home.nextViz} aria-label={t.home.nextViz} onclick={() => step(1)}>
           <svg viewBox="0 0 10 10"><path d="M3 1v8l5-4z" /></svg>
         </button>
       </div>
-      <span class="preset">{PRESETS[site.preset]!.name}</span>
+      <span class="preset">{t.vizNames[PRESETS[site.preset]!.id]}</span>
       <span class="grow"></span>
-      <a class="album" href="#/docs">Documentación</a>
+      <a class="album" href="#/docs">{t.home.docs}</a>
     </div>
   </div>
 
   <aside class="list">
-    <div class="list-head"><span>Lista de reproducción actual</span><span class="n">{TRACKS.length}</span></div>
-    <div class="cols"><span>Título</span><span>Artista</span><span>Dur.</span></div>
+    <div class="list-head"><span>{t.home.playlist}</span><span class="n">{TRACKS.length}</span></div>
+    <div class="cols"><span>{t.home.colTitle}</span><span>{t.home.colArtist}</span><span>{t.home.colLength}</span></div>
     <ol>
       {#each TRACKS as f, i (f.file)}
         <li>
-          <button class:current={i === player.track} aria-current={i === player.track ? "true" : undefined} title="Reproducir «{f.title}»" onclick={() => play(i)}>
+          <button class:current={i === player.track} aria-current={i === player.track ? "true" : undefined} title={t.home.play(f.title)} onclick={() => play(i)}>
             <span class="t">{f.title}</span><span class="c">{f.artist}</span><span class="d">{fmt(f.dur)}</span>
           </button>
         </li>
       {/each}
     </ol>
-    <p class="desc">«{track.title}» de {track.artist}. Dominio público (CC0): <a href={track.src}>origen</a>.</p>
-    <div class="list-foot"><span>Música libre (CC0)</span><span>Tiempo total: {fmt(total)}</span></div>
+    <p class="desc">{t.home.desc(track.title, track.artist)} <a href={track.src}>{t.home.source}</a>.</p>
+    <div class="list-foot"><span>{t.home.free}</span><span>{t.home.total}: {fmt(total)}</span></div>
   </aside>
 </div>
 
@@ -186,7 +184,7 @@
     text-decoration: underline;
   }
 
-  /* Lista de reproducción oscura de WMP 9. */
+  /* WMP 9 dark playlist. */
   .list {
     width: 280px;
     flex: none;

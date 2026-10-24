@@ -1,4 +1,4 @@
-/* Lo propio de la web sobre tokens.css y base.css de la app. */
+/* Website-specific styles on top of the app's tokens.css and base.css. */
 
 html,
 body,
@@ -12,7 +12,7 @@ body,
 }
 
 body {
-  /* Escritorio de XP: ilustración propia en SVG (no es la foto «Bliss»). */
+  /* XP desktop: original SVG illustration (not the "Bliss" photo). */
   background: #3f86ec url("./desktop.svg") center 30% / cover no-repeat;
   font-size: 12px;
   user-select: text;
@@ -24,7 +24,7 @@ a {
   color: #0b3c99;
 }
 
-/* Barra de tareas por tema. */
+/* Taskbar per theme. */
 :root,
 :root[data-theme="blue"] {
   --tb-grad: linear-gradient(to bottom, #3168d5 0%, #4993e6 4%, #2157d7 12%, #2663e0 50%, #245edb 88%, #1941a5 100%);
@@ -48,7 +48,7 @@ a {
   --tb-tray: linear-gradient(to bottom, #e8e8ee, #cfd0da 50%, #c4c5d1);
 }
 
-/* Vistas claras (Descargar, Capturas, Documentación): como la Biblioteca. */
+/* Light views (Download, Screenshots, Documentation): like the Library. */
 .view {
   flex: 1;
   min-height: 0;
@@ -88,7 +88,7 @@ a.xp-btn {
   font: bold 14px var(--font-title);
 }
 
-/* Tabla con la cabecera de la ListView "Detalles" de XP. */
+/* Table with the header of XP's "Details" ListView. */
 .lv,
 .md table {
   width: 100%;
@@ -122,7 +122,7 @@ a.xp-btn {
   text-align: right;
 }
 
-/* Documentación (HTML de marked). */
+/* Documentation (HTML from marked). */
 .md {
   max-width: 820px;
   font-size: 13px;
