@@ -19,8 +19,6 @@ const payloads = [
   [`XP Music_${version}_arm64.deb`, ["linux-aarch64-deb"]],
   [`XP Music_${version}_aarch64.AppImage`, ["linux-aarch64-appimage"]],
   [`XP Music-${version}-1.aarch64.rpm`, ["linux-aarch64-rpm"]],
-  [`XP Music_${version}_x64.app.tar.gz`, ["darwin-x86_64-app", "darwin-x86_64"]],
-  [`XP Music_${version}_aarch64.app.tar.gz`, ["darwin-aarch64-app", "darwin-aarch64"]],
 ];
 
 test("manifest uses uploaded URLs and fails closed on incomplete or unsafe releases", async () => {
@@ -84,9 +82,9 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
     await rejectsRelease((r) => { r.prerelease = true; }, /must be a draft/);
     await rejectsRelease((r) => { r.assets.splice(0, 1); }, /remote artifact/);
     await rejectsRelease((r) => { r.assets.splice(1, 1); }, /remote artifact/);
-    // Faltan las entradas de ARM64 o macOS: no se publica un manifiesto parcial.
+    // Faltan las entradas de Windows ARM64 o Linux ARM64: no se publica un manifiesto parcial.
     await rejectsRelease((r) => { r.assets.splice(2, 2); }, /remote artifact/);
-    await rejectsRelease((r) => { r.assets.splice(16, 2); }, /remote artifact/);
+    await rejectsRelease((r) => { r.assets.splice(14, 2); }, /remote artifact/);
     await rejectsRelease((r) => { r.assets.push(r.assets[0]); }, /found 2/);
     await rejectsRelease((r) => { r.assets.push(r.assets[1]); }, /found 2/);
     await rejectsRelease((r) => { r.assets[0].size++; }, /size mismatch/);
@@ -112,8 +110,8 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
     await writeFile(duplicate, "payload");
     await assert.rejects(generateManifest(metadata, packages, output), /found 2/);
     await rm(duplicate);
-    // Sin el .app.tar.gz local de macOS tampoco se genera.
-    await rm(join(packages, "9", "bundle", payloads[9][0]));
+    // Sin el paquete local de Linux ARM64 tampoco se genera.
+    await rm(join(packages, "7", "bundle", payloads[7][0]));
     await assert.rejects(generateManifest(metadata, packages, output), /local artifact/);
   } finally {
     await rm(directory, { recursive: true, force: true });

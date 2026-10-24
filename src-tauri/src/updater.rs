@@ -4,6 +4,8 @@
 //! instalador; el updater de Tauri comprueba su firma con la clave pública, que
 //! se inyecta al compilar (`XP_MUSIC_UPDATER_PUBKEY`). Solo se actualizan
 //! instalaciones con un formato compatible y no gestionadas externamente.
+//! macOS queda fuera mientras la app vaya con firma ad hoc: cada versión cambia de
+//! firma y el Llavero volvería a pedir permiso para leer la sesión tras actualizar.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -63,7 +65,6 @@ fn installation_allows_updates(
                     | BundleType::Rpm
                     | BundleType::Msi
                     | BundleType::Nsis
-                    | BundleType::App
             )
         )
         // El marcador del bundle puede seguir siendo Deb tras reempaquetar en Nix.
@@ -230,7 +231,6 @@ mod tests {
             BundleType::Rpm,
             BundleType::Msi,
             BundleType::Nsis,
-            BundleType::App,
         ] {
             for key in [None, Some(""), Some(" \n")] {
                 assert!(!installation_allows_updates(
@@ -247,7 +247,8 @@ mod tests {
                 false,
             ));
         }
-        for bundle in [None, Some(BundleType::Dmg)] {
+        // macOS (.app / .dmg) se actualiza a mano mientras sea experimental.
+        for bundle in [None, Some(BundleType::Dmg), Some(BundleType::App)] {
             assert!(!installation_allows_updates(
                 Some("key"),
                 bundle,

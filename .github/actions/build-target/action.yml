@@ -131,6 +131,7 @@ runs:
       env:
         BUNDLES: ${{ inputs.bundles }}
         TAG: ${{ inputs.tag }}
+        TARGET: ${{ inputs.target }}
         NO_STRIP: "true"
         XP_MUSIC_UPDATER_PUBKEY: ${{ inputs.updater-pubkey }}
         TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.signing-key }}
@@ -143,7 +144,8 @@ runs:
         APPLE_TEAM_ID: ${{ inputs.apple-team-id }}
       run: |
         args=(--bundles "$BUNDLES")
-        if [ -n "$TAG" ]; then
+        # macOS es experimental y sin updater (firma ad hoc): no usa la clave.
+        if [ -n "$TAG" ] && [[ "$TARGET" != darwin-* ]]; then
           test -n "$TAURI_SIGNING_PRIVATE_KEY"
           test -n "$XP_MUSIC_UPDATER_PUBKEY"
           # El bundler comprueba la firma con la clave pública de la config.

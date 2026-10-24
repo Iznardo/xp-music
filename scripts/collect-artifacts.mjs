@@ -1,9 +1,9 @@
 // Reúne en una carpeta plana los archivos que debe subir un job de CI (según la tabla de
-// release-targets.mjs) y falla si falta alguno. Renombra el `.app.tar.gz` de macOS.
+// release-targets.mjs) y falla si falta alguno.
 //   node scripts/collect-artifacts.mjs TARGET BUNDLE_DIR OUT_DIR [--signed]
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { ARTIFACTS, PRODUCT, listFiles, readVersion, unique } from "./release-targets.mjs";
+import { ARTIFACTS, listFiles, readVersion, unique } from "./release-targets.mjs";
 
 export async function collect(target, bundleDirectory, outputDirectory, signed, version) {
   const artifacts = ARTIFACTS.filter((a) => a.target === target);
@@ -13,14 +13,10 @@ export async function collect(target, bundleDirectory, outputDirectory, signed, 
   const copied = [];
   for (const artifact of artifacts) {
     const wantsSignature = signed && artifact.updater;
-    // Sin firma del updater, Tauri no genera los archivos que solo sirven para actualizar.
-    if (!artifact.installer && !wantsSignature) continue;
-    const built = artifact.built ?? artifact.suffix(version);
     for (const ext of wantsSignature ? ["", ".sig"] : [""]) {
-      const file = unique(files, `${built}${ext}`, "built");
-      const name = artifact.built ? `${PRODUCT}${artifact.suffix(version)}${ext}` : file.name;
-      await copyFile(join(file.parentPath, file.name), join(outputDirectory, name));
-      copied.push(name);
+      const file = unique(files, `${artifact.suffix(version)}${ext}`, "built");
+      await copyFile(join(file.parentPath, file.name), join(outputDirectory, file.name));
+      copied.push(file.name);
     }
   }
   return copied;
