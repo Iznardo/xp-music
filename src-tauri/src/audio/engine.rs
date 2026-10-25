@@ -759,6 +759,81 @@ mod tests {
         None
     }
 
+    /// Local files through the real output (muted): start, seek, PCM for the
+    /// visualization, gapless into a second file and the end.
+    /// `cargo test --lib -- --ignored --nocapture engine_local`.
+    #[test]
+    #[ignore]
+    fn engine_local_files_play_seek_and_chain() {
+        use crate::local::fixtures::{temp_dir, wav};
+        use ringbuf::traits::Observer;
+        let dir = temp_dir("engine-local");
+        let stream = |name: &str, secs: u32| {
+            let path = dir.join(name);
+            std::fs::write(&path, wav(44_100, 2, 44_100 * secs)).unwrap();
+            MediaStream::Local {
+                track_id: TrackId::local(&path),
+                path,
+                duration_ms: None,
+            }
+        };
+        let (a, b) = (stream("a.wav", 4), stream("b.wav", 2));
+        let (tx, rx) = unbounded();
+        let engine = EngineHandle::spawn(tx);
+        engine.send(EngineCmd::SetVolume {
+            volume: 0.5,
+            muted: test_muted(),
+        });
+        engine.send(EngineCmd::SetTap(true));
+        let t0 = Instant::now();
+        engine.send(EngineCmd::Load {
+            stream: a.clone(),
+            start_ms: 0,
+            autoplay: true,
+        });
+        let started = wait_for(&rx, Duration::from_secs(5), |e| {
+            matches!(e, EngineEvent::TrackStarted { .. })
+        })
+        .expect("did not start");
+        println!("first sound: {} ms", t0.elapsed().as_millis());
+        assert!(
+            matches!(
+                started,
+                EngineEvent::TrackStarted {
+                    duration_ms: Some(4000),
+                    ..
+                }
+            ),
+            "{started:?}"
+        );
+
+        engine.send(EngineCmd::Seek(2500));
+        wait_for(
+            &rx,
+            Duration::from_secs(5),
+            |e| matches!(e, EngineEvent::Position { position_ms, .. } if *position_ms >= 2600),
+        )
+        .expect("the seek does not play");
+        let tap = engine.take_tap().expect("PCM tap for the visualization");
+        assert!(tap.consumer.occupied_len() > 0, "no audio reaches the tap");
+
+        engine.send(EngineCmd::Preload { stream: b.clone() });
+        let mut ended_a = false;
+        wait_for(&rx, Duration::from_secs(5), |e| {
+            ended_a |= matches!(e, EngineEvent::Ended { track_id } if track_id == a.track_id());
+            matches!(e, EngineEvent::TrackStarted { track_id, gapless: true, .. } if track_id == b.track_id())
+        })
+        .expect("the second file did not follow");
+        assert!(!ended_a, "there was a gap between the files");
+        wait_for(
+            &rx,
+            Duration::from_secs(5),
+            |e| matches!(e, EngineEvent::Ended { track_id } if track_id == b.track_id()),
+        )
+        .expect("the end was not reported");
+        engine.shutdown();
+    }
+
     /// Visualization with real music (muted): audio reaches the tap even with
     /// the volume at 0 and beats are detected, also after releasing and
     /// retaking the tap. `cargo test --lib -- --ignored --nocapture viz_real`.
