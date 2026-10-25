@@ -1,10 +1,10 @@
-// Descarga yt-dlp y deno a tools/ con las versiones y SHA-256 fijados en tools.lock.json.
-// Destino normalizado e idéntico en todas las arquitecturas (lo busca la app Rust):
+// Downloads yt-dlp and deno into tools/ with the versions and SHA-256 pinned in tools.lock.json.
+// Normalized destination, the same on every architecture (the Rust app looks for it):
 //   windows: tools/deno.exe, tools/yt-dlp/yt-dlp.exe (onedir)
-//   linux:   tools/deno,     tools/yt-dlp/yt-dlp_linux (un solo archivo)
-//   macos:   tools/deno,     tools/yt-dlp/yt-dlp_macos (un solo archivo, universal)
-// Objetivo: process.platform/arch, o XP_MUSIC_TOOLS_TARGET (p. ej. "linux-arm64").
-// Carpeta de salida: tools/, o XP_MUSIC_TOOLS_DEST. `-Update` en Windows delega en el .ps1.
+//   linux:   tools/deno,     tools/yt-dlp/yt-dlp_linux (a single file)
+//   macos:   tools/deno,     tools/yt-dlp/yt-dlp_macos (a single universal file)
+// Target: process.platform/arch, or XP_MUSIC_TOOLS_TARGET (e.g. "linux-arm64").
+// Output folder: tools/, or XP_MUSIC_TOOLS_DEST. `-Update` on Windows delegates to the .ps1.
 import { createHash } from "node:crypto";
 import { chmod, mkdtemp, mkdir, readFile, rename, rm, writeFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,8 +14,8 @@ import { spawnSync } from "node:child_process";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-// win = ejecutable de yt-dlp dentro del zip si no se llama yt-dlp.exe (release arm64: yt-dlp_arm64.exe).
-// lock = clave de tools.lock.json (null: claves ytDlp/deno en la raíz, Windows x64 histórico).
+// packagedYtDlp = yt-dlp executable inside the zip if it is not named yt-dlp.exe (arm64 release: yt-dlp_arm64.exe).
+// lock = tools.lock.json key (null: ytDlp/deno keys at the root, the historical Windows x64).
 const TARGETS = {
   "windows-x64": { lock: null, os: "windows", ytDlp: "yt-dlp.exe" },
   "windows-arm64": { lock: "windows-arm64", os: "windows", ytDlp: "yt-dlp.exe", packagedYtDlp: "yt-dlp_arm64.exe" },
@@ -34,12 +34,12 @@ export function detectTarget(platform, arch, override) {
   return target;
 }
 
-// Función pura: objetivo + contenido de tools.lock.json -> qué descargar y dónde queda (relativo a tools/).
+// Pure function: target + tools.lock.json contents -> what to download and where it goes (relative to tools/).
 export function planFor(target, lockJson) {
   const t = TARGETS[target];
   if (!t) throw new Error(`Objetivo no soportado: ${target}`);
   const entry = t.lock ? lockJson[t.lock] : lockJson;
-  if (!entry?.ytDlp || !entry?.deno) throw new Error(`tools.lock.json no tiene entrada para ${target}`);
+  if (!entry?.ytDlp || !entry?.deno) throw new Error(`tools.lock.json has no entry for ${target}`);
   const denoExe = t.os === "windows" ? "deno.exe" : "deno";
   return {
     target,
@@ -65,7 +65,7 @@ function run(command, args) {
   if (result.status !== 0) throw new Error(`${command} exited with code ${result.status}`);
 }
 
-// GNU tar no abre zips; bsdtar (Windows 10+, macOS) sí; en Linux suele haber unzip.
+// GNU tar does not open zips; bsdtar (Windows 10+, macOS) does; Linux usually has unzip.
 function extractZip(zip, dir) {
   const attempts = [["unzip", ["-oq", zip, "-d", dir]], ["tar", ["-xf", zip, "-C", dir]], ["bsdtar", ["-xf", zip, "-C", dir]]];
   const errors = [];
@@ -74,7 +74,7 @@ function extractZip(zip, dir) {
     if (!error) return;
     errors.push(`${command}: ${String(error).trim()}`);
   }
-  throw new Error(`No se pudo extraer ${zip}:\n${errors.join("\n")}`);
+  throw new Error(`Could not extract ${zip}:\n${errors.join("\n")}`);
 }
 
 async function exists(path) {
@@ -85,7 +85,7 @@ async function main() {
   const native = detectTarget(process.platform, process.arch, "");
   const target = detectTarget(process.platform, process.arch, process.env.XP_MUSIC_TOOLS_TARGET);
   if (process.argv.length > 2) {
-    if (process.platform !== "win32") throw new Error("Sin argumentos: se usan las versiones de tools.lock.json.");
+    if (process.platform !== "win32") throw new Error("No arguments: the versions in tools.lock.json are used.");
     return run("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/fetch-tools.ps1", ...process.argv.slice(2)]);
   }
   const lockJson = JSON.parse((await readFile(join(root, "tools.lock.json"), "utf8")).replace(/^\uFEFF/, ""));
@@ -95,7 +95,7 @@ async function main() {
   try {
     for (const spec of [plan.ytDlp, plan.deno]) {
       const { version, asset, sha256, repo } = spec;
-      console.log(`Descargando ${asset} ${version} (${target})…`);
+      console.log(`Downloading ${asset} ${version} (${target})…`);
       const response = await fetch(`https://github.com/${repo}/releases/download/${version}/${asset}`);
       if (!response.ok) throw new Error(`Download of ${asset} failed: HTTP ${response.status}`);
       const bytes = Buffer.from(await response.arrayBuffer());
@@ -116,7 +116,7 @@ async function main() {
       } else {
         await writeFile(out, bytes);
       }
-      if (!(await exists(out))) throw new Error(`Falta ${spec.path} tras extraer ${asset}`);
+      if (!(await exists(out))) throw new Error(`${spec.path} is missing after extracting ${asset}`);
       if (process.platform !== "win32") await chmod(out, 0o755);
     }
     if (target.startsWith("windows")) await rm(join(tools, "yt-dlp.exe"), { force: true });
@@ -124,7 +124,7 @@ async function main() {
       run(join(tools, plan.ytDlp.path), ["--version"]);
       run(join(tools, plan.deno.path), ["--version"]);
     } else {
-      console.log(`Objetivo ${target} distinto de ${native}: solo se verificó el SHA-256 (no se ejecutan).`);
+      console.log(`Target ${target} differs from ${native}: only the SHA-256 was checked (they are not run).`);
     }
   } finally {
     await rm(temp, { recursive: true, force: true });

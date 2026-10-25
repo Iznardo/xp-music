@@ -16,20 +16,20 @@ use crate::audio::resolver::ToolPaths;
 use crate::error::{AppError, AppResult, ErrorCode};
 
 const RELEASES: &str = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
-/// Archivo de la release de yt-dlp para un sistema y arquitectura (`std::env::consts`).
+/// yt-dlp release file for a system and architecture (`std::env::consts`).
 fn asset_name(os: &str, arch: &str) -> Option<&'static str> {
     Some(match (os, arch) {
         ("windows", "x86_64") => "yt-dlp_win.zip",
         ("windows", "aarch64") => "yt-dlp_win_arm64.zip",
         ("linux", "x86_64") => "yt-dlp_linux",
         ("linux", "aarch64") => "yt-dlp_linux_aarch64",
-        // Un único Mach-O universal para Intel y Apple Silicon.
+        // A single universal Mach-O for Intel and Apple Silicon.
         ("macos", _) => "yt-dlp_macos",
         _ => return None,
     })
 }
 
-/// Nombre con el que se instala (y se empaqueta), igual en todas las arquitecturas.
+/// Name it is installed (and bundled) under, the same on every architecture.
 pub const YT_DLP_EXE: &str = if cfg!(windows) {
     "yt-dlp.exe"
 } else if cfg!(target_os = "macos") {
@@ -298,7 +298,7 @@ fn install_into(zip_bytes: &[u8], bin: &Path) -> AppResult<()> {
             let mut w = std::fs::File::create(&out).map_err(io)?;
             std::io::copy(&mut f, &mut w).map_err(io)?;
         }
-        // El zip de ARM64 trae `yt-dlp_arm64.exe`; la app y fetch-tools lo llaman `yt-dlp.exe`.
+        // The ARM64 zip contains `yt-dlp_arm64.exe`; the app and fetch-tools call it `yt-dlp.exe`.
         let arm64 = staging.join("yt-dlp_arm64.exe");
         if arm64.is_file() && !staging.join(YT_DLP_EXE).exists() {
             std::fs::rename(&arm64, staging.join(YT_DLP_EXE)).map_err(io)?;
@@ -410,7 +410,7 @@ mod tests {
     }
 
     #[test]
-    fn asset_por_plataforma() {
+    fn asset_per_platform() {
         for (os, arch, asset) in [
             ("windows", "x86_64", "yt-dlp_win.zip"),
             ("windows", "aarch64", "yt-dlp_win_arm64.zip"),
@@ -425,8 +425,8 @@ mod tests {
     }
 
     #[test]
-    fn instalar_rechaza_paquete_corrupto() {
-        assert!(install(b"esto no es un zip").is_err());
+    fn install_rejects_corrupt_package() {
+        assert!(install(b"this is not a zip").is_err());
     }
 
     #[cfg(unix)]

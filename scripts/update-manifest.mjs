@@ -38,12 +38,12 @@ export async function generateManifest(metadataPath, packagesDirectory, outputPa
     if (!signature) throw new Error(`Empty signature for ${local.name}`);
     downloadUrl(remoteSignature, release.tag_name);
     const entry = { signature, url: downloadUrl(remote, release.tag_name) };
-    // Clave específica del formato y, si existe, el alias heredado (mismo objeto).
+    // Format-specific key and, if any, the legacy alias (same object).
     for (const key of artifact.updater) platforms[key] = entry;
   }
   const manifest = {
     version,
-    // Solo las notas del mantenedor: la tabla de descargas se genera aparte.
+    // Only the maintainer's notes: the download table is generated separately.
     notes: stripDownloads(release.body),
     pub_date: release.created_at,
     platforms,

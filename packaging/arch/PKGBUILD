@@ -1,10 +1,10 @@
 # Maintainer: iznardo
-# XP Music para Arch Linux (x86_64 y aarch64): se compila desde el código fuente.
-# yt-dlp y Deno son los del sistema (los actualiza pacman); la app no se
-# autoactualiza ni descarga su propio yt-dlp.
+# XP Music for Arch Linux (x86_64 and aarch64): built from source.
+# yt-dlp and Deno are the system ones (pacman updates them); the app does not
+# update itself or download its own yt-dlp.
 #
-# Probar en local:       cd packaging/arch && makepkg -si
-# Cada versión nueva:    subir pkgver, pkgrel=1 y `updpkgsums`; para el AUR,
+# Test locally:          cd packaging/arch && makepkg -si
+# Each new version:      bump pkgver, pkgrel=1 and `updpkgsums`; for the AUR,
 #                        `makepkg --printsrcinfo > .SRCINFO`.
 pkgname=xp-music
 pkgver=1.0.2
@@ -16,10 +16,10 @@ license=(MIT)
 depends=(webkit2gtk-4.1 gtk3 glib2 libayatana-appindicator alsa-lib dbus openssl
          hicolor-icon-theme xdg-utils yt-dlp deno)
 makedepends=(rust nodejs npm pkgconf)
-optdepends=('gnome-keyring: Secret Service donde se guarda la sesión de YouTube (sirve cualquier otro, p. ej. KeePassXC)')
+optdepends=('gnome-keyring: Secret Service where the YouTube session is stored (any other works, e.g. KeePassXC)')
 options=(!lto !debug)
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# Actualizar con `updpkgsums` al fijar el tag de cada versión.
+# Update with `updpkgsums` when pinning each version's tag.
 sha256sums=('SKIP')
 
 prepare() {
@@ -33,11 +33,11 @@ prepare() {
 build() {
   cd "$pkgname-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
-  # tauri.linux.conf.json empaqueta tools/ como recurso; aquí lo aportan yt-dlp
-  # y deno del sistema, así que bastan marcadores vacíos para que compile.
+  # tauri.linux.conf.json bundles tools/ as a resource; here the system yt-dlp
+  # and deno provide it, so empty placeholders are enough for it to build.
   mkdir -p tools/yt-dlp
   touch tools/deno
-  # Sin paquetes de Tauri (.deb/AppImage/rpm): solo el binario con el frontend dentro.
+  # No Tauri packages (.deb/AppImage/rpm): just the binary with the frontend inside.
   npm run tauri build -- --no-bundle
 }
 
@@ -45,13 +45,13 @@ package() {
   cd "$pkgname-$pkgver"
   install -Dm755 src-tauri/target/release/xp-music "$pkgdir/usr/lib/$pkgname/xp-music"
 
-  # La app busca `deno` y `yt-dlp_linux` en XP_MUSIC_TOOLS (mismo esquema que nix/package.nix).
+  # The app looks for `deno` and `yt-dlp_linux` in XP_MUSIC_TOOLS (same scheme as nix/package.nix).
   install -d "$pkgdir/usr/lib/$pkgname/tools"
   ln -s /usr/bin/deno "$pkgdir/usr/lib/$pkgname/tools/deno"
   ln -s /usr/bin/yt-dlp "$pkgdir/usr/lib/$pkgname/tools/yt-dlp_linux"
 
-  # XP_MUSIC_TOOLS también desactiva la actualización de yt-dlp; el updater de la app
-  # se apaga a mano: las versiones las gestiona pacman.
+  # XP_MUSIC_TOOLS also turns off the yt-dlp update; the app updater is turned
+  # off by hand: pacman manages the versions.
   install -Dm755 /dev/stdin "$pkgdir/usr/bin/$pkgname" <<'EOF'
 #!/bin/sh
 export XP_MUSIC_TOOLS=/usr/lib/xp-music/tools

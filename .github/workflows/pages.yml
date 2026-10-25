@@ -26,7 +26,7 @@ on:
     paths:
       - "site/**"
       - "docs/**"
-      # Lo que la web reutiliza de la app.
+      # What the website reuses from the app.
       - "src/styles/**"
       - "src/lib/skin.ts"
       - "src/lib/strings.ts"
@@ -44,7 +44,7 @@ permissions:
   contents: read
 
 concurrency:
-  # Los despliegues van de uno en uno; las compilaciones de un PR no los esperan.
+  # Deployments go one at a time; PR builds do not wait for them.
   group: >-
     pages-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

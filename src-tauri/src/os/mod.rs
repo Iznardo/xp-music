@@ -17,7 +17,7 @@ use crate::error::{AppError, AppResult};
 use crate::player::service::PlayerService;
 use crate::settings::Settings;
 
-/// Abre una carpeta en el gestor de archivos del sistema.
+/// Opens a folder in the system file manager.
 pub fn open_dir(dir: &std::path::Path) -> AppResult<()> {
     let opener = if cfg!(windows) {
         "explorer.exe"
@@ -33,7 +33,7 @@ pub fn open_dir(dir: &std::path::Path) -> AppResult<()> {
         .map_err(|e| AppError::internal(e.to_string()))
 }
 
-/// Si se está saliendo de verdad (no solo cerrando la ventana a la bandeja).
+/// Whether the app is really quitting (not just closing the window to the tray).
 #[derive(Default)]
 pub struct OsState {
     pub quitting: AtomicBool,

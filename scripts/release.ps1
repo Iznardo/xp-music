@@ -1,21 +1,21 @@
-﻿# Publica una versión de XP Music (specs/007, FR-007-07): sube la versión, compila
-# los instaladores Windows x64 y ARM64 firmados (los únicos que se hacen aquí: el
-# certificado es no exportable), prepara un draft y lanza el workflow multiplataforma.
-# El workflow compila el resto (Linux x64/ARM64, macOS Intel/Apple Silicon), prueba
-# también los de Windows, y solo él publica la release, la tabla de descargas y
-# latest.json cuando pasan todos los targets. -Notes son las notas del mantenedor: el
-# workflow les añade encima la tabla de descargas.
+﻿# Publishes an XP Music version (specs/007, FR-007-07): bumps the version, builds
+# the signed Windows x64 and ARM64 installers (the only ones built here: the
+# certificate is non-exportable), prepares a draft and launches the multi-platform
+# workflow. The workflow builds the rest (Linux x64/ARM64, macOS Intel/Apple Silicon),
+# also tests the Windows ones, and only it publishes the release, the download table
+# and latest.json once every target passes. -Notes are the maintainer's notes: the
+# workflow adds the download table above them.
 #
 #   npm run release                 # patch: 0.1.0 → 0.1.1
 #   npm run release -- -Bump minor
 #   npm run release -- -Bump none -NoPublish   # build only (local test)
 #
-# Requisitos (una vez): scripts\setup-signing.ps1 (certificado), la clave del
-# updater en %USERPROFILE%\.xp-music\updater.key (+ .pub), creada con
+# Requirements (once): scripts\setup-signing.ps1 (certificate), the updater key
+# at %USERPROFILE%\.xp-music\updater.key (+ .pub), created with
 #   npm run tauri signer generate -- -w "$env:USERPROFILE\.xp-music\updater.key"
-# y, para ARM64, `rustup target add aarch64-pc-windows-msvc` más el componente
-# «MSVC ARM64 build tools» de Visual Studio Build Tools.
-# La contraseña de la clave se pide al compilar (o TAURI_SIGNING_PRIVATE_KEY_PASSWORD).
+# and, for ARM64, `rustup target add aarch64-pc-windows-msvc` plus the
+# "MSVC ARM64 build tools" component of Visual Studio Build Tools.
+# The key password is requested when building (or TAURI_SIGNING_PRIVATE_KEY_PASSWORD).
 param(
     [ValidateSet('patch', 'minor', 'major', 'none')][string]$Bump = 'patch',
     [switch]$NoPublish,
@@ -49,9 +49,9 @@ if (-not $NoPublish) {
     if (-not (Test-Path $keyPath)) { Fail "The updater key is missing at $keyPath." }
 }
 if (-not (@(rustup target list --installed) -contains $armTarget)) {
-    Fail "Falta el target de ARM64: rustup target add $armTarget (y «MSVC ARM64 build tools» de Visual Studio)."
+    Fail "The ARM64 target is missing: rustup target add $armTarget (and the Visual Studio 'MSVC ARM64 build tools')."
 }
-if (Test-Path (Join-Path $root 'tools.x64')) { Fail 'Existe tools.x64 de una ejecución anterior: devuélvelo a tools\ o bórralo.' }
+if (Test-Path (Join-Path $root 'tools.x64')) { Fail 'tools.x64 exists from a previous run: move it back to tools\ or delete it.' }
 if (-not (Test-Path (Join-Path $root 'tools\yt-dlp\yt-dlp.exe')) -or -not (Test-Path (Join-Path $root 'tools\deno.exe'))) {
     & (Join-Path $PSScriptRoot 'fetch-tools.ps1')
 }
@@ -114,21 +114,21 @@ if (Test-Path $keyPath) {
 $tmpConf = Join-Path ([IO.Path]::GetTempPath()) "xp-music-release-$v.json"
 Write-Utf8 $tmpConf ($extra | ConvertTo-Json -Depth 5)
 
-# --- 4. Compilar (x64 y ARM64) ------------------------------------------------
+# --- 4. Build (x64 and ARM64) -------------------------------------------------
 $tools = Join-Path $root 'tools'
 $toolsX64 = Join-Path $root 'tools.x64'
 try {
     npm run tauri build -- --config $tmpConf
-    if ($LASTEXITCODE -ne 0) { Fail 'La compilación x64 falló.' }
-    # El instalador empaqueta tools\ tal cual: mientras se compila ARM64 se ponen ahí
-    # el yt-dlp y el deno de ARM64 (fetch-tools solo comprueba su SHA-256, no los ejecuta).
+    if ($LASTEXITCODE -ne 0) { Fail 'The x64 build failed.' }
+    # The installer bundles tools\ as is: while ARM64 builds, the ARM64 yt-dlp and deno
+    # go there (fetch-tools only checks their SHA-256, it does not run them).
     Move-Item $tools $toolsX64
     try {
         $env:XP_MUSIC_TOOLS_TARGET = 'windows-arm64'
         node scripts/fetch-tools.mjs
-        if ($LASTEXITCODE -ne 0) { Fail 'No se pudieron descargar yt-dlp y deno de ARM64.' }
+        if ($LASTEXITCODE -ne 0) { Fail 'Could not download the ARM64 yt-dlp and deno.' }
         npm run tauri build -- --config $tmpConf --target $armTarget
-        if ($LASTEXITCODE -ne 0) { Fail 'La compilación ARM64 falló.' }
+        if ($LASTEXITCODE -ne 0) { Fail 'The ARM64 build failed.' }
     } finally {
         Remove-Item Env:XP_MUSIC_TOOLS_TARGET -ErrorAction SilentlyContinue
         if (Test-Path $tools) { Remove-Item -Recurse -Force $tools }
@@ -143,15 +143,15 @@ $installers = foreach ($build in @(
         @{ dir = "src-tauri\target\$armTarget\release\bundle\nsis"; arch = 'arm64' })) {
     $nsis = Join-Path $root $build.dir
     $found = Get-ChildItem $nsis -Filter "*_${v}_$($build.arch)-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (-not $found) { Fail "No se encuentra el instalador $($build.arch) de $v en $nsis." }
-    Write-Host "Instalador: $($found.FullName) ($([math]::Round($found.Length / 1MB, 1)) MB)"
+    if (-not $found) { Fail "$($build.arch) installer for $v not found in $nsis." }
+    Write-Host "Installer: $($found.FullName) ($([math]::Round($found.Length / 1MB, 1)) MB)"
     $found
 }
 
 # --- 5. Verify signature -------------------------------------------------------
 if (Test-Path $signingPath) {
-    # Solo los instaladores: Tauri firma el ejecutable al empaquetarlo y luego deja en
-    # target\...\release la copia sin firmar (la de dentro del instalador sí lo está).
+    # Only the installers: Tauri signs the executable when bundling it and then leaves
+    # the unsigned copy in target\...\release (the one inside the installer is signed).
     foreach ($f in @($installers.FullName)) {
         $a = Get-AuthenticodeSignature $f
         if ($a.Status -ne 'Valid' -or $a.SignerCertificate.Subject -ne 'CN=iznardo') {
@@ -163,10 +163,10 @@ if (Test-Path $signingPath) {
 }
 if ($NoPublish) { Write-Host 'Built without publishing.'; exit 0 }
 
-# --- 6. Preparar draft; el workflow compila el resto, lo verifica y publica -----
+# --- 6. Prepare the draft; the workflow builds the rest, verifies and publishes --
 $assets = foreach ($installer in $installers) {
     $sigFile = "$($installer.FullName).sig"
-    if (-not (Test-Path $sigFile)) { Fail "Falta la firma del updater de $($installer.Name)." }
+    if (-not (Test-Path $sigFile)) { Fail "The updater signature of $($installer.Name) is missing." }
     $installer.FullName
     $sigFile
 }
@@ -182,10 +182,10 @@ if ($LASTEXITCODE -ne 0) { Fail 'Could not create the tag (if the draft already 
 git push origin main $tag
 if ($LASTEXITCODE -ne 0) { Fail 'Could not push the tag.' }
 
-# Notas del mantenedor; el workflow antepone la tabla de descargas (SHA-256 y enlaces).
+# Maintainer's notes; the workflow prepends the download table (SHA-256 and links).
 if (-not $Notes) { $Notes = "XP Music $v" }
 gh release create $tag @assets --repo $repo --draft --title "XP Music $v" --notes $Notes
-if ($LASTEXITCODE -ne 0) { Fail 'No se pudo preparar el draft.' }
+if ($LASTEXITCODE -ne 0) { Fail 'Could not prepare the draft.' }
 gh workflow run release.yml --repo $repo --ref main -f "tag=$tag"
-if ($LASTEXITCODE -ne 0) { Fail 'El draft sigue sin publicar: lanza release.yml con su tag desde Actions.' }
-Write-Host "Draft $tag preparado. El workflow probará los instaladores de Windows, compilará y probará Linux y macOS, y publicará la release con la tabla de descargas y latest.json si todo pasa. Antes de compilar Linux y macOS esperará a que apruebes el environment release (Actions → Review deployments)." -ForegroundColor Green
+if ($LASTEXITCODE -ne 0) { Fail 'The draft is still unpublished: run release.yml with its tag from Actions.' }
+Write-Host "Draft $tag ready. The workflow will test the Windows installers, build and test Linux and macOS, and publish the release with the download table and latest.json if everything passes. Before building Linux and macOS it waits for you to approve the release environment (Actions → Review deployments)." -ForegroundColor Green

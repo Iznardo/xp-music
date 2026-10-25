@@ -1,5 +1,5 @@
-// Reúne en una carpeta plana los archivos que debe subir un job de CI (según la tabla de
-// release-targets.mjs) y falla si falta alguno.
+// Gathers into a flat folder the files a CI job must upload (according to the table in
+// release-targets.mjs) and fails if any is missing.
 //   node scripts/collect-artifacts.mjs TARGET BUNDLE_DIR OUT_DIR [--signed]
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
