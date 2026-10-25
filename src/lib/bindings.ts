@@ -347,6 +347,8 @@ export type Settings = {
 	notifications: boolean,
 	/**  Pause when the Windows session is locked (006). */
 	pauseOnLock: boolean,
+	/**  Show the current song as a Discord activity. Off by default: it tells others what you listen to. */
+	discordPresence: boolean,
 	/**  Global shortcuts (006). Format `Ctrl+Alt+P`; `None` = no shortcut. */
 	hotkeys: HotkeySettings,
 };

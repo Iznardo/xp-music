@@ -262,6 +262,12 @@ pub fn run() {
                     .map(|s| s.pause_on_lock)
                     .unwrap_or(false)
             });
+            let discord_db = Arc::clone(&db);
+            let discord = os::discord::start(move || {
+                settings::Settings::load(&discord_db)
+                    .map(|s| s.discord_presence)
+                    .unwrap_or(false)
+            });
             #[cfg(windows)]
             {
                 let tb_player = Arc::clone(&player);
@@ -277,6 +283,7 @@ pub fn run() {
             let last_track = std::sync::Mutex::new(None::<String>);
             player.observe(Box::new(move |s| {
                 let _ = media.send(os::media::MediaMsg::State(Box::new(s.clone())));
+                let _ = discord.send(Box::new(s.clone()));
                 #[cfg(windows)]
                 {
                     let playing = matches!(

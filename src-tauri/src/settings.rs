@@ -68,6 +68,8 @@ pub struct Settings {
     pub notifications: bool,
     /// Pause when the Windows session is locked (006).
     pub pause_on_lock: bool,
+    /// Show the current song as a Discord activity. Off by default: it tells others what you listen to.
+    pub discord_presence: bool,
     /// Global shortcuts (006). Format `Ctrl+Alt+P`; `None` = no shortcut.
     pub hotkeys: HotkeySettings,
 }
@@ -100,6 +102,7 @@ impl Default for Settings {
             xp_sounds: true,
             notifications: true,
             pause_on_lock: false,
+            discord_presence: false,
             hotkeys: HotkeySettings::default(),
         }
     }

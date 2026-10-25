@@ -183,6 +183,7 @@ let settings: Settings = {
   xpSounds: true,
   notifications: true,
   pauseOnLock: false,
+  discordPresence: false,
   hotkeys: { playPause: null, next: null, previous: null, show: null },
 };
 
