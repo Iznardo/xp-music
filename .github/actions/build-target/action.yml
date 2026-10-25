@@ -133,9 +133,11 @@ runs:
         if ($signature.SignerCertificate.Thumbprint -ne $expected) {
           throw 'The installer does not use the expected Windows certificate.'
         }
-        # Trust only the pinned thumbprint and only on this ephemeral runner.
+        # Trust only the pinned thumbprint and only on this ephemeral runner. LocalMachine,
+        # not CurrentUser: adding a root to the user store pops up a confirmation dialog
+        # that nobody can click on a runner, and the job hangs until it times out.
         $type = 'System.Security.Cryptography.X509Certificates.X509Store'
-        $store = New-Object -TypeName $type -ArgumentList 'Root','CurrentUser'
+        $store = New-Object -TypeName $type -ArgumentList 'Root','LocalMachine'
         $store.Open('ReadWrite')
         try { $store.Add($signature.SignerCertificate) }
         finally { $store.Close() }
