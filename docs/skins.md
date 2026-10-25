@@ -10,6 +10,7 @@ Open **View → Skin Chooser… → Open folder**. It is:
 | --- | --- |
 | Windows | `%APPDATA%\xp-music\skins` |
 | Linux | `~/.config/xp-music/skins` (or `$XDG_CONFIG_HOME/xp-music/skins`) |
+| macOS | `~/Library/Application Support/xp-music/skins` |
 
 You can organize them in subfolders.
 
@@ -23,4 +24,4 @@ You can organize them in subfolders.
 
 - Each skin's scripts run isolated, with no access to your account or your files.
 - Secondary windows (equalizer, separate playlist) do not open yet.
-- On Linux, click-through on the transparent areas does not work.
+- On Linux and macOS, click-through on the transparent areas does not work.
