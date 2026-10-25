@@ -147,6 +147,22 @@ fn text(s: &str) -> Option<String> {
     (!s.is_empty()).then(|| s.to_owned())
 }
 
+/// Main artist of a credit: "Romeo Santos, Drake" or "Bad Bunny feat. Drake" →
+/// the first one. Used to group an album whose files have no album artist tag
+/// (otherwise every song with a guest would make an album of its own). "&" is
+/// kept: it is usually part of the name ("Simon & Garfunkel").
+pub(crate) fn primary_artist(artist: &str) -> &str {
+    const SEPARATORS: &[&str] = &[", ", "; ", " feat. ", " feat ", " ft. ", " featuring "];
+    let lower = artist.to_lowercase();
+    let cut = SEPARATORS
+        .iter()
+        .filter_map(|s| lower.find(s))
+        .min()
+        .unwrap_or(artist.len());
+    // `to_lowercase` may change byte lengths; fall back to the whole credit then.
+    artist.get(..cut).map(str::trim).unwrap_or(artist)
+}
+
 /// "2003-05-12" → 2003.
 fn year_of(s: &str) -> Option<u32> {
     s.trim()
@@ -241,7 +257,9 @@ fn write_rows(db: &Db, rows: &mut Vec<Row>) -> AppResult<()> {
                     .unwrap_or_default()
             });
             let artist = t.artist.unwrap_or_default();
-            let album_artist = t.album_artist.unwrap_or_else(|| artist.clone());
+            let album_artist = t
+                .album_artist
+                .unwrap_or_else(|| primary_artist(&artist).to_owned());
             stmt.execute(rusqlite::params![
                 r.path,
                 r.folder,
@@ -424,6 +442,39 @@ mod tests {
         // Without the folder in the list, its songs leave the library.
         scan(&db, &[], |_, _| {}).unwrap();
         assert_eq!(count(&db), 0);
+    }
+
+    #[test]
+    fn albums_without_album_artist_group_by_the_main_artist() {
+        assert_eq!(primary_artist("Romeo Santos, Drake"), "Romeo Santos");
+        assert_eq!(primary_artist("Bad Bunny feat. Drake"), "Bad Bunny");
+        assert_eq!(primary_artist("Ozuna Ft. Anuel AA"), "Ozuna");
+        assert_eq!(primary_artist("Simon & Garfunkel"), "Simon & Garfunkel");
+        assert_eq!(primary_artist("Aventura"), "Aventura");
+        assert_eq!(primary_artist(""), "");
+
+        let db = Db::open_in_memory().unwrap();
+        let dir = temp_dir("scan-album-artist");
+        std::fs::write(
+            dir.join("1.mp3"),
+            mp3_with_id3("A", "Romeo Santos", "Golden", 1, false),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("2.mp3"),
+            mp3_with_id3("B", "Romeo Santos, Ozuna", "Golden", 2, false),
+        )
+        .unwrap();
+        scan(&db, std::slice::from_ref(&dir), |_, _| {}).unwrap();
+        let groups: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(DISTINCT album_artist || '|' || album) FROM local_tracks",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(groups, 1, "one album, not one per guest");
     }
 
     #[test]

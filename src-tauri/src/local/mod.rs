@@ -13,7 +13,7 @@ use tauri::AppHandle;
 use tauri::http::{Request, Response, StatusCode};
 use tauri_specta::Event;
 
-use crate::domain::{AlbumRef, ArtistRef, Thumbnail, Track, TrackId};
+use crate::domain::{AlbumRef, ArtistRef, BrowseId, Thumbnail, Track, TrackId};
 use crate::error::AppResult;
 use crate::settings::Settings;
 use crate::storage::Db;
@@ -24,6 +24,8 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(250);
 const MAX_COVER: usize = 8 * 1024 * 1024;
 /// Prefix of the thumbnail "URL" of a local song; the UI turns it into `cover://`.
 const COVER_PREFIX: &str = "cover:";
+/// Prefix of the album and artist ids of local songs (YouTube's never have it).
+const LOCAL_REF: &str = "local:";
 
 #[derive(Serialize, Type, Event, Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -77,19 +79,25 @@ fn row_to_track(r: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
     let path: String = r.get("path")?;
     let artist: String = r.get("artist")?;
     let album: String = r.get("album")?;
+    let album_artist: String = r.get("album_artist")?;
     let has_cover = r.get::<_, Option<String>>("cover")?.is_some();
+    // The ids lead to "My music" pages: `local:<album artist>` for the album (its
+    // title is the name) and `local:<main artist>` for the artist.
     Ok(Track {
         id: TrackId::local(Path::new(&path)),
         title: r.get("title")?,
         artists: (!artist.is_empty())
-            .then_some(ArtistRef {
-                id: None,
+            .then(|| ArtistRef {
+                id: Some(BrowseId(format!(
+                    "{LOCAL_REF}{}",
+                    scan::primary_artist(&artist)
+                ))),
                 name: artist,
             })
             .into_iter()
             .collect(),
         album: (!album.is_empty()).then_some(AlbumRef {
-            id: None,
+            id: Some(BrowseId(format!("{LOCAL_REF}{album_artist}"))),
             name: album,
         }),
         duration_ms: r.get("duration_ms")?,
@@ -513,7 +521,11 @@ mod tests {
             "by artist, then track number"
         );
         assert!(all.iter().all(|t| t.id.is_local()));
-        assert_eq!(all[1].album.as_ref().unwrap().name, "Play");
+        let album = all[1].album.as_ref().unwrap();
+        assert_eq!(album.name, "Play");
+        // Links to the "My music" pages, never mistaken for YouTube ids.
+        assert_eq!(album.id.as_ref().unwrap().0, "local:Moby");
+        assert_eq!(all[1].artists[0].id.as_ref().unwrap().0, "local:Moby");
 
         let play = tracks(
             &db,

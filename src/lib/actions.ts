@@ -1,7 +1,7 @@
 // Actions on songs and collections, shared by all views and menus.
 
 import { commands, type MediaItem, type QueueSource, type Track } from "./bindings";
-import { router } from "./router.svelte";
+import { router, type Route } from "./router.svelte";
 import { library } from "./stores/library.svelte";
 import { ui, type MenuItem } from "./stores/ui.svelte";
 import { t } from "./i18n.svelte";
@@ -114,31 +114,48 @@ export function trackMenu(tracks: Track[], opts: { onPlay?: () => void; queueInd
     items.push({ kind: "item", label: t.menu.removeFromQueue, action: () => void commands.queueRemove(i) });
   }
   // Radio, likes and playlists are YouTube's: songs on disk only get what is local.
-  if (tracks.some(isLocal)) {
+  if (!tracks.some(isLocal)) {
+    items.push({ kind: "sep" });
     if (one) {
-      items.push({ kind: "sep" });
-      const album = one.album?.name;
-      const artist = one.artists[0]?.name;
-      items.push({ kind: "item", label: t.menu.goAlbum, disabled: album === undefined, action: () => album !== undefined && router.go({ name: "localAlbum", artist: artist ?? "", title: album }) });
-      items.push({ kind: "item", label: t.menu.goArtist, disabled: artist === undefined, action: () => artist !== undefined && router.go({ name: "localArtist", artist }) });
+      items.push({ kind: "item", label: t.menu.startRadio, action: () => playWithRadio(one) });
+      const liked = one.likeStatus === "Like";
+      items.push({ kind: "item", label: liked ? t.menu.unlike : t.menu.like, action: () => setLike(one, !liked) });
     }
-    return items;
+    items.push({ kind: "sub", label: t.menu.addToPlaylist, items: playlistChoices(tracks) });
   }
-  items.push({ kind: "sep" });
-  if (one) {
-    items.push({ kind: "item", label: t.menu.startRadio, action: () => playWithRadio(one) });
-    const liked = one.likeStatus === "Like";
-    items.push({ kind: "item", label: liked ? t.menu.unlike : t.menu.like, action: () => setLike(one, !liked) });
-  }
-  items.push({ kind: "sub", label: t.menu.addToPlaylist, items: playlistChoices(tracks) });
   if (one) {
     items.push({ kind: "sep" });
-    const album = one.album?.id;
-    const artist = one.artists.find((a) => a.id)?.id;
-    items.push({ kind: "item", label: t.menu.goAlbum, disabled: !album, action: () => album && router.go({ name: "album", id: album }) });
-    items.push({ kind: "item", label: t.menu.goArtist, disabled: !artist, action: () => artist && router.go({ name: "artist", id: artist }) });
+    items.push({ kind: "item", label: t.menu.goAlbum, disabled: !albumRoute(one), action: () => goAlbum(one) });
+    items.push({ kind: "item", label: t.menu.goArtist, disabled: !artistRoute(one), action: () => goArtist(one) });
   }
   return items;
+}
+
+/// Page of the song's album: on YouTube, or in "My music" for a song on disk
+/// (whose album id is `local:<album artist>`).
+export function albumRoute(track: Track): Route | null {
+  const id = track.album?.id;
+  if (!id) return null;
+  if (id.startsWith("local:")) return { name: "localAlbum", artist: id.slice(6), title: track.album!.name };
+  return { name: "album", id };
+}
+
+/// Page of the song's (first linked) artist; `local:<name>` for songs on disk.
+export function artistRoute(track: Track): Route | null {
+  const id = track.artists.find((a) => a.id)?.id;
+  if (!id) return null;
+  if (id.startsWith("local:")) return { name: "localArtist", artist: id.slice(6) };
+  return { name: "artist", id };
+}
+
+export function goAlbum(track: Track) {
+  const r = albumRoute(track);
+  if (r) router.go(r);
+}
+
+export function goArtist(track: Track) {
+  const r = artistRoute(track);
+  if (r) router.go(r);
 }
 
 /// Open an item from Home/search/artist.
