@@ -8,9 +8,17 @@ No. XP Music is not affiliated with, sponsored by or endorsed by Google, YouTube
 
 The installer is signed, but not with a commercial certificate, so SmartScreen warns you the first few times. Click "More info" → "Run anyway".
 
+## macOS says it cannot open the app
+
+The macOS app is experimental and has an *ad hoc* signature, without an Apple certificate or notarization, so Gatekeeper blocks it the first time. On macOS 15 or later, try to open it and then go to **System Settings → Privacy & Security → "Open Anyway"**; on earlier versions, right-click → **Open**. More details in [Install](install.md).
+
+## On macOS I do not get updates
+
+This is intentional while macOS is experimental: download the new `.dmg` and replace the app in *Applications*. After changing versions, macOS will ask once for permission for the app to read its session from the Keychain.
+
 ## Where is my session stored?
 
-On Windows, encrypted with DPAPI (tied to your user). On Linux, in the Secret Service (GNOME Keyring, KeePassXC); if it is not available, the session is not stored in plain text.
+On Windows, encrypted with DPAPI (tied to your user). On Linux, in the Secret Service (GNOME Keyring, KeePassXC); if it is not available, the session is not stored in plain text. On macOS, in the Keychain.
 
 ## On Linux I cannot sign in or the account is forgotten
 

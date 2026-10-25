@@ -41,7 +41,7 @@ caché. Los smoke tests arrancan el paquete real:
   `scripts/smoke-linux.sh`. El `.rpm` se instala en un contenedor `fedora:latest`
   (`scripts/smoke-linux-rpm.sh`, necesita Docker).
 - Windows y macOS: `scripts/smoke-desktop.mjs` lanza la app instalada (Windows) o la del
-  `.dmg` (macOS) y espera hasta 60 s a las líneas «UI montada» y «herramientas encontradas»
+  `.dmg` (macOS) y espera hasta 60 s a las líneas «UI mounted» y «tools found»
   del log.
 
 Para repetir el de Linux localmente (requiere Xvfb, D-Bus, Openbox, xdotool,
@@ -67,7 +67,7 @@ El inglés es el idioma base y el español es una traducción. Si cambias un tex
 
 ## La web
 
-La web vive en `site/` y se publica en GitHub Pages con `.github/workflows/pages.yml` en cada cambio de `main` que toque `site/`, `docs/` o los estilos y visualizaciones que reutiliza de `src/`.
+La web vive en `site/` y se publica en GitHub Pages con `.github/workflows/pages.yml` en cada cambio de `main` que toque `site/`, `docs/` o los estilos y visualizaciones que reutiliza de `src/`. En los PR el mismo workflow solo la compila, sin desplegar.
 Las páginas de documentación salen de los `.md` de `docs/` (inglés) y `docs/es/` (español): para añadir una, crea el archivo en las dos carpetas (empieza por un título `# …`) y enlázalo desde el índice ([inglés](../README.md), [español](README.md)).
 Las páginas solo para el mantenedor (`releasing.md`) no salen en la web: añádelas a `MAINTAINER_ONLY` en `site/vite.config.ts` y exclúyelas en el glob de `site/src/docs.ts`.
 
