@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
@@ -27,6 +27,8 @@ const RETRIES: u32 = 3;
 /// (previously 45 s) a slow cold yt-dlp (first song, antivirus) cut the
 /// track off when the head ran out (~1:04) even though the URL was about to arrive.
 const UPGRADE_TIMEOUT: Duration = Duration::from_secs(180);
+/// Upper bound for honouring a stream's `available_at` (YouTube asks for ~6 s).
+const MAX_AVAILABILITY_WAIT: u64 = 30;
 const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
 
 /// Failures the engine tells apart: a 403 means an expired URL (re-resolve).
@@ -96,6 +98,7 @@ impl SourceProbe {
 
 impl HttpRangeSource {
     /// Opens the source. If the length is unknown, it requests it (blocking).
+    /// Nothing is requested from `url` before `available_at` (see `wait_available`).
     /// With `upgrade`, `url` only serves the start (fast start) and the rest
     /// is downloaded with the full URL once it arrives.
     pub fn open(
@@ -103,12 +106,16 @@ impl HttpRangeSource {
         url: &str,
         user_agent: Option<&str>,
         len: Option<u64>,
+        available_at: Option<u64>,
         upgrade: Option<Upgrade>,
     ) -> Result<Self, SourceError> {
         let ua = user_agent.unwrap_or(DEFAULT_UA).to_owned();
         let len = match len {
             Some(l) => l,
-            None => probe_len(&client, url, &ua)?,
+            None => {
+                wait_available(available_at, || false);
+                probe_len(&client, url, &ua)?
+            }
         };
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
@@ -123,7 +130,7 @@ impl HttpRangeSource {
         let url = url.to_owned();
         thread::Builder::new()
             .name("audio-download".into())
-            .spawn(move || download_loop(worker, client, url, ua, len, upgrade))
+            .spawn(move || download_loop(worker, client, url, ua, len, available_at, upgrade))
             .map_err(|_| SourceError::Network)?;
         Ok(Self {
             shared,
@@ -157,8 +164,35 @@ fn probe_len(client: &Client, url: &str, ua: &str) -> Result<u64, SourceError> {
         .ok_or(SourceError::Network)
 }
 
+fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Some YouTube clients' URLs answer 403 for a few seconds after being issued;
+/// yt-dlp reports when they start working (`available_at`, Unix seconds). Waits
+/// until then (at most `MAX_AVAILABILITY_WAIT`). `false` if `cancelled` first.
+fn wait_available(available_at: Option<u64>, cancelled: impl Fn() -> bool) -> bool {
+    let now = unix_now();
+    let Some(wait) = available_at.filter(|&at| at > now).map(|at| at - now) else {
+        return true;
+    };
+    tracing::debug!(seconds = wait, "waiting until the stream URL is available");
+    let deadline = Instant::now() + Duration::from_secs(wait.min(MAX_AVAILABILITY_WAIT));
+    while Instant::now() < deadline {
+        if cancelled() {
+            return false;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    true
+}
+
 /// Waits for the full URL while still watching for the source being closed.
-fn wait_upgrade(sh: &Shared, up: &Upgrade, len: u64) -> Option<(String, String)> {
+/// Returns its URL, user agent and `available_at`.
+fn wait_upgrade(sh: &Shared, up: &Upgrade, len: u64) -> Option<(String, String, Option<u64>)> {
     let deadline = std::time::Instant::now() + UPGRADE_TIMEOUT;
     while std::time::Instant::now() < deadline {
         if sh.state.lock().unwrap().closed {
@@ -172,7 +206,7 @@ fn wait_upgrade(sh: &Shared, up: &Upgrade, len: u64) -> Option<(String, String)>
             }
             Some(Ok(full)) => {
                 let ua = full.user_agent.unwrap_or_else(|| DEFAULT_UA.to_owned());
-                return Some((full.url, ua));
+                return Some((full.url, ua, full.available_at));
             }
             Some(Err(_)) => return None,
             None => {}
@@ -187,6 +221,7 @@ fn download_loop(
     mut url: String,
     mut ua: String,
     len: u64,
+    mut available_at: Option<u64>,
     mut upgrade: Option<Upgrade>,
 ) {
     let n_chunks = len.div_ceil(CHUNK);
@@ -219,10 +254,14 @@ fn download_loop(
             && let Some(up) = upgrade.take()
         {
             match wait_upgrade(&sh, &up, len) {
-                Some((full, full_ua)) => {
+                Some((full, full_ua, full_available_at)) => {
                     tracing::debug!("fast start: switching to the full URL");
                     url = full;
                     ua = full_ua;
+                    // It usually arrives a moment after yt-dlp issued it, and the
+                    // download runs ahead of playback: requesting it right away got
+                    // a 403 that only surfaced when playback reached ~1:04.
+                    available_at = full_available_at;
                 }
                 None => {
                     // No full URL: network failure, the engine retries. Not as expired:
@@ -233,6 +272,9 @@ fn download_loop(
                     return;
                 }
             }
+        }
+        if !wait_available(available_at.take(), || sh.state.lock().unwrap().closed) {
+            return;
         }
         let result = fetch(&client, &url, &ua, start, end);
         let mut st = sh.state.lock().unwrap();
@@ -352,15 +394,32 @@ pub(crate) mod test_server {
     use std::net::TcpListener;
     use std::sync::Arc;
     use std::thread;
+    use std::time::Instant;
 
     /// Serves `data`. With `fail_after = Some(n)` it answers 403 from request n on.
     pub fn serve(data: Arc<Vec<u8>>, fail_after: Option<usize>) -> String {
+        serve_with(data, move |i| fail_after.is_some_and(|n| i >= n))
+    }
+
+    /// Serves `data` but answers 403 until `from`, like a YouTube URL that is
+    /// not available yet.
+    pub fn serve_from(data: Arc<Vec<u8>>, from: Instant) -> String {
+        serve_with(data, move |_| Instant::now() < from)
+    }
+
+    /// `forbidden(i)`: whether request number `i` gets a 403.
+    fn serve_with(
+        data: Arc<Vec<u8>>,
+        forbidden: impl Fn(usize) -> bool + Send + Sync + 'static,
+    ) -> String {
+        let forbidden = Arc::new(forbidden);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
         thread::spawn(move || {
             for (i, stream) in listener.incoming().enumerate() {
                 let Ok(mut stream) = stream else { continue };
                 let data = Arc::clone(&data);
+                let forbidden = Arc::clone(&forbidden);
                 thread::spawn(move || {
                     let mut reader = BufReader::new(stream.try_clone().unwrap());
                     let mut range = None;
@@ -375,7 +434,7 @@ pub(crate) mod test_server {
                                 Some((a.parse::<usize>().unwrap(), b.parse::<usize>().unwrap()));
                         }
                     }
-                    if fail_after.is_some_and(|n| i >= n) {
+                    if forbidden(i) {
                         let _ = stream.write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
                         return;
                     }
@@ -414,7 +473,7 @@ mod tests {
     fn reads_in_order_and_after_seek() {
         let data = Arc::new(pattern(5 * CHUNK as usize + 12345));
         let url = test_server::serve(Arc::clone(&data), None);
-        let mut src = HttpRangeSource::open(client(), &url, None, None, None).unwrap();
+        let mut src = HttpRangeSource::open(client(), &url, None, None, None, None).unwrap();
         assert_eq!(src.len, data.len() as u64);
 
         let mut buf = vec![0u8; 3000];
@@ -437,7 +496,8 @@ mod tests {
         let data = Arc::new(pattern(3 * CHUNK as usize));
         let url = test_server::serve(Arc::clone(&data), None);
         let mut src =
-            HttpRangeSource::open(client(), &url, None, Some(data.len() as u64), None).unwrap();
+            HttpRangeSource::open(client(), &url, None, Some(data.len() as u64), None, None)
+                .unwrap();
         let probe = src.probe();
         let mut b = [0u8; 10];
         src.read_exact(&mut b).unwrap();
@@ -455,7 +515,7 @@ mod tests {
         let data = Arc::new(pattern(4 * CHUNK as usize));
         // Request 0 = length, 1 = first block; then 403.
         let url = test_server::serve(Arc::clone(&data), Some(2));
-        let mut src = HttpRangeSource::open(client(), &url, None, None, None).unwrap();
+        let mut src = HttpRangeSource::open(client(), &url, None, None, None, None).unwrap();
         let mut buf = vec![0u8; CHUNK as usize];
         src.read_exact(&mut buf).unwrap();
         src.seek(SeekFrom::Start(3 * CHUNK)).unwrap();
@@ -475,6 +535,7 @@ mod tests {
             &head,
             None,
             Some(data.len() as u64),
+            None,
             Some(up.clone()),
         )
         .unwrap();
@@ -488,6 +549,7 @@ mod tests {
                 content_length: None,
                 duration_ms: None,
                 expires_at: u64::MAX,
+                available_at: None,
                 user_agent: None,
                 upgrade: None,
             }));
@@ -499,14 +561,75 @@ mod tests {
     }
 
     #[test]
+    fn waits_until_the_url_is_available() {
+        let data = Arc::new(pattern(2 * CHUNK as usize));
+        let url = test_server::serve_from(
+            Arc::clone(&data),
+            Instant::now() + Duration::from_millis(1500),
+        );
+        let mut src =
+            HttpRangeSource::open(client(), &url, None, None, Some(unix_now() + 2), None).unwrap();
+        let mut all = Vec::new();
+        src.read_to_end(&mut all).unwrap();
+        assert!(all == *data);
+    }
+
+    /// The bug behind the stall at ~1:04 on the first song of a list: the full URL
+    /// arrives a moment after yt-dlp issued it and the download, which runs ahead
+    /// of playback, requested it before YouTube allowed it (403).
+    #[test]
+    fn fast_start_waits_until_the_full_url_is_available() {
+        let data = Arc::new(pattern(HEAD_LIMIT as usize + 2 * CHUNK as usize));
+        let head = test_server::serve(Arc::clone(&data), Some((HEAD_LIMIT / CHUNK) as usize));
+        let full = test_server::serve_from(
+            Arc::clone(&data),
+            Instant::now() + Duration::from_millis(1500),
+        );
+        let up = Upgrade::default();
+        let mut src = HttpRangeSource::open(
+            client(),
+            &head,
+            None,
+            Some(data.len() as u64),
+            None,
+            Some(up.clone()),
+        )
+        .unwrap();
+        let filler = up.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(300));
+            filler.fill(Ok(crate::audio::resolver::ResolvedStream {
+                track_id: crate::domain::TrackId("t".into()),
+                url: full,
+                itag: 140,
+                content_length: None,
+                duration_ms: None,
+                expires_at: u64::MAX,
+                available_at: Some(unix_now() + 2),
+                user_agent: None,
+                upgrade: None,
+            }));
+        });
+        let mut all = Vec::new();
+        src.read_to_end(&mut all).unwrap();
+        assert!(all == *data, "content differs after the URL switch");
+    }
+
+    #[test]
     fn missing_full_url_is_reported_as_network_failure() {
         let data = Arc::new(pattern(2 * HEAD_LIMIT as usize));
         let head = test_server::serve(Arc::clone(&data), Some((HEAD_LIMIT / CHUNK) as usize));
         let up = Upgrade::default();
         up.fill(Err(crate::error::AppError::internal("yt-dlp failed")));
-        let mut src =
-            HttpRangeSource::open(client(), &head, None, Some(data.len() as u64), Some(up))
-                .unwrap();
+        let mut src = HttpRangeSource::open(
+            client(),
+            &head,
+            None,
+            Some(data.len() as u64),
+            None,
+            Some(up),
+        )
+        .unwrap();
         // The start is audible; beyond it there is no URL to continue with.
         let mut buf = vec![0u8; HEAD_LIMIT as usize];
         src.read_exact(&mut buf).unwrap();
