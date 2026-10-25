@@ -51,6 +51,18 @@ if (-not $NoPublish) {
 if (-not (@(rustup target list --installed) -contains $armTarget)) {
     Fail "The ARM64 target is missing: rustup target add $armTarget (and the Visual Studio 'MSVC ARM64 build tools')."
 }
+# ring and aws-lc-sys need clang/clang-cl to build for ARM64 (cl.exe is not enough). If they
+# are not on PATH, use the ones from Visual Studio's "C++ Clang Compiler for Windows".
+if (-not (Get-Command clang-cl -ErrorAction SilentlyContinue)) {
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    $clang = if (Test-Path $vswhere) {
+        & $vswhere -latest -products * -find 'VC\Tools\Llvm\x64\bin\clang-cl.exe' | Select-Object -First 1
+    }
+    if (-not $clang) {
+        Fail "Clang is missing for the ARM64 build: add the Visual Studio component 'C++ Clang Compiler for Windows' (Microsoft.VisualStudio.Component.VC.Llvm.Clang)."
+    }
+    $env:PATH = "$(Split-Path $clang);$env:PATH"
+}
 if (Test-Path (Join-Path $root 'tools.x64')) { Fail 'tools.x64 exists from a previous run: move it back to tools\ or delete it.' }
 if (-not (Test-Path (Join-Path $root 'tools\yt-dlp\yt-dlp.exe')) -or -not (Test-Path (Join-Path $root 'tools\deno.exe'))) {
     & (Join-Path $PSScriptRoot 'fetch-tools.ps1')
