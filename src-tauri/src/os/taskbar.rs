@@ -77,11 +77,7 @@ pub fn set_playing(playing: bool) {
     let b = button(
         BTN_TOGGLE,
         if playing { icons.pause } else { icons.play },
-        if playing {
-            tr!("Pause", "Pausa")
-        } else {
-            tr!("Play", "Reproducir")
-        },
+        &toggle_tip(playing),
     );
     // SAFETY: COM is already initialized on the UI thread (WebView2 uses it).
     unsafe {
@@ -118,6 +114,15 @@ unsafe extern "system" fn subclass(
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }
 
+/// Tooltip of the Play/Pause button.
+fn toggle_tip(playing: bool) -> String {
+    if playing {
+        tr!("Pause", "Pausa")
+    } else {
+        tr!("Play", "Reproducir")
+    }
+}
+
 fn add_buttons(hwnd: HWND) {
     let Some(icons) = icons() else { return };
     let playing = PLAYING.load(Ordering::Acquire);
@@ -126,11 +131,7 @@ fn add_buttons(hwnd: HWND) {
         button(
             BTN_TOGGLE,
             if playing { icons.pause } else { icons.play },
-            if playing {
-                tr!("Pause", "Pausa")
-            } else {
-                tr!("Play", "Reproducir")
-            },
+            &toggle_tip(playing),
         ),
         button(BTN_NEXT, icons.next, &tr!("Next", "Siguiente")),
     ];
