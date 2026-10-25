@@ -435,7 +435,8 @@ export class Button extends El {
   async _setImg(slot, v) {
     const name = String(v ?? "");
     this._img[slot] = name;
-    const img = name ? await this._rt.images.get(name, this._key()) : null;
+    // Igual que en ButtonGroup: sin transparencyColor, el magenta sigue siendo la clave.
+    const img = name ? await this._rt.images.get(name, this._key() ?? "#ff00ff") : null;
     if (this._img[slot] !== name) return;
     this._loaded[slot] = img;
     if (slot === "image") {
@@ -623,7 +624,9 @@ export class ButtonGroup extends El {
   async _set(slot, v) {
     const name = String(v ?? "");
     this._names[slot] = name;
-    const img = name ? await (slot === "mappingimage" ? this._rt.images.raw(name) : this._rt.images.get(name, this._key())) : null;
+    // Las imágenes de un grupo de botones llevan magenta fuera de la forma aunque el
+    // grupo no declare transparencyColor (WMP no lo pinta): magenta es el color clave por defecto.
+    const img = name ? await (slot === "mappingimage" ? this._rt.images.raw(name) : this._rt.images.get(name, this._key() ?? "#ff00ff")) : null;
     if (this._names[slot] !== name) return;
     this._loaded[slot] = img;
     if (slot === "mappingimage") {
