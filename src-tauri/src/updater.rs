@@ -1,11 +1,11 @@
 //! Self-update of the app from the public GitHub releases (specs/007).
 //!
-//! `latest.json` de la última release dice qué versión hay y dónde está el
-//! instalador; el updater de Tauri comprueba su firma con la clave pública, que
-//! se inyecta al compilar (`XP_MUSIC_UPDATER_PUBKEY`). Solo se actualizan
-//! instalaciones con un formato compatible y no gestionadas externamente.
-//! macOS queda fuera mientras la app vaya con firma ad hoc: cada versión cambia de
-//! firma y el Llavero volvería a pedir permiso para leer la sesión tras actualizar.
+//! The latest release's `latest.json` says which version there is and where the
+//! installer is; Tauri's updater checks its signature with the public key, which
+//! is injected at build time (`XP_MUSIC_UPDATER_PUBKEY`). Only installations with a
+//! supported format that are not managed externally are updated.
+//! macOS is left out while the app is ad hoc signed: every version changes the
+//! signature and the Keychain would ask again for access to the session after updating.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -261,7 +261,7 @@ mod tests {
                 false,
             ));
         }
-        // macOS (.app / .dmg) se actualiza a mano mientras sea experimental.
+        // macOS (.app / .dmg) is updated by hand while it is experimental.
         for bundle in [None, Some(BundleType::Dmg), Some(BundleType::App)] {
             assert!(!installation_allows_updates(
                 Some("key"),

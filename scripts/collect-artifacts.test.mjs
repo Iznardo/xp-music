@@ -21,14 +21,14 @@ test("collect gathers the expected files and fails on gaps", async () => {
     }
     assert.deepEqual(await collect("windows-aarch64", bundle, out, true, v),
       ["XP Music_1.2.3_arm64-setup.exe", "XP Music_1.2.3_arm64-setup.exe.sig"]);
-    // macOS no tiene updater: aunque haya .app.tar.gz firmado, solo se recoge el .dmg.
+    // macOS has no updater: even with a signed .app.tar.gz, only the .dmg is collected.
     assert.deepEqual(await collect("darwin-aarch64", bundle, out, true, v), ["XP Music_1.2.3_aarch64.dmg"]);
     assert.deepEqual((await readdir(out)).sort(),
       ["XP Music_1.2.3_aarch64.dmg", "XP Music_1.2.3_arm64-setup.exe", "XP Music_1.2.3_arm64-setup.exe.sig"]);
-    // Sin firma del updater solo se recoge el instalador.
+    // Without the updater signature only the installer is collected.
     await rm(out, { recursive: true });
     assert.deepEqual(await collect("windows-aarch64", bundle, out, false, v), ["XP Music_1.2.3_arm64-setup.exe"]);
-    // Falta la firma, o es un target sin construir: error.
+    // Missing signature, or a target that was not built: error.
     await rm(join(bundle, "nsis", "XP Music_1.2.3_arm64-setup.exe.sig"));
     await assert.rejects(collect("windows-aarch64", bundle, out, true, v), /found 0/);
     await assert.rejects(collect("linux-x86_64", bundle, out, false, v), /found 0/);

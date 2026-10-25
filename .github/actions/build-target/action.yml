@@ -1,67 +1,68 @@
-name: Compilar, probar y reunir un target de XP Music
+name: Build, test and gather one XP Music target
 description: >-
-  Instala dependencias, ejecuta las comprobaciones (si `checks`), empaqueta, prueba el
-  arranque de los paquetes y reúne los archivos de release de UN target
-  (sistema y arquitectura del runner). Con `tag` firma además los artefactos
-  del updater (release); sin él compila sin claves (PR, push y dry run).
+  Installs dependencies, runs the checks (if `checks`), packages, tests the
+  startup of the packages and gathers the release files of ONE target
+  (system and architecture of the runner). With `tag` it also signs the
+  updater artifacts (release); without it, it builds without keys (PR, push
+  and dry run).
 
 inputs:
   target:
     description: >-
-      Id del target (windows-x86_64, linux-aarch64, darwin-x86_64…);
-      ver scripts/release-targets.mjs
+      Target id (windows-x86_64, linux-aarch64, darwin-x86_64…);
+      see scripts/release-targets.mjs
     required: true
   bundles:
-    description: "Valor de `tauri build --bundles`"
+    description: "Value of `tauri build --bundles`"
     required: true
   tag:
-    description: "Tag del draft si es release; vacío en PR, push y dry run"
+    description: "Draft tag for a release; empty on PR, push and dry run"
     required: false
     default: ""
   checks:
     description: >-
-      "true" ejecuta `npm run check` (svelte-check, rustfmt, Clippy y tests);
-      basta con un target por sistema
+      "true" runs `npm run check` (svelte-check, rustfmt, Clippy and tests);
+      one target per system is enough
     required: false
     default: "false"
   updater-pubkey:
-    description: "Clave pública del updater (solo release)"
+    description: "Updater public key (release only)"
     required: false
     default: ""
   signing-key:
-    description: "TAURI_SIGNING_PRIVATE_KEY, clave del updater (solo release)"
+    description: "TAURI_SIGNING_PRIVATE_KEY, the updater key (release only)"
     required: false
     default: ""
   signing-key-password:
-    description: "Contraseña de la clave del updater (solo release)"
+    description: "Password of the updater key (release only)"
     required: false
     default: ""
   windows-thumbprint:
-    description: "Huella del certificado Authenticode local (Windows)"
+    description: "Thumbprint of the local Authenticode certificate (Windows)"
     required: false
     default: ""
   apple-certificate:
-    description: "Certificado Developer ID .p12 en base64 (opcional, macOS)"
+    description: "Developer ID .p12 certificate in base64 (optional, macOS)"
     required: false
     default: ""
   apple-certificate-password:
-    description: "Contraseña del .p12 (opcional)"
+    description: "Password of the .p12 (optional)"
     required: false
     default: ""
   apple-signing-identity:
-    description: "Identidad, p. ej. «Developer ID Application: …» (opcional)"
+    description: "Identity, e.g. \"Developer ID Application: …\" (optional)"
     required: false
     default: ""
   apple-id:
-    description: "Apple ID para notarizar (opcional)"
+    description: "Apple ID for notarization (optional)"
     required: false
     default: ""
   apple-password:
-    description: "Contraseña específica de app para notarizar (opcional)"
+    description: "App-specific password for notarization (optional)"
     required: false
     default: ""
   apple-team-id:
-    description: "Team ID para notarizar (opcional)"
+    description: "Team ID for notarization (optional)"
     required: false
     default: ""
 
@@ -76,7 +77,7 @@ runs:
     - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
       with:
         components: rustfmt, clippy
-    - name: Dependencias Linux
+    - name: Linux dependencies
       if: runner.os == 'Linux'
       shell: bash
       run: |
@@ -86,8 +87,8 @@ runs:
           librsvg2-dev patchelf libasound2-dev libdbus-1-dev libssl-dev \
           xvfb xauth xdotool dbus-x11 openbox gnome-keyring \
           pulseaudio libasound2-plugins
-    # Caché de compilación de Rust solo fuera de las releases: lo que se firma y
-    # publica se compila siempre desde cero. Solo `main` la guarda; los PR la leen.
+    # Rust build cache only outside releases: what gets signed and published is
+    # always built from scratch. Only `main` saves it; PRs read it.
     # Swatinem/rust-cache v2.9.2
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       if: inputs.tag == ''
@@ -95,27 +96,27 @@ runs:
         workspaces: src-tauri -> target
         key: ${{ inputs.target }}
         save-if: ${{ github.ref == 'refs/heads/main' }}
-    - name: Dependencias
+    - name: Dependencies
       shell: bash
       run: |
         npm ci
         npm run fetch-tools
-    - name: Comprobaciones
+    - name: Checks
       if: inputs.checks == 'true'
       shell: bash
       run: npm run check
 
-    # Windows (x64 y ARM64): el instalador lo firma el mantenedor en local y
-    # aquí solo se reutiliza byte a byte.
-    - name: Recuperar el instalador Windows con su firma local
+    # Windows (x64 and ARM64): the maintainer signs the installer locally and
+    # here it is only reused byte for byte.
+    - name: Fetch the Windows installer with its local signature
       if: inputs.tag != '' && startsWith(inputs.target, 'windows-')
-      # actions/download-artifact v8.0.2. Lo sube `validate`, el único job
-      # con permiso para ver el draft.
+      # actions/download-artifact v8.0.2. Uploaded by `validate`, the only job
+      # allowed to see the draft.
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
       with:
         name: draft-${{ inputs.target }}
         path: src-tauri/target/release/bundle/nsis
-    - name: Verificar Authenticode sin cambiar el certificado de Windows
+    - name: Verify Authenticode without changing the Windows certificate
       if: inputs.tag != '' && startsWith(inputs.target, 'windows-')
       shell: pwsh
       env:
@@ -123,27 +124,27 @@ runs:
       run: |
         $ErrorActionPreference = 'Stop'
         $expected = $env:WINDOWS_SIGNING_THUMBPRINT
-        if (-not $expected) { throw 'Falta WINDOWS_SIGNING_THUMBPRINT.' }
+        if (-not $expected) { throw 'WINDOWS_SIGNING_THUMBPRINT is missing.' }
         $bundle = 'src-tauri/target/release/bundle/nsis'
         $files = @(Get-ChildItem "$bundle/*-setup.exe")
-        if ($files.Count -ne 1) { throw 'Debe haber un instalador Windows.' }
+        if ($files.Count -ne 1) { throw 'There must be one Windows installer.' }
         $file = $files[0].FullName
         $signature = Get-AuthenticodeSignature $file
         if ($signature.SignerCertificate.Thumbprint -ne $expected) {
-          throw 'El instalador no usa el certificado Windows esperado.'
+          throw 'The installer does not use the expected Windows certificate.'
         }
-        # Confiar solo en la huella fijada y solo en este runner efímero.
+        # Trust only the pinned thumbprint and only on this ephemeral runner.
         $type = 'System.Security.Cryptography.X509Certificates.X509Store'
         $store = New-Object -TypeName $type -ArgumentList 'Root','CurrentUser'
         $store.Open('ReadWrite')
         try { $store.Add($signature.SignerCertificate) }
         finally { $store.Close() }
         if ((Get-AuthenticodeSignature $file).Status -ne 'Valid') {
-          throw 'Firma Authenticode no válida.'
+          throw 'Invalid Authenticode signature.'
         }
 
-    # Todo lo demás se compila aquí.
-    - name: Empaquetar
+    # Everything else is built here.
+    - name: Package
       if: inputs.tag == '' || !startsWith(inputs.target, 'windows-')
       shell: bash
       env:
@@ -162,11 +163,11 @@ runs:
         APPLE_TEAM_ID: ${{ inputs.apple-team-id }}
       run: |
         args=(--bundles "$BUNDLES")
-        # macOS es experimental y sin updater (firma ad hoc): no usa la clave.
+        # macOS is experimental and has no updater (ad hoc signing): no key.
         if [ -n "$TAG" ] && [[ "$TARGET" != darwin-* ]]; then
           test -n "$TAURI_SIGNING_PRIVATE_KEY"
           test -n "$XP_MUSIC_UPDATER_PUBKEY"
-          # El bundler comprueba la firma con la clave pública de la config.
+          # The bundler checks the signature with the public key in the config.
           node -e '
             const fs = require("node:fs");
             const config = {
@@ -183,20 +184,20 @@ runs:
           unset XP_MUSIC_UPDATER_PUBKEY TAURI_SIGNING_PRIVATE_KEY \
             TAURI_SIGNING_PRIVATE_KEY_PASSWORD
         fi
-        # Sin certificado de Apple completo, macOS queda con firma ad hoc.
+        # Without a complete Apple certificate, macOS stays ad hoc signed.
         if [ -z "$TAG" ] || [ -z "$APPLE_CERTIFICATE" ] ||
            [ -z "$APPLE_SIGNING_IDENTITY" ]; then
           unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD \
             APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
         fi
-        # Sin credenciales de notarización, solo se firma.
+        # Without notarization credentials, it is only signed.
         if [ -z "${APPLE_ID:-}" ] || [ -z "${APPLE_PASSWORD:-}" ] ||
            [ -z "${APPLE_TEAM_ID:-}" ]; then
           unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
         fi
         npm run tauri build -- "${args[@]}"
 
-    - name: Reunir los archivos de la release
+    - name: Gather the release files
       shell: bash
       env:
         TARGET: ${{ inputs.target }}
@@ -205,8 +206,8 @@ runs:
         node scripts/collect-artifacts.mjs "$TARGET" \
           src-tauri/target/release/bundle release-files ${TAG:+--signed}
 
-    # Smoke tests sobre los archivos reunidos (lo mismo que se publica).
-    - name: Probar paquetes Linux fuera del repositorio
+    # Smoke tests on the gathered files (exactly what gets published).
+    - name: Test Linux packages outside the repository
       if: runner.os == 'Linux'
       shell: bash
       run: |
@@ -219,27 +220,27 @@ runs:
             bash scripts/smoke-linux.sh "$package"
         done
         bash scripts/smoke-linux-rpm.sh release-files/*.rpm
-    - name: Probar el instalador de Windows
+    - name: Test the Windows installer
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
         $installer = @(Get-ChildItem 'release-files/*-setup.exe')
-        if ($installer.Count -ne 1) { throw 'Debe haber un instalador.' }
+        if ($installer.Count -ne 1) { throw 'There must be one installer.' }
         $dir = Join-Path $env:RUNNER_TEMP 'xp-music-smoke'
-        # /S silencioso; /D debe ser el último argumento y sin comillas.
+        # /S is silent; /D must be the last argument, without quotes.
         $process = Start-Process -Wait -PassThru `
           -FilePath $installer[0].FullName -ArgumentList '/S', "/D=$dir"
         if ($process.ExitCode -ne 0) {
-          throw "El instalador salió con $($process.ExitCode)."
+          throw "The installer exited with $($process.ExitCode)."
         }
         $exe = Get-ChildItem $dir -Filter *.exe |
           Where-Object { $_.Name -notlike 'uninstall*' } |
           Select-Object -First 1
-        if (-not $exe) { throw "No se instaló la app en $dir." }
+        if (-not $exe) { throw "The app was not installed in $dir." }
         node scripts/smoke-desktop.mjs $exe.FullName
-        if ($LASTEXITCODE -ne 0) { throw 'Smoke test fallido.' }
-    - name: Probar el .dmg de macOS
+        if ($LASTEXITCODE -ne 0) { throw 'Smoke test failed.' }
+    - name: Test the macOS .dmg
       if: runner.os == 'macOS'
       shell: bash
       run: |

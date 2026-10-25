@@ -14,20 +14,20 @@ test("composeNotes is idempotent and keeps only the maintainer notes under the t
   const rows = ARTIFACTS.map((artifact, index) => ({ artifact, url: `https://example.test/XP.Music_${index}.bin`, sha256: "a".repeat(64) }));
   const once = composeNotes("Arreglos varios", rows);
   assert.equal(composeNotes(once, rows), once);
-  assert.ok(once.startsWith(`${START}\n## Descargas\n`));
+  assert.ok(once.startsWith(`${START}\n## Downloads\n`));
   assert.ok(once.endsWith(`${END}\n\nArreglos varios\n`));
   assert.equal(stripDownloads(once), "Arreglos varios");
   assert.equal(stripDownloads(null), "");
   assert.equal(composeNotes("", rows).endsWith(`${END}\n`), true);
   const [header, separator, first] = once.split("\n").slice(3, 6);
-  assert.equal(header, "| Sistema | SHA-256 | Descarga |");
+  assert.equal(header, "| System | SHA-256 | Download |");
   assert.equal(separator, "| --- | --- | --- |");
   assert.equal(first, `| Windows x64 | \`${"a".repeat(64)}\` | [XP.Music_0.bin](https://example.test/XP.Music_0.bin) |`);
-  // Los archivos que solo usa el updater no se listan.
+  // The files only the updater uses are not listed.
   assert.ok(!once.includes("app.tar.gz") && !once.includes("<details>") && !once.includes("Actualizador"));
   assert.equal(once.split("\n").filter((line) => /^\| (Windows|Linux|macOS) /.test(line)).length, ARTIFACTS.filter((a) => a.installer).length);
-  assert.throws(() => stripDownloads(`${START}\nsin cierre`), /incompleto/);
-  assert.throws(() => stripDownloads(`${END}${START}`), /incompleto/);
+  assert.throws(() => stripDownloads(`${START}\nno end marker`), /incomplete/);
+  assert.throws(() => stripDownloads(`${END}${START}`), /incomplete/);
 });
 
 test("generateNotes hashes local files, uses uploaded URLs and fails closed", async () => {
@@ -55,7 +55,7 @@ test("generateNotes hashes local files, uses uploaded URLs and fails closed", as
     assert.ok(notes.includes(`| macOS Apple Silicon | \`${sha("payload-9")}\` | [${release.assets[9].name}](${release.assets[9].browser_download_url}) |`));
     assert.ok(!notes.includes("app.tar.gz"));
     assert.ok(notes.endsWith("\nMis notas\n"));
-    // Regenerar sobre unas notas ya publicadas da el mismo resultado.
+    // Regenerating over already published notes gives the same result.
     release.body = notes;
     await writeFile(metadata, JSON.stringify(release));
     assert.equal(await generateNotes(metadata, packages, output), notes);

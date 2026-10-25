@@ -8,7 +8,7 @@ edition = "2024"
 publish = false
 
 [lib]
-# El sufijo `_lib` evita el choque de nombres entre lib y bin en Windows
+# The `_lib` suffix avoids the lib/bin name clash on Windows
 # (https://github.com/rust-lang/cargo/issues/8519).
 name = "xp_music_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -17,9 +17,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# `macos-private-api` (ventana transparente en macOS) debe ir con `app.macOSPrivateApi` de
-# tauri.conf.json: tauri-build solo comprueba `[dependencies]` y exige que coincidan en todas
-# las plataformas. Fuera de macOS no tiene efecto.
+# `macos-private-api` (transparent window on macOS) must go with `app.macOSPrivateApi` in
+# tauri.conf.json: tauri-build only checks `[dependencies]` and requires them to match on
+# every platform. It has no effect outside macOS.
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

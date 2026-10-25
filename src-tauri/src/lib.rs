@@ -348,7 +348,7 @@ pub fn run() {
                 tracing::info!("window closed: staying in the tray");
             }
         }
-        // Clic en el Dock sin ventana (con «cerrar a la bandeja» se destruye al cerrarla).
+        // Dock click with no window (with "close to tray" it is destroyed when closed).
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Reopen {
             has_visible_windows: false,

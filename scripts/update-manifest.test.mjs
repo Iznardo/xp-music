@@ -9,7 +9,7 @@ import { generateManifest } from "./update-manifest.mjs";
 
 const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
-// Nombres tal y como los genera Tauri (contrato escrito a mano, no sacado de la tabla).
+// Names exactly as Tauri generates them (a hand-written contract, not taken from the table).
 const payloads = [
   [`XP Music_${version}_x64-setup.exe`, ["windows-x86_64-nsis", "windows-x86_64"]],
   [`XP Music_${version}_arm64-setup.exe`, ["windows-aarch64-nsis", "windows-aarch64"]],
@@ -47,10 +47,10 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
         });
       }
     }
-    // Instaladores sin firma de updater (.dmg) y notas con el bloque generado: no cuentan.
+    // Installers without an updater signature (.dmg) and notes with the generated block: they do not count.
     release.assets.push({ name: `XP.Music_${version}_x64.dmg`, size: 1,
       browser_download_url: `https://github.com/Iznardo/xp-music/releases/download/v${version}/XP.Music_${version}_x64.dmg` });
-    release.body = "<!-- xp-music:downloads:start -->\n## Descargas\n<!-- xp-music:downloads:end -->\n\nExisting release notes\n";
+    release.body = "<!-- xp-music:downloads:start -->\n## Downloads\n<!-- xp-music:downloads:end -->\n\nExisting release notes\n";
     await writeFile(metadata, JSON.stringify(release));
     // A different cwd must not change where package.json is read.
     execFileSync(process.execPath, [fileURLToPath(new URL("./update-manifest.mjs", import.meta.url)),
@@ -82,14 +82,14 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
     await rejectsRelease((r) => { r.prerelease = true; }, /must be a draft/);
     await rejectsRelease((r) => { r.assets.splice(0, 1); }, /remote artifact/);
     await rejectsRelease((r) => { r.assets.splice(1, 1); }, /remote artifact/);
-    // Faltan las entradas de Windows ARM64 o Linux ARM64: no se publica un manifiesto parcial.
+    // Missing Windows ARM64 or Linux ARM64 entries: no partial manifest is published.
     await rejectsRelease((r) => { r.assets.splice(2, 2); }, /remote artifact/);
     await rejectsRelease((r) => { r.assets.splice(14, 2); }, /remote artifact/);
     await rejectsRelease((r) => { r.assets.push(r.assets[0]); }, /found 2/);
     await rejectsRelease((r) => { r.assets.push(r.assets[1]); }, /found 2/);
     await rejectsRelease((r) => { r.assets[0].size++; }, /size mismatch/);
     await rejectsRelease((r) => { r.assets[1].size = 0; }, /empty uploaded signature/);
-    await rejectsRelease((r) => { r.body = "<!-- xp-music:downloads:start -->"; }, /incompleto/);
+    await rejectsRelease((r) => { r.body = "<!-- xp-music:downloads:start -->"; }, /incomplete/);
     for (const url of [
       release.assets[0].browser_download_url.replace("https:", "http:"),
       release.assets[0].browser_download_url.replace("github.com", "github.com.evil.test"),
@@ -110,7 +110,7 @@ test("manifest uses uploaded URLs and fails closed on incomplete or unsafe relea
     await writeFile(duplicate, "payload");
     await assert.rejects(generateManifest(metadata, packages, output), /found 2/);
     await rm(duplicate);
-    // Sin el paquete local de Linux ARM64 tampoco se genera.
+    // Without the local Linux ARM64 package it is not generated either.
     await rm(join(packages, "7", "bundle", payloads[7][0]));
     await assert.rejects(generateManifest(metadata, packages, output), /local artifact/);
   } finally {

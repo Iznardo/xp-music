@@ -1,6 +1,6 @@
-// Smoke test de Windows y macOS: lanza la app y espera a que el log diga que la interfaz
-// está montada y que encontró yt-dlp/deno; luego la cierra. (Linux: smoke-linux.sh.)
-//   node scripts/smoke-desktop.mjs EJECUTABLE [SEGUNDOS]
+// Windows and macOS smoke test: starts the app and waits for the log to say the UI is
+// mounted and that it found yt-dlp/deno; then closes it. (Linux: smoke-linux.sh.)
+//   node scripts/smoke-desktop.mjs EXECUTABLE [SECONDS]
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, openSync, readSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -8,16 +8,16 @@ import { join } from "node:path";
 
 const [binary, seconds = "60"] = process.argv.slice(2);
 if (!binary) {
-  console.error("Uso: node scripts/smoke-desktop.mjs EJECUTABLE [SEGUNDOS]");
+  console.error("Usage: node scripts/smoke-desktop.mjs EXECUTABLE [SECONDS]");
   process.exit(2);
 }
 
-// Misma ruta que AppDirs::logs (dirs::data_local_dir()/xp-music/logs).
+// Same path as AppDirs::logs (dirs::data_local_dir()/xp-music/logs).
 const dataLocal = process.platform === "win32" ? process.env.LOCALAPPDATA
   : process.platform === "darwin" ? join(homedir(), "Library", "Application Support")
   : process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share");
 const logs = join(dataLocal, "xp-music", "logs");
-const expected = ["UI montada", "herramientas encontradas"];
+const expected = ["UI mounted", "tools found"];
 
 const sizes = () => {
   try {
@@ -26,7 +26,7 @@ const sizes = () => {
     return new Map();
   }
 };
-// Solo cuenta lo escrito después de lanzar la app (puede haber logs de ejecuciones previas).
+// Only what is written after starting the app counts (there may be logs from earlier runs).
 const before = sizes();
 function newLog() {
   let text = "";
@@ -47,7 +47,7 @@ child.on("exit", () => { exited = true; });
 
 function stop() {
   if (exited) return;
-  // En Windows hay que cerrar también los procesos de WebView2.
+  // On Windows the WebView2 processes have to be closed too.
   if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"]);
   else child.kill("SIGKILL");
 }
@@ -58,12 +58,12 @@ while (Date.now() < deadline && !exited) {
   log = newLog();
   if (expected.every((line) => log.includes(line))) {
     stop();
-    console.log(`Smoke OK (${process.platform}): ${expected.join(" y ")}.`);
+    console.log(`Smoke OK (${process.platform}): ${expected.join(" and ")}.`);
     process.exit(0);
   }
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
 log = newLog();
 stop();
-console.error(`${exited ? "La app terminó antes de tiempo" : "Tiempo agotado"}; log de la app:\n${log || "(vacío)"}`);
+console.error(`${exited ? "The app exited early" : "Timed out"}; app log:\n${log || "(empty)"}`);
 process.exit(1);

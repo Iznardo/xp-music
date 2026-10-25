@@ -75,7 +75,7 @@ el workflow único:
 3. Verifica criptográficamente con `minisign` **todas** las firmas del updater, sube los
    archivos al draft (salvo los EXE de Windows, que ya estaban) y calcula el SHA-256 de cada uno.
 4. Escribe en las notas de la release, **encima** de las notas del mantenedor, una tabla
-   *Sistema (SO y arquitectura) · SHA-256 · Descarga* con los instaladores; el texto del
+   *System · SHA-256 · Download* (en inglés) con los instaladores; el texto del
    enlace es el nombre del archivo, que ya indica el formato. Los archivos del actualizador
    (`.sig`, `latest.json`) siguen en la release pero no se listan. La tabla va
    entre marcadores HTML, así que reintentar el workflow la sustituye en vez de duplicarla.

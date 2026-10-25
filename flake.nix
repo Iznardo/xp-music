@@ -6,7 +6,7 @@
   outputs =
     { self, nixpkgs }:
     let
-      # aarch64-linux: evaluado, pero sin probar en hardware (solo lo compila el CI).
+      # aarch64-linux: evaluated, but not tested on hardware (only CI builds it).
       systems = [
         "x86_64-linux"
         "aarch64-linux"

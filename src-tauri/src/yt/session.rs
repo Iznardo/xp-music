@@ -1,14 +1,14 @@
 //! YouTube Music session: import from the browser and encrypted storage.
 //!
-//! - Las cookies se leen del perfil de un navegador tipo Firefox (Zen, Firefox,
-//!   LibreWolf…) copiando `cookies.sqlite` **y su WAL** (las cookies rotadas hace
-//!   poco solo están ahí) y quedándose con **un único contenedor**: mezclar
-//!   contenedores produce una sesión inválida.
-//! - En Windows la sesión se guarda cifrada con DPAPI (ligada al usuario) en
-//!   `%APPDATA%\xp-music\session.bin`. En Linux se guarda en Secret Service,
-//!   aislada por la ruta de SessionStore; en macOS, en el Llavero con la misma clave;
-//!   nunca en claro en disco (principio VI).
-//!   No se usa el Administrador de credenciales de Windows por su límite de 2,5 KB.
+//! - Cookies are read from the profile of a Firefox-like browser (Zen, Firefox,
+//!   LibreWolf…) by copying `cookies.sqlite` **and its WAL** (recently rotated
+//!   cookies only live there) and keeping **a single container**: mixing
+//!   containers produces an invalid session.
+//! - On Windows the session is stored encrypted with DPAPI (tied to the user) in
+//!   `%APPDATA%\xp-music\session.bin`. On Linux it is stored in Secret Service,
+//!   isolated by the SessionStore path; on macOS, in the Keychain with the same key;
+//!   never in plain text on disk (principle VI).
+//!   The Windows Credential Manager is not used because of its 2.5 KB limit.
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -405,7 +405,7 @@ pub fn netscape_from_header(header: &str) -> String {
 
 // ------------------------------------------------------------------ encrypted storage
 
-/// Almacén del sistema, para los logs.
+/// System store, for the logs.
 #[cfg(not(windows))]
 const KEYRING: &str = if cfg!(target_os = "macos") {
     "Keychain"
@@ -488,7 +488,7 @@ impl SessionStore {
     #[cfg(not(windows))]
     fn entry(&self) -> AppResult<&keyring::Entry> {
         self.entry.as_ref().map_err(|_| {
-            tracing::error!("no se pudo inicializar la entrada de {KEYRING}");
+            tracing::error!("could not initialize the {KEYRING} entry");
             AppError::new(
                 ErrorCode::Storage,
                 if cfg!(target_os = "macos") {
@@ -512,13 +512,13 @@ impl SessionStore {
             Ok(plain) => plain,
             Err(keyring::Error::NoEntry) => return None,
             Err(_) => {
-                tracing::warn!("no se pudo leer la sesión de {KEYRING}");
+                tracing::warn!("could not read the session from {KEYRING}");
                 return None;
             }
         };
         serde_json::from_slice(&plain)
-            // No registrar el error de JSON: puede incluir valores de las cookies.
-            .map_err(|_| tracing::warn!("sesión de {KEYRING} no válida"))
+            // Do not log the JSON error: it may include cookie values.
+            .map_err(|_| tracing::warn!("invalid session in {KEYRING}"))
             .ok()
     }
 
@@ -526,7 +526,7 @@ impl SessionStore {
     pub fn save(&self, s: &Session) -> AppResult<()> {
         let plain = serde_json::to_vec(s)?;
         self.entry()?.set_secret(&plain).map_err(|_| {
-            tracing::error!("no se pudo guardar la sesión en {KEYRING}");
+            tracing::error!("could not save the session in {KEYRING}");
             AppError::new(
                 ErrorCode::Storage,
                 if cfg!(target_os = "macos") {
@@ -549,7 +549,7 @@ impl SessionStore {
         match self.entry()?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(_) => {
-                tracing::error!("no se pudo borrar la sesión de {KEYRING}");
+                tracing::error!("could not delete the session from {KEYRING}");
                 Err(AppError::new(
                     ErrorCode::Storage,
                     if cfg!(target_os = "macos") {
@@ -710,7 +710,7 @@ mod tests {
 
     #[cfg(not(windows))]
     #[test]
-    fn sesion_en_keyring_mock() {
+    fn session_in_keyring_mock() {
         let dir = std::env::temp_dir().join(format!("xp-music-test-{}", rand::random::<u64>()));
         std::fs::create_dir_all(&dir).unwrap();
         // Per-instance injection: don't change keyring's global builder.
@@ -752,7 +752,7 @@ mod tests {
             store.load().is_some(),
             "must not pretend the credential was deleted"
         );
-        entry.set_secret(br#"{"auth_user":"secreto123"}"#).unwrap();
+        entry.set_secret(br#"{"auth_user":"secret123"}"#).unwrap();
         assert!(store.load().is_none(), "reject invalid session JSON");
         store.clear().unwrap();
         store.clear().unwrap(); // Deleting a missing entry is harmless.
@@ -772,13 +772,13 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
-    /// Linux: requiere D-Bus y Secret Service desbloqueado (p. ej. gnome-keyring);
-    /// macOS: el Llavero de inicio de sesión desbloqueado.
-    /// `cargo test --lib sesion_keyring_real -- --ignored --nocapture`
+    /// Linux: needs D-Bus and an unlocked Secret Service (e.g. gnome-keyring);
+    /// macOS: the unlocked login Keychain.
+    /// `cargo test --lib session_keyring_real -- --ignored --nocapture`
     #[cfg(not(windows))]
     #[test]
-    #[ignore = "requiere un almacén de credenciales real y desbloqueado"]
-    fn sesion_keyring_real() {
+    #[ignore = "needs a real, unlocked credential store"]
+    fn session_keyring_real() {
         let dir = std::env::temp_dir().join(format!("xp-music-keyring-{}", rand::random::<u64>()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = SessionStore::new(&dir);
@@ -807,8 +807,8 @@ mod tests {
 
     #[cfg(not(windows))]
     #[test]
-    fn usuarios_keyring_aislados_por_ruta() {
-        // (servicio, usuario) de la credencial nativa.
+    fn keyring_users_isolated_by_path() {
+        // (service, user) of the native credential.
         let ids = |store: &SessionStore| {
             let cred = store.entry().unwrap().get_credential();
             #[cfg(target_os = "linux")]
@@ -827,11 +827,11 @@ mod tests {
                 (m.service.clone(), m.account.clone())
             }
         };
-        let a = ids(&SessionStore::new(Path::new("/tmp/perfil-a")));
-        let b = ids(&SessionStore::new(Path::new("/tmp/perfil-b")));
+        let a = ids(&SessionStore::new(Path::new("/tmp/profile-a")));
+        let b = ids(&SessionStore::new(Path::new("/tmp/profile-b")));
         assert_eq!(a.0, "com.iznardo.xpmusic");
         assert_ne!(a.1, b.1);
-        assert_eq!(a, ids(&SessionStore::new(Path::new("/tmp/perfil-a"))));
+        assert_eq!(a, ids(&SessionStore::new(Path::new("/tmp/profile-a"))));
     }
 
     #[cfg(unix)]

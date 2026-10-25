@@ -1,4 +1,4 @@
-name: Desktop (Windows, Linux y macOS)
+name: Desktop (Windows, Linux and macOS)
 
 on:
   pull_request:
@@ -9,15 +9,15 @@ on:
     inputs:
       tag:
         description: >-
-          Tag del draft preparado con npm run release (v1.0.3).
-          Vacío: dry run, compila y prueba todo pero no publica nada.
+          Tag of the draft prepared with npm run release (v1.0.3).
+          Empty: dry run, builds and tests everything but publishes nothing.
         required: false
         type: string
 
 permissions:
   contents: read
 
-# Una sola publicación a la vez; los checks y los dry run no la bloquean.
+# One publication at a time; checks and dry runs do not block it.
 concurrency:
   group: >-
     desktop-${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' &&
@@ -26,11 +26,11 @@ concurrency:
 
 jobs:
   validate:
-    # Antes de tocar ninguna clave: solo hace algo al publicar una release.
-    # Los drafts solo los ve un token con permiso de escritura, así que este
-    # es el único job previo con `contents: write`. No ejecuta código del
-    # repositorio salvo `node -e` en línea; los jobs de compilación, que sí
-    # ejecutan dependencias y llevan las claves, siguen en solo lectura.
+    # Before touching any key: it only does something when publishing a release.
+    # Drafts are only visible to a token with write permission, so this is the
+    # only earlier job with `contents: write`. It runs no repository code
+    # except inline `node -e`; the build jobs, which do run dependencies and
+    # carry the keys, stay read-only.
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - name: Validar la release
+      - name: Validate the release
         if: inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -57,7 +57,7 @@ jobs:
         run: |
           test "$GH_REPO" = Iznardo/xp-music
           test -n "$XP_MUSIC_UPDATER_PUBKEY"
-          # shellcheck disable=SC2016  # las plantillas son de JavaScript
+          # shellcheck disable=SC2016  # the templates are JavaScript
           node --input-type=module -e '
             import assert from "node:assert/strict";
             import { readFileSync } from "node:fs";
@@ -67,7 +67,7 @@ jobs:
             assert.equal(process.env.TAG, `v${version}`);
           '
           git merge-base --is-ancestor HEAD origin/main
-          # `releases/tags/<tag>` no devuelve drafts: se busca en la lista.
+          # `releases/tags/<tag>` does not return drafts: search the list instead.
           gh api "repos/$GH_REPO/releases?per_page=100" --paginate \
             --jq ".[] | select(.tag_name == \"$TAG\")" \
             | sed -n 1p > "$RUNNER_TEMP/release.json"
@@ -78,7 +78,7 @@ jobs:
             assert.equal(release.draft, true, "The release must be a draft");
             assert.equal(release.prerelease, false);
           '
-      - name: Reunir los instaladores Windows firmados en local
+      - name: Gather the Windows installers signed locally
         if: inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -116,12 +116,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Etiquetas de runner de repositorios públicos (docs de GitHub):
-          # windows-11-arm, ubuntu-24.04-arm y macos-15-intel existen
-          # desde 2025.
-          # checks: `npm run check` en un target por sistema (el código con
-          # #[cfg] cambia por SO, no por arquitectura); el resto solo empaqueta
-          # y prueba el arranque.
+          # Runner labels for public repositories (GitHub docs):
+          # windows-11-arm, ubuntu-24.04-arm and macos-15-intel exist
+          # since 2025.
+          # checks: `npm run check` on one target per system (#[cfg] code
+          # changes by OS, not by architecture); the rest only package and
+          # test startup.
           - target: windows-x86_64
             os: windows-2022
             bundles: nsis
@@ -144,9 +144,9 @@ jobs:
             bundles: app,dmg
             checks: true
     runs-on: ${{ matrix.os }}
-    # La clave del updater y los certificados de Apple solo existen en el
-    # environment `release`, que exige la aprobación del mantenedor. Solo lo
-    # usan los jobs de Linux y macOS al publicar; Windows llega ya firmado.
+    # The updater key and the Apple certificates only exist in the `release`
+    # environment, which requires the maintainer's approval. Only the Linux and
+    # macOS jobs use it when publishing; Windows arrives already signed.
     environment: >-
       ${{ inputs.tag && !startsWith(matrix.target, 'windows-') && 'release' ||
       '' }}
@@ -157,8 +157,8 @@ jobs:
             ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) ||
             github.sha }}
           persist-credentials: false
-      # Los secretos solo se pasan al publicar una release, nunca en PR,
-      # push ni dry run.
+      # Secrets are only passed when publishing a release, never on PRs,
+      # pushes or dry runs.
       - uses: ./.github/actions/build-target
         with:
           target: ${{ matrix.target }}
@@ -166,7 +166,7 @@ jobs:
           tag: ${{ inputs.tag }}
           checks: ${{ matrix.checks || false }}
           updater-pubkey: ${{ inputs.tag && vars.XP_MUSIC_UPDATER_PUBKEY }}
-          # Solo Linux firma en CI: Windows se firma en local y macOS no tiene
+          # Only Linux signs in CI: Windows is signed locally and macOS has no
           # updater (experimental).
           signing-key: >-
             ${{ inputs.tag && startsWith(matrix.target, 'linux-') &&
@@ -186,7 +186,7 @@ jobs:
           apple-team-id: ${{ inputs.tag && secrets.APPLE_TEAM_ID }}
 
   nix:
-    # Comprueba el flake en los PR; no forma parte de la publicación.
+    # Checks the flake on PRs; not part of the release.
     if: inputs.tag == ''
     strategy:
       fail-fast: false
@@ -218,13 +218,13 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      # Un artefacto por target; los nombres de archivo no se repiten.
+      # One artifact per target; file names do not repeat.
       # actions/download-artifact v8.0.2
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           path: packages
           merge-multiple: true
-      - name: Verificar todas las firmas del updater
+      - name: Verify every updater signature
         env:
           XP_MUSIC_UPDATER_PUBKEY: ${{ vars.XP_MUSIC_UPDATER_PUBKEY }}
         run: |
@@ -242,26 +242,26 @@ jobs:
             minisign -Vm "${signature%.sig}" \
               -x "$RUNNER_TEMP/artifact.sig" -p "$RUNNER_TEMP/updater.pub"
           done
-      - name: Completar notas y manifiesto, y publicar la release
+      - name: Complete the notes and manifest, and publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
         run: |
-          # `releases/tags/<tag>` no devuelve drafts: se busca en la lista.
+          # `releases/tags/<tag>` does not return drafts: search the list instead.
           find_release() {
             gh api "repos/$GH_REPO/releases?per_page=100" --paginate \
               --jq ".[] | select(.tag_name == \"$TAG\")" | sed -n 1p
           }
           find_release > "$RUNNER_TEMP/release.json"
           test -s "$RUNNER_TEMP/release.json"
-          # Si alguien publicó durante el build, no modificar esa release.
+          # If someone published during the build, do not modify that release.
           node -e '
             const release = require(process.env.RUNNER_TEMP + "/release.json");
             if (!release.draft) process.exit(1);
           '
-          # Los instaladores Windows (x64 y ARM64) ya están en el draft,
-          # firmados en local: no se vuelven a subir.
+          # The Windows installers (x64 and ARM64) are already in the draft,
+          # signed locally: they are not uploaded again.
           mapfile -d '' uploads < <(
             find packages -type f ! -name '*-setup.exe' \
               ! -name '*-setup.exe.sig' -print0
@@ -270,17 +270,17 @@ jobs:
           find_release > "$RUNNER_TEMP/release.json"
           release_id=$(node -p \
             'require(process.env.RUNNER_TEMP + "/release.json").id')
-          # Tabla de descargas (idempotente) sobre las notas del mantenedor.
+          # Download table (idempotent) above the maintainer's notes.
           node scripts/release-notes.mjs \
             "$RUNNER_TEMP/release.json" packages "$RUNNER_TEMP/notes.md"
-          # Un PATCH de un draft sin `tag_name` lo desvincula del tag
-          # (pasa a `untagged-<hash>`): hay que repetirlo en cada PATCH.
+          # A PATCH of a draft without `tag_name` unlinks it from the tag
+          # (it becomes `untagged-<hash>`): repeat it on every PATCH.
           gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
             -f "tag_name=$TAG" -F "body=@$RUNNER_TEMP/notes.md" --silent
-          # El manifiesto solo lleva las notas del mantenedor.
+          # The manifest only carries the maintainer's notes.
           node scripts/update-manifest.mjs \
             "$RUNNER_TEMP/release.json" packages "$RUNNER_TEMP/latest.json"
           gh release upload "$TAG" "$RUNNER_TEMP/latest.json" --clobber
-          # GitHub elige latest por fecha/semver, no por orden de los builds.
+          # GitHub picks latest by date/semver, not by build order.
           gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
             -f "tag_name=$TAG" -F draft=false -f make_latest=legacy --silent
