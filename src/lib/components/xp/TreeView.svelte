@@ -5,7 +5,7 @@
   import { t } from "../../i18n.svelte";
 
   let { nodes, selected }: { nodes: TreeNode[]; selected: string | null } = $props();
-  let expanded = $state<Set<string>>(new Set(["library", "playlists"]));
+  let expanded = $state<Set<string>>(new Set(["library", "playlists", "local"]));
 
   // Flat list of visible nodes (for the keyboard).
   const visible = $derived.by(() => {

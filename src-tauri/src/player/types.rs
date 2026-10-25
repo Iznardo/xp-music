@@ -34,6 +34,8 @@ pub enum QueueSource {
     Radio(TrackId),
     Search(String),
     Library,
+    /// "My music" (files on disk).
+    Local,
     Manual,
 }
 

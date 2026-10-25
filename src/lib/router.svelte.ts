@@ -6,6 +6,8 @@ import { commands } from "./bindings";
 //   #/library/<section>       Library: playlists | songs | liked | albums | artists | history
 //   #/playlist/<id>  #/album/<id>  #/artist/<id>
 //   #/search/<filter>/<text>
+//   #/local/<view>            My music (files on disk): songs | albums | artists
+//   #/local/album/<artist>/<title>  #/local/artist/<name>
 
 export type Route =
   | { name: "now" }
@@ -14,10 +16,16 @@ export type Route =
   | { name: "playlist"; id: string }
   | { name: "album"; id: string }
   | { name: "artist"; id: string }
-  | { name: "search"; filter: string; query: string };
+  | { name: "search"; filter: string; query: string }
+  | { name: "local"; view: LocalSection }
+  | { name: "localAlbum"; artist: string; title: string }
+  | { name: "localArtist"; artist: string };
 
 export type LibrarySection = "playlists" | "songs" | "liked" | "albums" | "artists" | "history";
 const SECTIONS: LibrarySection[] = ["playlists", "songs", "liked", "albums", "artists", "history"];
+
+export type LocalSection = "songs" | "albums" | "artists";
+const LOCAL_SECTIONS: LocalSection[] = ["songs", "albums", "artists"];
 
 function parse(hash: string): Route {
   const [, name = "", a = "", ...rest] = hash.replace(/^#/, "").split("/");
@@ -35,6 +43,10 @@ function parse(hash: string): Route {
       return a ? { name, id: dec(a) } : { name: "library", section: "playlists" };
     case "search":
       return { name: "search", filter: a || "All", query: dec(rest.join("/")) };
+    case "local":
+      if (a === "album") return { name: "localAlbum", artist: dec(rest[0] ?? ""), title: dec(rest[1] ?? "") };
+      if (a === "artist") return { name: "localArtist", artist: dec(rest[0] ?? "") };
+      return { name: "local", view: (LOCAL_SECTIONS as string[]).includes(a) ? (a as LocalSection) : "songs" };
     default:
       return { name: "library", section: "playlists" };
   }
@@ -51,6 +63,12 @@ export function href(r: Route): string {
       return `#/${r.name}/${enc(r.id)}`;
     case "search":
       return `#/search/${r.filter}/${enc(r.query)}`;
+    case "local":
+      return `#/local/${r.view}`;
+    case "localAlbum":
+      return `#/local/album/${enc(r.artist)}/${enc(r.title)}`;
+    case "localArtist":
+      return `#/local/artist/${enc(r.artist)}`;
     default:
       return `#/${r.name}`;
   }
@@ -87,6 +105,12 @@ class Router {
     const n = this.route.name;
     if (n === "now" || n === "home" || n === "search") return n;
     return "library";
+  }
+
+  /// A "My music" route (works without a YouTube session).
+  get isLocal(): boolean {
+    const n = this.route.name;
+    return n === "local" || n === "localAlbum" || n === "localArtist";
   }
 }
 

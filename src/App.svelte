@@ -12,6 +12,7 @@
   import { settings } from "./lib/stores/settings.svelte";
   import { auth } from "./lib/stores/auth.svelte";
   import { library } from "./lib/stores/library.svelte";
+  import { local } from "./lib/stores/local.svelte";
   import { ui } from "./lib/stores/ui.svelte";
   import { updates } from "./lib/stores/updates.svelte";
   import { skins } from "./lib/stores/skins.svelte";
@@ -101,10 +102,13 @@
     void settings.init();
     void player.init();
     void library.init();
+    void local.init();
     void updates.init();
     void auth.init().then(() => {
-      if (!auth.signedIn) ui.loginOpen = true;
-      else void library.refresh();
+      if (auth.signedIn) return void library.refresh();
+      ui.loginOpen = true;
+      // Without a session the YouTube library is empty: "My music" works on its own.
+      if (router.tab === "library" && !router.isLocal) router.go({ name: "local", view: "songs" });
     });
     const win = appWindow();
     if (!win) return () => clearTimeout(idle);

@@ -79,6 +79,7 @@ ${notes}` : ""}
     search: "Buscar",
   },
   tree: {
+    myMusic: "Mi música",
     library: "Biblioteca",
     playlists: "Listas de reproducción",
     songs: "Canciones",
@@ -190,7 +191,7 @@ ${notes}` : ""}
   },
   options: {
     title: "Opciones",
-    tabs: { player: "Reproductor", audio: "Audio", keys: "Teclado", account: "Cuenta", viz: "Visualización", about: "Acerca de" },
+    tabs: { player: "Reproductor", audio: "Audio", keys: "Teclado", library: "Mi música", account: "Cuenta", viz: "Visualización", about: "Acerca de" },
     pauseOnLock: "Pausar al bloquear el equipo",
     hotkeys: "Atajos globales (funcionan aunque XP Music esté en segundo plano)",
     hotkeyNames: { playPause: "Reproducir/Pausa", next: "Siguiente", previous: "Anterior", show: "Mostrar XP Music" },
@@ -242,6 +243,21 @@ ${notes}` : ""}
     ok: "Aceptar",
     cancel: "Cancelar",
     apply: "Aplicar",
+  },
+  local: {
+    intro: "Reproduce la música guardada en este equipo, sin necesidad de una cuenta de YouTube Music. Elige las carpetas donde la tienes.",
+    addFolder: "Agregar carpeta…",
+    rescan: "Volver a buscar",
+    scanning: (done: number, total: number) => (total ? `Buscando música: ${done} de ${total}…` : "Buscando música…"),
+    noSongs: "No se encontraron canciones en tus carpetas. Formatos: MP3, M4A/AAC, FLAC, Ogg Vorbis, WAV y AIFF.",
+    unknownArtist: "Artista desconocido",
+    unknownAlbum: "Álbum desconocido",
+    artistStats: (albums: number, songs: number) => `${albums === 1 ? "1 álbum" : `${albums} álbumes`} • ${songs === 1 ? "1 canción" : `${songs} canciones`}`,
+    folders: "Carpetas de música",
+    noFolders: "Todavía no hay carpetas.",
+    remove: "Quitar",
+    foldersHint: "Se incluyen las subcarpetas. Los cambios en el disco aparecen al volver a buscar (también al iniciar).",
+    signedOutHint: "Tu música de este equipo está en Mi música.",
   },
   skins: {
     title: "Selector de máscaras",

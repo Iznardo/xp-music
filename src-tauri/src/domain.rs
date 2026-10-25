@@ -5,9 +5,27 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// YouTube `videoId` (11 characters).
+/// YouTube `videoId` (11 characters) or a file on disk as `local:<absolute path>`.
+/// A videoId never contains `:`, so the two cannot collide.
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TrackId(pub String);
+
+const LOCAL_PREFIX: &str = "local:";
+
+impl TrackId {
+    pub fn local(path: &std::path::Path) -> Self {
+        Self(format!("{LOCAL_PREFIX}{}", path.display()))
+    }
+
+    pub fn is_local(&self) -> bool {
+        self.0.starts_with(LOCAL_PREFIX)
+    }
+
+    /// The file of a local track (`None` for YouTube ones).
+    pub fn local_path(&self) -> Option<std::path::PathBuf> {
+        self.0.strip_prefix(LOCAL_PREFIX).map(Into::into)
+    }
+}
 
 /// Playlist id as returned by the library (with the `VL` prefix).
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq, Hash)]
@@ -190,5 +208,16 @@ mod tests {
         assert_eq!(json["durationMs"], 255_000);
         assert_eq!(json["likeStatus"], "Like");
         assert!(json.get("setVideoId").is_some());
+    }
+
+    #[test]
+    fn local_ids_round_trip_and_never_look_like_youtube() {
+        let path = std::path::Path::new(r"C:\Music\Café del Mar\01 - Intro.flac");
+        let id = TrackId::local(path);
+        assert!(id.is_local());
+        assert_eq!(id.local_path().as_deref(), Some(path));
+        let yt = TrackId("yQd4xQBlBa0".into());
+        assert!(!yt.is_local());
+        assert_eq!(yt.local_path(), None);
     }
 }

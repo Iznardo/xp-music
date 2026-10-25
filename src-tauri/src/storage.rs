@@ -25,6 +25,16 @@ fn migrations() -> Migrations<'static> {
              CREATE TABLE thumb_index (name TEXT PRIMARY KEY, url TEXT NOT NULL, mime TEXT NOT NULL,
                                        bytes INTEGER NOT NULL, last_access INTEGER NOT NULL);",
         ),
+        // 0004 · local music library. `cover` = 'embedded', path of an image in the
+        // song's folder or NULL; images are read from disk when shown, never copied.
+        M::up(
+            "CREATE TABLE local_tracks (path TEXT PRIMARY KEY, folder TEXT NOT NULL, title TEXT NOT NULL,
+                                        artist TEXT NOT NULL, album TEXT NOT NULL, album_artist TEXT NOT NULL,
+                                        track_no INTEGER, disc_no INTEGER, year INTEGER, duration_ms INTEGER,
+                                        cover TEXT, mtime INTEGER NOT NULL, size INTEGER NOT NULL);
+             CREATE INDEX local_tracks_album ON local_tracks (album_artist, album);
+             CREATE INDEX local_tracks_artist ON local_tracks (artist);",
+        ),
     ])
 }
 

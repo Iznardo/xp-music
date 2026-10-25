@@ -6,11 +6,22 @@
   import { thumbSrc } from "../../thumb";
   import { t } from "../../i18n.svelte";
 
-  let { items, row = false }: { items: MediaItem[]; row?: boolean } = $props();
+  let {
+    items,
+    row = false,
+    onopen,
+  }: {
+    items: MediaItem[];
+    row?: boolean;
+    /// Instead of opening the item on YouTube (local albums and artists).
+    onopen?: (item: MediaItem, index: number) => void;
+  } = $props();
 
-  function menu(item: MediaItem, e: MouseEvent) {
-    if (item.Track) return ui.openMenu(e, trackMenu([item.Track], { onPlay: () => openItem(item) }));
-    const items: MenuItem[] = [{ kind: "item", label: t.menu.open, bold: true, action: () => openItem(item) }];
+  const open = (item: MediaItem, i: number) => (onopen ? onopen(item, i) : openItem(item));
+
+  function menu(item: MediaItem, i: number, e: MouseEvent) {
+    if (item.Track) return ui.openMenu(e, trackMenu([item.Track], { onPlay: () => open(item, i) }));
+    const items: MenuItem[] = [{ kind: "item", label: t.menu.open, bold: true, action: () => open(item, i) }];
     ui.openMenu(e, items);
   }
   void playTracks;
@@ -19,7 +30,7 @@
 <div class="grid" class:row>
   {#each items as item, i (i)}
     {@const src = thumbSrc(itemThumbs(item), 120)}
-    <button class="tile" class:round={!!item.Artist} onmouseenter={() => item.Track && hintTrack(item.Track.id)} ondblclick={() => openItem(item)} onkeydown={(e) => e.key === "Enter" && openItem(item)} oncontextmenu={(e) => menu(item, e)} title={itemTitle(item)}>
+    <button class="tile" class:round={!!item.Artist} onmouseenter={() => item.Track && hintTrack(item.Track.id)} ondblclick={() => open(item, i)} onkeydown={(e) => e.key === "Enter" && open(item, i)} oncontextmenu={(e) => menu(item, i, e)} title={itemTitle(item)}>
       <span class="art">
         <span class="ph">♫</span>
         <!-- Some automatic lists come without a valid cover: the icon stays. -->

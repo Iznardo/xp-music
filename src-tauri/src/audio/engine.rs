@@ -15,9 +15,8 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use reqwest::blocking::Client;
 
-use super::decoder::{DecodeFailure, Decoding, http_client};
+use super::decoder::{DecodeFailure, Decoding, MediaStream, http_client};
 use super::output::{Output, PcmTap, perceptual_amplitude};
-use super::resolver::ResolvedStream;
 use crate::domain::TrackId;
 use crate::error::AppError;
 
@@ -28,12 +27,12 @@ const MIN_FREE_SAMPLES: usize = 4096;
 #[derive(Debug)]
 pub enum EngineCmd {
     Load {
-        stream: ResolvedStream,
+        stream: MediaStream,
         start_ms: u32,
         autoplay: bool,
     },
     Preload {
-        stream: ResolvedStream,
+        stream: MediaStream,
     },
     Play,
     Pause,
@@ -359,7 +358,7 @@ impl Engine {
         }
     }
 
-    fn load(&mut self, stream: ResolvedStream, start_ms: u32, autoplay: bool) {
+    fn load(&mut self, stream: MediaStream, start_ms: u32, autoplay: bool) {
         self.generation += 1;
         self.want_playing = autoplay;
         if !self.ensure_output() {
@@ -371,7 +370,7 @@ impl Engine {
             && self
                 .next
                 .as_ref()
-                .is_some_and(|n| n.track_id == stream.track_id)
+                .is_some_and(|n| &n.track_id == stream.track_id())
         {
             let next = self.next.take().expect("preload");
             self.start_active(next, 0, false);
@@ -389,14 +388,14 @@ impl Engine {
             let result = Decoding::open(client, &stream, start_ms, out_rate, out_ch);
             let _ = tx.send(Opened::Load {
                 generation,
-                track_id: stream.track_id,
+                track_id: stream.track_id().clone(),
                 start_ms,
                 result,
             });
         });
     }
 
-    fn preload(&mut self, stream: ResolvedStream) {
+    fn preload(&mut self, stream: MediaStream) {
         if !self.ensure_output() {
             return;
         }
@@ -409,7 +408,7 @@ impl Engine {
         thread::spawn(move || {
             let result = Decoding::open(client, &stream, 0, out_rate, out_ch);
             let _ = tx.send(Opened::Preload {
-                track_id: stream.track_id,
+                track_id: stream.track_id().clone(),
                 result,
             });
         });
@@ -733,7 +732,9 @@ mod tests {
     fn test_muted() -> bool {
         std::env::var_os("XP_MUSIC_TEST_AUDIBLE").is_none()
     }
-    use crate::audio::resolver::{FormatPreference, StreamResolver, ToolPaths, YtDlpResolver};
+    use crate::audio::resolver::{
+        FormatPreference, ResolvedStream, StreamResolver, ToolPaths, YtDlpResolver,
+    };
 
     fn wait_for(
         rx: &Receiver<EngineEvent>,
@@ -778,7 +779,7 @@ mod tests {
         });
         engine.send(EngineCmd::SetTap(true));
         engine.send(EngineCmd::Load {
-            stream: s,
+            stream: MediaStream::Remote(s),
             start_ms: 30_000,
             autoplay: true,
         });
@@ -848,7 +849,7 @@ mod tests {
         // 1) First sound with the URL already resolved (same as cached): target < 1 s.
         let t0 = Instant::now();
         engine.send(EngineCmd::Load {
-            stream: a.clone(),
+            stream: MediaStream::Remote(a.clone()),
             start_ms: 0,
             autoplay: true,
         });
@@ -880,7 +881,9 @@ mod tests {
         );
 
         // 3) Preload and gapless transition: the first track must not send `Ended`.
-        engine.send(EngineCmd::Preload { stream: b.clone() });
+        engine.send(EngineCmd::Preload {
+            stream: MediaStream::Remote(b.clone()),
+        });
         let mut ended_a = false;
         let started_b = wait_for(&rx, Duration::from_secs(20), |e| {
             if matches!(e, EngineEvent::Ended { .. }) {
@@ -949,7 +952,7 @@ mod tests {
             muted: test_muted(),
         });
         engine.send(EngineCmd::Load {
-            stream: failing,
+            stream: MediaStream::Remote(failing),
             start_ms: 0,
             autoplay: true,
         });
@@ -983,7 +986,7 @@ mod tests {
 
         // What the service would do: re-resolve and load at the same position.
         engine.send(EngineCmd::Load {
-            stream: healthy,
+            stream: MediaStream::Remote(healthy),
             start_ms: position_ms,
             autoplay: true,
         });

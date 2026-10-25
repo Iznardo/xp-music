@@ -22,6 +22,11 @@ async function succeeded(p: Promise<{ status: "ok"; data: unknown } | { status: 
   return r.status === "ok";
 }
 
+/// A song from "My music" (a file on disk), not from YouTube.
+export function isLocal(track: Track): boolean {
+  return track.id.startsWith("local:");
+}
+
 export async function playTracks(tracks: Track[], index = 0, source: QueueSource = "Manual") {
   if (!tracks.length) return;
   await check(commands.queueSet(tracks, index, source));
@@ -50,7 +55,7 @@ export async function playPlaylist(id: string) {
 let lastHint: string | null = null;
 /// Tells the player this song is likely to be requested soon.
 export function hintTrack(id: string | undefined) {
-  if (!id || id === lastHint) return;
+  if (!id || id === lastHint || id.startsWith("local:")) return;
   lastHint = id;
   void commands.playerHint([id]);
 }
@@ -107,6 +112,17 @@ export function trackMenu(tracks: Track[], opts: { onPlay?: () => void; queueInd
   if (opts.queueIndex !== undefined) {
     const i = opts.queueIndex;
     items.push({ kind: "item", label: t.menu.removeFromQueue, action: () => void commands.queueRemove(i) });
+  }
+  // Radio, likes and playlists are YouTube's: songs on disk only get what is local.
+  if (tracks.some(isLocal)) {
+    if (one) {
+      items.push({ kind: "sep" });
+      const album = one.album?.name;
+      const artist = one.artists[0]?.name;
+      items.push({ kind: "item", label: t.menu.goAlbum, disabled: album === undefined, action: () => album !== undefined && router.go({ name: "localAlbum", artist: artist ?? "", title: album }) });
+      items.push({ kind: "item", label: t.menu.goArtist, disabled: artist === undefined, action: () => artist !== undefined && router.go({ name: "localArtist", artist }) });
+    }
+    return items;
   }
   items.push({ kind: "sep" });
   if (one) {

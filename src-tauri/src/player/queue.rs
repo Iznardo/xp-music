@@ -485,6 +485,43 @@ mod tests {
     }
 
     #[test]
+    fn mixes_local_files_and_youtube_tracks() {
+        let local = |name: &str| Track {
+            id: TrackId::local(std::path::Path::new(&format!(r"D:\Music\{name}.flac"))),
+            ..tr(name)
+        };
+        let mut q = Queue::new().with_seed(3);
+        q.set(
+            vec![local("a"), tr("yt1"), local("b")],
+            0,
+            QueueSource::Local,
+        );
+        q.add(vec![tr("yt2")], InsertPosition::Next);
+        assert_eq!(ids(&q)[1], "yt2");
+        assert!(q.current().unwrap().id.is_local());
+        assert!(q.advance(false));
+        assert!(!q.current().unwrap().id.is_local());
+
+        q.set_shuffle(true);
+        q.set_shuffle(false);
+        let json = serde_json::to_string(&q).unwrap();
+        let back: Queue = serde_json::from_str(&json).unwrap();
+        let locals: Vec<_> = back
+            .tracks_in_order()
+            .filter_map(|t| t.id.local_path())
+            .collect();
+        assert_eq!(
+            locals,
+            [
+                std::path::PathBuf::from(r"D:\Music\a.flac"),
+                std::path::PathBuf::from(r"D:\Music\b.flac")
+            ],
+            "local files survive persistence with their paths"
+        );
+        assert_eq!(back.snapshot().source, Some(QueueSource::Local));
+    }
+
+    #[test]
     fn like_marks_all_occurrences() {
         let mut q = Queue::new();
         let a = tr("a");
