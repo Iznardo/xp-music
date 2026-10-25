@@ -106,6 +106,7 @@
           <label><input type="checkbox" bind:checked={draft.notifications} /> {t.options.notifications}</label>
           <label><input type="checkbox" bind:checked={draft.xpSounds} /> {t.options.xpSounds}</label>
           <label><input type="checkbox" bind:checked={draft.pauseOnLock} /> {t.options.pauseOnLock}</label>
+          <label><input type="checkbox" bind:checked={draft.discordPresence} /> {t.options.discordPresence}</label>
         </fieldset>
       {:else if tab === "keys"}
         <fieldset>

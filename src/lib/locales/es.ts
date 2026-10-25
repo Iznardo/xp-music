@@ -192,6 +192,7 @@ ${notes}` : ""}
     title: "Opciones",
     tabs: { player: "Reproductor", audio: "Audio", keys: "Teclado", account: "Cuenta", viz: "Visualización", about: "Acerca de" },
     pauseOnLock: "Pausar al bloquear el equipo",
+    discordPresence: "Mostrar lo que escucho en Discord",
     hotkeys: "Atajos globales (funcionan aunque XP Music esté en segundo plano)",
     hotkeyNames: { playPause: "Reproducir/Pausa", next: "Siguiente", previous: "Anterior", show: "Mostrar XP Music" },
     hotkeyHint: "Haz clic en un campo y pulsa la combinación (por ejemplo Ctrl+Alt+P). Supr la quita.",
