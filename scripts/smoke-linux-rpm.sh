@@ -4,7 +4,7 @@
 set -euo pipefail
 rpm=$(realpath "$1")
 scripts=$(realpath "$(dirname "$0")")
-# IPC_LOCK: Fedora's gnome-keyring-daemon aborts without that capability inside docker.
+# IPC_LOCK: the Fedora gnome-keyring-daemon aborts without that capability inside docker.
 docker run --rm --cap-add IPC_LOCK \
   -v "$rpm:/pkg/xp-music.rpm:ro" -v "$scripts:/scripts:ro" fedora:latest bash -euo pipefail -c '
     # Desktop packages the smoke test needs (Xvfb, WM, virtual keyboard, Secret Service, audio).
@@ -16,6 +16,6 @@ docker run --rm --cap-add IPC_LOCK \
     dnf install -y -q --setopt=install_weak_deps=False /pkg/xp-music.rpm \
       webkit2gtk4.1 libayatana-appindicator-gtk3
     test -x /usr/bin/xp-music
-    # Fedora's Xvfb defaults to 640x480x8 and the window (960x640) would not fit.
+    # The Fedora Xvfb defaults to 640x480x8 and the window (960x640) would not fit.
     xvfb-run -a -s "-screen 0 1280x1024x24" dbus-run-session -- bash /scripts/smoke-linux.sh /usr/bin/xp-music
   '
