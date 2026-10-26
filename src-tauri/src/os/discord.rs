@@ -103,14 +103,12 @@ fn build<'a>(
     if let Some(d) = duration_ms {
         times = times.end((start_ms + i64::from(d)) / 1000);
     }
-    // Discord shows `large_text` as the third line of the card, under the artist.
-    let assets = Assets::new()
-        .large_image(cover)
-        .large_url(&links.album)
-        .large_text(match &t.album {
-            Some(a) => fit(&a.name),
-            None => "XP Music".to_string(),
-        });
+    let mut assets = Assets::new().large_image(cover).large_url(&links.album);
+    // Discord shows `large_text` as the third line of the card, under the artist (not only as a
+    // tooltip). Without an album the line is left out.
+    if let Some(a) = &t.album {
+        assets = assets.large_text(fit(&a.name));
+    }
     let mut activity = Activity::new()
         .activity_type(ActivityType::Listening)
         .details(fit(&t.title))
@@ -278,7 +276,7 @@ mod tests {
         t.artists.clear();
         let a = activity(&t);
         assert_eq!(a["assets"]["large_image"], "icon-1024");
-        assert_eq!(a["assets"]["large_text"], "XP Music");
+        assert!(a["assets"].get("large_text").is_none());
         assert!(a.get("state").is_none());
         assert!(a.get("state_url").is_none());
         // No album id: the cover opens the track.
