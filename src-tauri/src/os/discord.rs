@@ -10,7 +10,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use discord_rich_presence::activity::{Activity, ActivityType, Assets, Timestamps};
 use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
 
-use crate::domain::Track;
+use crate::domain::{BrowseId, Track};
 use crate::player::types::{PlaybackStatus, PlayerState};
 
 /// Application ID of "XP Music" in the Discord Developer Portal (public, not a secret).
@@ -49,8 +49,40 @@ fn now_ms() -> i64 {
         .map_or(0, |d| d.as_millis() as i64)
 }
 
+/// Where each clickable part of the card goes on YouTube Music. Discord takes a single URL per
+/// part: the title opens the track, the artist line the first artist, the cover the album.
+struct Links {
+    track: String,
+    artist: Option<String>,
+    /// Falls back to the track when the album has no id.
+    album: String,
+}
+
+impl Links {
+    fn new(t: &Track) -> Self {
+        // A `TrackId` is the YouTube `videoId`; artist and album ids are `browseId`s.
+        let browse = |id: &BrowseId| format!("https://music.youtube.com/browse/{}", id.0);
+        let track = format!("https://music.youtube.com/watch?v={}", t.id.0);
+        Self {
+            artist: t.artists.iter().find_map(|a| a.id.as_ref()).map(browse),
+            album: t
+                .album
+                .as_ref()
+                .and_then(|a| a.id.as_ref())
+                .map_or_else(|| track.clone(), browse),
+            track,
+        }
+    }
+}
+
 /// What Discord shows for a track. `start_ms` is when it would have started at position 0.
-fn build(t: &Track, start_ms: i64, duration_ms: Option<u32>) -> Activity<'_> {
+/// `links` is borrowed because the activity holds references to it.
+fn build<'a>(
+    t: &'a Track,
+    links: &'a Links,
+    start_ms: i64,
+    duration_ms: Option<u32>,
+) -> Activity<'a> {
     let artist = t
         .artists
         .iter()
@@ -72,25 +104,32 @@ fn build(t: &Track, start_ms: i64, duration_ms: Option<u32>) -> Activity<'_> {
         times = times.end((start_ms + i64::from(d)) / 1000);
     }
     // Discord shows `large_text` as the third line of the card, under the artist.
-    let assets = Assets::new().large_image(cover).large_text(match &t.album {
-        Some(a) => fit(&a.name),
-        None => "XP Music".to_string(),
-    });
+    let assets = Assets::new()
+        .large_image(cover)
+        .large_url(&links.album)
+        .large_text(match &t.album {
+            Some(a) => fit(&a.name),
+            None => "XP Music".to_string(),
+        });
     let mut activity = Activity::new()
         .activity_type(ActivityType::Listening)
         .details(fit(&t.title))
+        .details_url(&links.track)
         .timestamps(times)
         .assets(assets);
     // Optional: without an artist the line is left out instead of showing a blank one.
     if !artist.is_empty() {
         activity = activity.state(fit(&artist));
+        if let Some(u) = &links.artist {
+            activity = activity.state_url(u);
+        }
     }
     activity
 }
 
 /// Sends the activity; `false` if Discord did not take it.
 fn publish(c: &mut DiscordIpcClient, t: &Track, start_ms: i64, duration_ms: Option<u32>) -> bool {
-    c.set_activity(build(t, start_ms, duration_ms))
+    c.set_activity(build(t, &Links::new(t), start_ms, duration_ms))
         .map_err(|e| tracing::warn!(error = %e, "Discord rejected the activity"))
         .is_ok()
 }
@@ -168,8 +207,8 @@ fn run(rx: Receiver<Box<PlayerState>>, enabled: impl Fn() -> bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::{build, fit};
-    use crate::domain::{AlbumRef, ArtistRef, Thumbnail, Track, TrackId};
+    use super::{Links, build, fit};
+    use crate::domain::{AlbumRef, ArtistRef, BrowseId, Thumbnail, Track, TrackId};
     use serde_json::{Value, json};
 
     fn track() -> Track {
@@ -177,11 +216,11 @@ mod tests {
             id: TrackId("id".into()),
             title: "Song".into(),
             artists: vec![ArtistRef {
-                id: None,
+                id: Some(BrowseId("UCartist".into())),
                 name: "Artist".into(),
             }],
             album: Some(AlbumRef {
-                id: None,
+                id: Some(BrowseId("MPREalbum".into())),
                 name: "Album".into(),
             }),
             duration_ms: Some(60_000),
@@ -197,7 +236,7 @@ mod tests {
     }
 
     fn activity(t: &Track) -> Value {
-        serde_json::to_value(build(t, 1_700_000_000_500, Some(60_000))).unwrap()
+        serde_json::to_value(build(t, &Links::new(t), 1_700_000_000_500, Some(60_000))).unwrap()
     }
 
     #[test]
@@ -216,6 +255,14 @@ mod tests {
         assert_eq!(a["state"], "Artist");
         assert_eq!(a["assets"]["large_image"], "https://example.com/cover.jpg");
         assert_eq!(a["assets"]["large_text"], "Album");
+        assert!(a.get("buttons").is_none());
+        // Title -> track, artist line -> first artist, cover -> album.
+        assert_eq!(a["details_url"], "https://music.youtube.com/watch?v=id");
+        assert_eq!(a["state_url"], "https://music.youtube.com/browse/UCartist");
+        assert_eq!(
+            a["assets"]["large_url"],
+            "https://music.youtube.com/browse/MPREalbum"
+        );
         // Seconds, not milliseconds.
         assert_eq!(
             a["timestamps"],
@@ -233,6 +280,12 @@ mod tests {
         assert_eq!(a["assets"]["large_image"], "icon-1024");
         assert_eq!(a["assets"]["large_text"], "XP Music");
         assert!(a.get("state").is_none());
+        assert!(a.get("state_url").is_none());
+        // No album id: the cover opens the track.
+        assert_eq!(
+            a["assets"]["large_url"],
+            "https://music.youtube.com/watch?v=id"
+        );
 
         // A cover URL Discord would reject is replaced too.
         let mut t = track();
