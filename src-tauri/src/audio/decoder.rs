@@ -7,7 +7,7 @@ use reqwest::blocking::Client;
 use rubato::{Fft, FixedSync, Resampler};
 use symphonia::core::codecs::audio::{AudioDecoder, AudioDecoderOptions};
 use symphonia::core::errors::Error as SymError;
-use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::probe::{Hint, Probe};
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo, TrackType};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
@@ -107,6 +107,19 @@ pub struct Decoding {
     pub duration_ms: Option<u32>,
 }
 
+/// Format detection for YouTube's streams: MP4 only, without the trailing-metadata readers
+/// the default probe has for local files. ID3v1 is read from the last 128 bytes, and during
+/// a fast start those are beyond the head the first URL serves: opening the stream would
+/// wait for yt-dlp's full URL (and its `available_at`), delaying the start by seconds.
+fn remote_probe() -> &'static Probe {
+    static PROBE: std::sync::OnceLock<Probe> = std::sync::OnceLock::new();
+    PROBE.get_or_init(|| {
+        let mut probe = Probe::new();
+        probe.register_format::<symphonia::default::formats::IsoMp4Reader<'_>>();
+        probe
+    })
+}
+
 impl Decoding {
     /// Blocking (network or disk): open from a helper thread, not from the engine.
     pub fn open(
@@ -147,7 +160,11 @@ impl Decoding {
                 (mss, Buffered::Local, Some(len), *duration_ms)
             }
         };
-        let format = symphonia::default::get_probe()
+        let formats = match stream {
+            MediaStream::Remote(_) => remote_probe(),
+            MediaStream::Local { .. } => symphonia::default::get_probe(),
+        };
+        let format = formats
             .probe(
                 &hint,
                 mss,

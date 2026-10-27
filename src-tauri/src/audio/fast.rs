@@ -154,6 +154,29 @@ mod tests {
         );
     }
 
+    /// With real YouTube: a fast start produces audio before yt-dlp's full URL exists.
+    /// Format detection must not read past the head (it used to probe for ID3v1 at the
+    /// end of the file and wait for the full URL, delaying the start by seconds).
+    /// `cargo test --lib -- --ignored --nocapture fast_start_plays_before_the_full_url`.
+    #[test]
+    #[ignore]
+    fn fast_start_plays_before_the_full_url() {
+        use crate::audio::decoder::{Decoding, MediaStream};
+        use crate::audio::resolver::Upgrade;
+        let t = std::time::Instant::now();
+        let mut head =
+            resolve_head(&TrackId("fJ9rUzIMcZQ".into()), FormatPreference::Aac128).unwrap();
+        // The full URL never arrives: only the head can be used.
+        head.upgrade = Some(Upgrade::default());
+        let client = reqwest::blocking::Client::new();
+        let mut dec = Decoding::open(client, &MediaStream::Remote(head), 0, 48_000, 2).unwrap();
+        let mut out = Vec::new();
+        dec.next_chunk(&mut out).unwrap();
+        println!("first audio in {} ms", t.elapsed().as_millis());
+        assert!(!out.is_empty());
+        assert!(t.elapsed() < std::time::Duration::from_secs(5));
+    }
+
     /// End to end with real YouTube: the start with the fast URL and the rest
     /// with yt-dlp's. `cargo test --lib -- --ignored --nocapture fast_start_full`.
     #[test]
