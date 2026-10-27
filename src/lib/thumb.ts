@@ -5,7 +5,7 @@ import type { Thumbnail } from "./bindings";
 import { isTauri } from "./platform";
 
 /// Local URL for a Google/YouTube image (in the preview, the original one).
-/// `cover:<path>` is the cover of a song on disk, served by the `cover` protocol.
+/// `cover:<key>` is the cover of a song on disk (an opaque key), served by the `cover` protocol.
 export function thumbUrl(url: string): string {
   if (url.startsWith("cover:")) return isTauri ? convertFileSrc(url.slice(6), "cover") : "";
   if (!isTauri || url.startsWith("data:")) return url;

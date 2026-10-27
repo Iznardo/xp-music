@@ -227,7 +227,7 @@ pub fn run() {
             let thumbs = Arc::clone(&thumbs);
             std::thread::spawn(move || responder.respond(thumbs.handle(&request)));
         })
-        // Covers of local songs: http://cover.localhost/<encoded path>
+        // Covers of local songs: http://cover.localhost/<cover key> (an opaque hash, not the path)
         .register_asynchronous_uri_scheme_protocol("cover", move |_ctx, request, responder| {
             let db = Arc::clone(&cover_db);
             std::thread::spawn(move || responder.respond(local::handle_cover(&db, &request)));

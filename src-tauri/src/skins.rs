@@ -23,7 +23,7 @@ const MAX_WMZ: u64 = 64 * 1024 * 1024;
 const MAX_DEPTH: usize = 4;
 
 const CSP: &str = "default-src 'none'; script-src skin: http://skin.localhost 'unsafe-eval'; \
-style-src 'unsafe-inline'; img-src blob: data: thumb: http://thumb.localhost; connect-src skin: http://skin.localhost";
+style-src 'unsafe-inline'; img-src blob: data: thumb: http://thumb.localhost cover: http://cover.localhost; connect-src skin: http://skin.localhost";
 
 /// The frame engine, embedded in the executable.
 const FRAME: &[(&str, &str)] = &[
@@ -255,7 +255,7 @@ mod tests {
                     "default-src 'none'",
                     "script-src skin: http://skin.localhost 'unsafe-eval'",
                     "style-src 'unsafe-inline'",
-                    "img-src blob: data: thumb: http://thumb.localhost",
+                    "img-src blob: data: thumb: http://thumb.localhost cover: http://cover.localhost",
                     "connect-src skin: http://skin.localhost",
                 ]
             );

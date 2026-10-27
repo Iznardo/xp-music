@@ -106,6 +106,15 @@ pub fn probe(path: &Path) -> Option<Box<dyn FormatReader>> {
         .ok()
 }
 
+/// Runs `f`, which parses `path` with symphonia, so that a parser panic on a malformed or
+/// hostile file is logged and treated as "nothing read" instead of killing the thread.
+pub fn guarded<T>(path: &Path, f: impl FnOnce() -> Option<T>) -> Option<T> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|_| {
+        tracing::warn!(path = %path.display(), "the audio parser panicked on this file; skipped");
+        None
+    })
+}
+
 /// Reads the tags of a file; `None` if it is not playable.
 pub fn read_tags(path: &Path) -> Option<Tags> {
     let mut format = probe(path)?;
@@ -320,7 +329,7 @@ pub fn scan(
             seen.insert(key);
             continue;
         }
-        let Some(tags) = read_tags(&path) else {
+        let Some(tags) = guarded(&path, || read_tags(&path)) else {
             tracing::debug!(path = %key, "not playable audio; skipped");
             continue;
         };

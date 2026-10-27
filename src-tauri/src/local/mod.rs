@@ -65,9 +65,19 @@ pub enum LocalFilter {
     Album { artist: String, title: String },
 }
 
+/// Opaque id of a song's cover in the `cover` protocol. The URL reaches the WMP skins,
+/// whose scripts come from third parties: it must not carry the file's path.
+fn cover_key(path: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(path.as_bytes())[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 fn cover_thumbs(path: Option<String>) -> Vec<Thumbnail> {
     path.map(|p| Thumbnail {
-        url: format!("{COVER_PREFIX}{p}"),
+        url: format!("{COVER_PREFIX}{}", cover_key(&p)),
         width: 300,
         height: 300,
     })
@@ -181,20 +191,24 @@ pub fn artists(db: &Db) -> AppResult<Vec<LocalArtist>> {
 
 // ---------------------------------------------------------------- covers
 
-/// Cover of a library song: the image embedded in the file or the one in its folder.
-/// Only paths that are in the library are served (never an arbitrary file).
-fn cover(db: &Db, path: &str) -> Option<(String, Vec<u8>)> {
-    use rusqlite::OptionalExtension;
-    let source: String = db
-        .conn()
-        .query_row(
-            "SELECT cover FROM local_tracks WHERE path = ?1",
-            [path],
-            |r| r.get(0),
-        )
-        .optional()
-        .ok()
-        .flatten()?;
+/// Cover of a library song, by its `cover_key`: the image embedded in the file or the
+/// one in its folder. Only songs in the library are served (never an arbitrary file).
+fn cover(db: &Db, key: &str) -> Option<(String, Vec<u8>)> {
+    if key.len() != 32 || !key.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    // The key is a hash: find the song it belongs to (hashing a path takes well under a
+    // microsecond, so even large libraries answer in a few milliseconds).
+    let (path, source) = {
+        let conn = db.conn();
+        let mut stmt = conn
+            .prepare("SELECT path, cover FROM local_tracks WHERE cover IS NOT NULL")
+            .ok()?;
+        let mut rows = stmt
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            .ok()?;
+        rows.find_map(|row| row.ok().filter(|(p, _)| cover_key(p) == key))?
+    };
     if source != scan::EMBEDDED {
         let bytes = std::fs::read(&source)
             .ok()
@@ -206,7 +220,12 @@ fn cover(db: &Db, path: &str) -> Option<(String, Vec<u8>)> {
         };
         return Some((mime.to_owned(), bytes));
     }
-    let mut format = scan::probe(Path::new(path))?;
+    scan::guarded(Path::new(&path), || embedded_cover(Path::new(&path)))
+}
+
+/// The image embedded in an audio file, preferring the front cover.
+fn embedded_cover(path: &Path) -> Option<(String, Vec<u8>)> {
+    let mut format = scan::probe(path)?;
     let mut metadata = format.metadata();
     let mut best: Option<symphonia::core::meta::Visual> = None;
     loop {
@@ -238,11 +257,12 @@ fn cover(db: &Db, path: &str) -> Option<(String, Vec<u8>)> {
     Some((mime, v.data.into_vec()))
 }
 
-/// `cover` protocol: `http://cover.localhost/<encoded song path>`.
+/// `cover` protocol: `http://cover.localhost/<cover_key>`. No CORS header: `<img>`
+/// does not need one, and without it no other page can read the covers.
 pub fn handle_cover(db: &Db, req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
-    let raw = req.uri().path().trim_start_matches('/');
-    let found = crate::yt::thumbs::percent_decode(raw).and_then(|p| cover(db, &p));
-    let builder = Response::builder().header("Access-Control-Allow-Origin", "*");
+    let key = req.uri().path().trim_start_matches('/');
+    let found = cover(db, key);
+    let builder = Response::builder();
     match found {
         Some((mime, bytes)) => builder
             .header("Content-Type", mime)
@@ -340,16 +360,20 @@ impl LocalLibrary {
                 done: 0,
                 total: 0,
             });
-            let result = scan::scan(&self.db, &folders, |done, total| {
-                if last.elapsed() >= PROGRESS_EVERY {
-                    last = Instant::now();
-                    self.emit(LocalScanStatus {
-                        scanning: true,
-                        done,
-                        total,
-                    });
-                }
-            });
+            // A panic must not leave `running` set: no scan would ever start again.
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                scan::scan(&self.db, &folders, |done, total| {
+                    if last.elapsed() >= PROGRESS_EVERY {
+                        last = Instant::now();
+                        self.emit(LocalScanStatus {
+                            scanning: true,
+                            done,
+                            total,
+                        });
+                    }
+                })
+            }))
+            .unwrap_or_else(|_| Err(crate::error::AppError::internal("the scan panicked")));
             let total = match result {
                 Ok(s) => {
                     tracing::info!(
@@ -558,16 +582,63 @@ mod tests {
     fn serves_embedded_covers_only_for_library_songs() {
         let (db, dir) = library();
         let song = dir.join("Moby - Play").join("03.mp3").display().to_string();
-        let (mime, bytes) = cover(&db, &song).expect("embedded cover");
+        let (mime, bytes) = cover(&db, &cover_key(&song)).expect("embedded cover");
         assert_eq!(mime, "image/jpeg");
         assert_eq!(&bytes[..3], &[0xFF, 0xD8, 0xFF]);
-        assert!(
-            cover(
-                &db,
-                &dir.join("Moby - Play").join("01.mp3").display().to_string()
-            )
-            .is_none()
+        let no_cover = dir.join("Moby - Play").join("01.mp3").display().to_string();
+        assert!(cover(&db, &cover_key(&no_cover)).is_none());
+        assert!(cover(&db, &cover_key(r"C:\Windows\win.ini")).is_none());
+        // Only keys: a path (or anything that is not 32 hex digits) finds nothing.
+        assert!(cover(&db, &song).is_none());
+        assert!(cover(&db, "../../etc/passwd").is_none());
+    }
+
+    /// The cover URL reaches the WMP skins (third-party scripts): it carries an opaque
+    /// key, never the song's path.
+    #[test]
+    fn cover_urls_do_not_carry_the_path() {
+        let (db, dir) = library();
+        let folder = dir.display().to_string();
+        let urls: Vec<String> = tracks(&db, &LocalFilter::All)
+            .unwrap()
+            .into_iter()
+            .flat_map(|t| t.thumbnails)
+            .chain(albums(&db).unwrap().into_iter().flat_map(|a| a.thumbnails))
+            .map(|t| t.url)
+            .collect();
+        assert!(!urls.is_empty());
+        for url in urls {
+            let key = url.strip_prefix(COVER_PREFIX).expect("cover URL");
+            assert_eq!(key.len(), 32, "{url}");
+            assert!(key.bytes().all(|b| b.is_ascii_hexdigit()), "{url}");
+            assert!(!url.contains(&folder) && !url.contains("Moby"), "{url}");
+        }
+    }
+
+    #[test]
+    fn cover_protocol_has_no_cors_header() {
+        let (db, dir) = library();
+        let song = dir.join("Moby - Play").join("03.mp3").display().to_string();
+        let get = |path: String| {
+            let req = Request::builder()
+                .uri(format!("http://cover.localhost/{path}"))
+                .body(Vec::new())
+                .unwrap();
+            handle_cover(&db, &req)
+        };
+        let ok = get(cover_key(&song));
+        assert_eq!(ok.status(), StatusCode::OK);
+        assert!(ok.headers().get("Access-Control-Allow-Origin").is_none());
+        assert_eq!(get("not-a-key".into()).status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn a_parser_panic_counts_as_unreadable() {
+        let hostile = std::path::Path::new("hostile.mp3");
+        assert_eq!(
+            scan::guarded(hostile, || -> Option<u8> { panic!("parser bug") }),
+            None
         );
-        assert!(cover(&db, r"C:\Windows\win.ini").is_none());
+        assert_eq!(scan::guarded(hostile, || Some(7)), Some(7));
     }
 }
