@@ -1001,6 +1001,7 @@ mod tests {
             &real.url,
             None,
             real.content_length,
+            real.available_at,
             None,
         )
         .unwrap();

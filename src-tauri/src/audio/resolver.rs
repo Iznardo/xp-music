@@ -42,6 +42,10 @@ pub struct ResolvedStream {
     pub duration_ms: Option<u32>,
     /// Unix seconds (the URL's `expire` parameter).
     pub expires_at: u64,
+    /// Unix seconds from which the URL works (yt-dlp's `available_at`): some
+    /// YouTube clients' URLs answer 403 for a few seconds after being issued.
+    #[serde(default)]
+    pub available_at: Option<u64>,
     pub user_agent: Option<String>,
     /// Fast start: this URL only serves the start and the full one arrives
     /// here later (see `fast.rs`). Never cached.
@@ -171,6 +175,7 @@ struct YtDlpInfo {
     format_id: String,
     filesize: Option<u64>,
     duration: Option<f64>,
+    available_at: Option<u64>,
     #[serde(default)]
     http_headers: HashMap<String, String>,
 }
@@ -267,6 +272,7 @@ fn parse_info(id: &TrackId, stdout: &[u8]) -> AppResult<ResolvedStream> {
         content_length: info.filesize,
         duration_ms: info.duration.map(|d| (d * 1000.0) as u32),
         expires_at,
+        available_at: info.available_at,
         user_agent: info.http_headers.get("User-Agent").cloned(),
         url: info.url,
         upgrade: None,
@@ -570,6 +576,7 @@ mod tests {
                 content_length: Some(10),
                 duration_ms: Some(1000),
                 expires_at: now + self.expires_in,
+                available_at: None,
                 user_agent: None,
                 upgrade: None,
             })
@@ -652,13 +659,14 @@ mod tests {
 
     #[test]
     fn parses_yt_dlp_output() {
-        let json = br#"{"url":"https://rr3.googlevideo.com/videoplayback?expire=1792466577&itag=140","format_id":"140","filesize":3449447,"duration":213.0,"http_headers":{"User-Agent":"Mozilla/5.0"}}"#;
+        let json = br#"{"url":"https://rr3.googlevideo.com/videoplayback?expire=1792466577&itag=140","format_id":"140","filesize":3449447,"duration":213.0,"available_at":1792466000,"http_headers":{"User-Agent":"Mozilla/5.0"}}"#;
         let s = parse_info(&TrackId("dQw4w9WgXcQ".into()), json).unwrap();
         assert_eq!(s.itag, 140);
         assert_eq!(s.expires_at, 1_792_466_577);
         assert_eq!(s.duration_ms, Some(213_000));
         assert_eq!(s.content_length, Some(3_449_447));
         assert_eq!(s.user_agent.as_deref(), Some("Mozilla/5.0"));
+        assert_eq!(s.available_at, Some(1_792_466_000));
     }
 
     /// Real test with yt-dlp: `cargo test -- --ignored resolves_for_real`.

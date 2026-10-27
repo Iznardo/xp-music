@@ -104,6 +104,7 @@ fn parse(id: &TrackId, pref: FormatPreference, v: &Value) -> AppResult<ResolvedS
         content_length: num(&f["contentLength"]),
         duration_ms: num(&f["approxDurationMs"]).map(|d| d as u32),
         expires_at,
+        available_at: None,
         user_agent: Some(UA.to_owned()),
         upgrade: None,
     })
@@ -176,6 +177,7 @@ mod tests {
             &head.url,
             head.user_agent.as_deref(),
             head.content_length,
+            head.available_at,
             Some(up),
         )
         .unwrap();
