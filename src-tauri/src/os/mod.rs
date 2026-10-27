@@ -1,6 +1,7 @@
 //! System integration (specs/006): tray, disposable window, system media
 //! controls, notifications, autostart and global shortcuts.
 
+pub mod discord;
 pub mod media;
 #[cfg(windows)]
 pub mod taskbar;
