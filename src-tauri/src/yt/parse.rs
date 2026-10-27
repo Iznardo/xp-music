@@ -781,10 +781,31 @@ fn card_shelf_top(card: &Value) -> Option<MediaItem> {
 
 /// Radio queue from `next` (and its continuation).
 pub fn radio_page(v: &Value) -> Page<Track> {
-    let mut tracks = Vec::new();
-    for r in find_all(v, "playlistPanelVideoRenderer") {
-        tracks.extend(panel_item(r));
+    // A `playlistPanelVideoWrapperRenderer` row carries the song (`primaryRenderer`)
+    // and its music video (`counterpart`): only the first one belongs in the queue.
+    fn walk<'a>(v: &'a Value, out: &mut Vec<&'a Value>) {
+        match v {
+            Value::Object(m) => {
+                for (k, x) in m {
+                    match k.as_str() {
+                        "playlistPanelVideoRenderer" => out.push(x),
+                        "counterpart" => {}
+                        _ => walk(x, out),
+                    }
+                }
+            }
+            Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+            _ => {}
+        }
     }
+    let mut rows = Vec::new();
+    walk(v, &mut rows);
+    let mut seen = std::collections::HashSet::new();
+    let tracks: Vec<Track> = rows
+        .into_iter()
+        .filter_map(panel_item)
+        .filter(|t| seen.insert(t.id.0.clone()))
+        .collect();
     let continuation = find_all(v, "nextRadioContinuationData")
         .into_iter()
         .chain(find_all(v, "nextContinuationData"))
@@ -973,6 +994,21 @@ mod tests {
         assert_eq!(t.duration_ms, Some(255_000));
         assert_eq!(t.album.unwrap().name, "We Broke The Rules");
         assert_eq!(t.artists.len(), 1);
+    }
+
+    #[test]
+    fn radio_skips_music_video_counterparts() {
+        let row = |id: &str, title: &str| json!({ "videoId": id, "title": { "runs": [ { "text": title } ] } });
+        let v = json!({ "contents": [
+            { "playlistPanelVideoRenderer": row("seed", "Seed") },
+            { "playlistPanelVideoWrapperRenderer": {
+                "primaryRenderer": { "playlistPanelVideoRenderer": row("u4mzqZg1i20", "Chi-Partner") },
+                "counterpart": [ { "counterpartRenderer": { "playlistPanelVideoRenderer": row("lSXi7k72X_g", "Chi-Partner") } } ]
+            } },
+            { "playlistPanelVideoRenderer": row("seed", "Seed") }
+        ] });
+        let ids: Vec<String> = radio_page(&v).items.into_iter().map(|t| t.id.0).collect();
+        assert_eq!(ids, ["seed", "u4mzqZg1i20"]);
     }
 
     #[test]
