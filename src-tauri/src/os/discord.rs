@@ -51,26 +51,33 @@ fn now_ms() -> i64 {
 
 /// Where each clickable part of the card goes on YouTube Music. Discord takes a single URL per
 /// part: the title opens the track, the artist line the first artist, the cover the album.
+#[derive(Default)]
 struct Links {
-    track: String,
+    track: Option<String>,
     artist: Option<String>,
     /// Falls back to the track when the album has no id.
-    album: String,
+    album: Option<String>,
 }
 
 impl Links {
     fn new(t: &Track) -> Self {
+        // A local file has no YouTube page, and its ids carry its path and tag names
+        // (`local:…`): nothing about it may end up in a link on the user's profile.
+        if t.id.is_local() {
+            return Self::default();
+        }
         // A `TrackId` is the YouTube `videoId`; artist and album ids are `browseId`s.
         let browse = |id: &BrowseId| format!("https://music.youtube.com/browse/{}", id.0);
         let track = format!("https://music.youtube.com/watch?v={}", t.id.0);
         Self {
             artist: t.artists.iter().find_map(|a| a.id.as_ref()).map(browse),
-            album: t
-                .album
-                .as_ref()
-                .and_then(|a| a.id.as_ref())
-                .map_or_else(|| track.clone(), browse),
-            track,
+            album: Some(
+                t.album
+                    .as_ref()
+                    .and_then(|a| a.id.as_ref())
+                    .map_or_else(|| track.clone(), browse),
+            ),
+            track: Some(track),
         }
     }
 }
@@ -90,12 +97,13 @@ fn build<'a>(
         .collect::<Vec<_>>()
         .join(", ");
     // The largest cover, straight from YouTube (Discord proxies external URLs up to 256 chars).
+    // Only public https images: a local song's cover is `cover:<path of the file>`.
     let cover = t
         .thumbnails
         .iter()
         .max_by_key(|x| x.width)
         .map(|x| x.url.as_str())
-        .filter(|u| u.len() <= 256)
+        .filter(|u| u.starts_with("https://") && u.len() <= 256)
         .unwrap_or(FALLBACK_IMAGE);
 
     // Discord's IPC takes Unix seconds (it also tolerates ms, but not every bridge does).
@@ -103,7 +111,10 @@ fn build<'a>(
     if let Some(d) = duration_ms {
         times = times.end((start_ms + i64::from(d)) / 1000);
     }
-    let mut assets = Assets::new().large_image(cover).large_url(&links.album);
+    let mut assets = Assets::new().large_image(cover);
+    if let Some(u) = &links.album {
+        assets = assets.large_url(u);
+    }
     // Discord shows `large_text` as the third line of the card, under the artist (not only as a
     // tooltip). Without an album the line is left out.
     if let Some(a) = &t.album {
@@ -112,9 +123,11 @@ fn build<'a>(
     let mut activity = Activity::new()
         .activity_type(ActivityType::Listening)
         .details(fit(&t.title))
-        .details_url(&links.track)
         .timestamps(times)
         .assets(assets);
+    if let Some(u) = &links.track {
+        activity = activity.details_url(u);
+    }
     // Optional: without an artist the line is left out instead of showing a blank one.
     if !artist.is_empty() {
         activity = activity.state(fit(&artist));
@@ -289,5 +302,30 @@ mod tests {
         let mut t = track();
         t.thumbnails[0].url = format!("https://example.com/{}", "x".repeat(300));
         assert_eq!(activity(&t)["assets"]["large_image"], "icon-1024");
+    }
+
+    /// A song from "My music" shows its tags, but nothing that would put the user's
+    /// folders on their public profile: no links (its ids are `local:…`) and no cover
+    /// (it is `cover:<path of the file>`).
+    #[test]
+    fn local_track_never_exposes_its_path() {
+        let path = r"C:\Users\someone\Music\Album\01 Song.flac";
+        let mut t = track();
+        t.id = TrackId::local(std::path::Path::new(path));
+        t.artists[0].id = Some(BrowseId("local:Artist".into()));
+        t.album.as_mut().unwrap().id = Some(BrowseId("local:Artist".into()));
+        t.thumbnails[0].url = format!("cover:{path}");
+
+        let a = activity(&t);
+        assert_eq!(a["details"], "Song");
+        assert_eq!(a["state"], "Artist");
+        assert_eq!(a["assets"]["large_text"], "Album");
+        assert_eq!(a["assets"]["large_image"], "icon-1024");
+        for url in ["details_url", "state_url"] {
+            assert!(a.get(url).is_none(), "{url}");
+        }
+        assert!(a["assets"].get("large_url").is_none());
+        let sent = a.to_string();
+        assert!(!sent.contains("someone") && !sent.contains("local:") && !sent.contains("cover:"));
     }
 }
