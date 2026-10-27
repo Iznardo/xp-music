@@ -22,6 +22,7 @@ use super::types::{
     InsertPosition, PlaybackStatus, PlayerError, PlayerState, PositionUpdate, QueueSnapshot,
     QueueSource, RepeatMode,
 };
+use crate::audio::decoder::MediaStream;
 use crate::audio::engine::{EngineCmd, EngineEvent, EngineHandle, EngineState};
 use crate::audio::resolver::{FormatPreference, ResolvedStream, StreamResolver, Upgrade};
 use crate::domain::{LikeStatus, Track, TrackId};
@@ -269,24 +270,25 @@ impl PlayerService {
         self.emit_state();
         // Without the current track in cache, the next ones wait for its yt-dlp to
         // finish (`resolve_for_play`): several at once when cold slow everything down.
-        if self
-            .resolver
-            .cached(&track.id, FormatPreference::Aac128)
-            .is_some()
+        if track.id.is_local()
+            || self
+                .resolver
+                .cached(&track.id, FormatPreference::Aac128)
+                .is_some()
         {
             self.prefetch_upcoming();
         }
 
         let svc = Arc::clone(self);
         thread::spawn(move || {
-            let result = svc.resolve_for_play(&track.id);
+            let result = svc.resolve_for_play(&track);
             {
                 let mut i = svc.lock();
                 if i.load_seq != seq {
                     return; // The user already asked for another song.
                 }
                 if let Ok(s) = &result {
-                    i.duration_ms = i.duration_ms.or(s.duration_ms);
+                    i.duration_ms = i.duration_ms.or(s.duration_ms());
                 }
             }
             match result {
@@ -304,9 +306,17 @@ impl PlayerService {
         *self.fast_start.lock().unwrap() = Some(f);
     }
 
-    /// What gets loaded into the engine: from the cache, with fast start (and the
-    /// full resolution in parallel) or, failing that, waiting for yt-dlp.
-    fn resolve_for_play(self: &Arc<Self>, id: &TrackId) -> AppResult<ResolvedStream> {
+    /// What gets loaded into the engine: a local file as is; a YouTube one from the
+    /// cache, with fast start (and the full resolution in parallel) or, failing
+    /// that, waiting for yt-dlp.
+    fn resolve_for_play(self: &Arc<Self>, track: &Track) -> AppResult<MediaStream> {
+        if track.id.is_local() {
+            return local_stream(track);
+        }
+        self.resolve_remote(&track.id).map(MediaStream::Remote)
+    }
+
+    fn resolve_remote(self: &Arc<Self>, id: &TrackId) -> AppResult<ResolvedStream> {
         let pref = FormatPreference::Aac128;
         if let Some(s) = self.resolver.cached(id, pref) {
             return Ok(s);
@@ -342,6 +352,7 @@ impl PlayerService {
 
     /// Resolves right now the tracks the user is about to pick.
     pub fn hint(&self, ids: Vec<TrackId>) {
+        let ids: Vec<TrackId> = ids.into_iter().filter(|id| !id.is_local()).collect();
         if !ids.is_empty() {
             let _ = self.hint_tx.send(ids);
         }
@@ -368,6 +379,8 @@ impl PlayerService {
                     }
                 })
                 .filter_map(|n| i.queue.track_at(n).map(|t| t.id.clone()))
+                // Local files need no resolution.
+                .filter(|id| !id.is_local())
                 .collect()
         };
         if !ids.is_empty() {
@@ -382,23 +395,30 @@ impl PlayerService {
                 .queue
                 .peek_next(true)
                 .and_then(|n| i.queue.track_at(n))
-                .map(|t| t.id.clone())
+                .cloned()
             else {
                 return;
             };
-            if i.preload_for.as_ref() == Some(&next) {
+            if i.preload_for.as_ref() == Some(&next.id) {
                 return;
             }
-            i.preload_for = Some(next.clone());
+            i.preload_for = Some(next.id.clone());
             next
         };
         let svc = Arc::clone(self);
-        thread::spawn(
-            move || match svc.resolver.resolve(&next, FormatPreference::Aac128) {
+        thread::spawn(move || {
+            let stream = if next.id.is_local() {
+                local_stream(&next)
+            } else {
+                svc.resolver
+                    .resolve(&next.id, FormatPreference::Aac128)
+                    .map(MediaStream::Remote)
+            };
+            match stream {
                 Ok(stream) => svc.engine.send(EngineCmd::Preload { stream }),
-                Err(e) => tracing::warn!(track = %next.0, error = %e, "could not preload"),
-            },
-        );
+                Err(e) => tracing::warn!(track = %next.id.0, error = %e, "could not preload"),
+            }
+        });
     }
 
     // ------------------------------------------------------------ transport
@@ -683,8 +703,13 @@ impl PlayerService {
     fn on_queue_end(self: &Arc<Self>) {
         let (autoplay, seed, exclude) = {
             let i = self.lock();
-            let seed = i.queue.current().map(|t| t.id.clone());
-            let exclude: Vec<TrackId> = i.queue.tracks_in_order().map(|t| t.id.clone()).collect();
+            let seed = radio_seed(&i.queue);
+            let exclude: Vec<TrackId> = i
+                .queue
+                .tracks_in_order()
+                .map(|t| t.id.clone())
+                .filter(|id| !id.is_local())
+                .collect();
             (i.queue.autoplay(), seed, exclude)
         };
         let Some(seed) = seed.filter(|_| autoplay) else {
@@ -841,7 +866,7 @@ impl PlayerService {
                 };
                 tracing::warn!(track = %track_id.0, position_ms, expired, retry, "stream failure");
                 if retry {
-                    if expired {
+                    if expired && !track_id.is_local() {
                         self.resolver.invalidate(&track_id);
                     }
                     self.play_current(position_ms, true);
@@ -898,6 +923,41 @@ impl PlayerService {
         self.save_now();
         self.engine.shutdown();
     }
+}
+
+/// A local track goes to the engine as is; it only has to still be on disk.
+fn local_stream(track: &Track) -> AppResult<MediaStream> {
+    let path = track
+        .id
+        .local_path()
+        .filter(|p| p.is_file())
+        .ok_or_else(|| {
+            AppError::new(
+                ErrorCode::NotFound,
+                tr!(
+                    "This file is no longer on disk.",
+                    "Este archivo ya no está en el disco."
+                ),
+            )
+        })?;
+    Ok(MediaStream::Local {
+        track_id: track.id.clone(),
+        path,
+        duration_ms: track.duration_ms,
+    })
+}
+
+/// Song the autoplay radio starts from: the current one or, if it is a local file
+/// (YouTube does not know it), the last YouTube song before it. A queue of only
+/// local files has none: playback stops at the end.
+fn radio_seed(queue: &Queue) -> Option<TrackId> {
+    let upto = queue.current_index()?;
+    queue
+        .tracks_in_order()
+        .take(upto + 1)
+        .filter(|t| !t.id.is_local())
+        .last()
+        .map(|t| t.id.clone())
 }
 
 /// Thread that resolves (and caches) the tracks it receives, one at a
@@ -1019,6 +1079,61 @@ mod bench {
         db.kv_set(POSITION_KEY, "54321").unwrap();
         let (queue, pos) = restore(&db);
         assert_eq!((queue.len(), pos), (3, 54_321));
+    }
+
+    fn local_track(path: &std::path::Path) -> Track {
+        Track {
+            id: TrackId::local(path),
+            duration_ms: Some(1234),
+            ..realistic_track(0)
+        }
+    }
+
+    #[test]
+    fn radio_starts_from_the_last_youtube_song() {
+        let dir = std::env::temp_dir();
+        let mut q = Queue::new();
+        q.set(
+            vec![
+                realistic_track(1),
+                local_track(&dir.join("a.mp3")),
+                realistic_track(2),
+                local_track(&dir.join("b.mp3")),
+            ],
+            3,
+            QueueSource::Manual,
+        );
+        assert_eq!(radio_seed(&q), Some(realistic_track(2).id));
+        q.play_index(0);
+        assert_eq!(radio_seed(&q), Some(realistic_track(1).id));
+
+        let mut only_local = Queue::new();
+        only_local.set(vec![local_track(&dir.join("a.mp3"))], 0, QueueSource::Local);
+        assert_eq!(
+            radio_seed(&only_local),
+            None,
+            "nothing for YouTube to go on"
+        );
+    }
+
+    #[test]
+    fn local_tracks_skip_resolution() {
+        let dir = std::env::temp_dir().join(format!("xp-music-svc-{}", rand::random::<u64>()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("song.flac");
+        std::fs::write(&path, b"x").unwrap();
+        let stream = local_stream(&local_track(&path)).unwrap();
+        assert_eq!(
+            stream,
+            MediaStream::Local {
+                track_id: TrackId::local(&path),
+                path: path.clone(),
+                duration_ms: Some(1234),
+            }
+        );
+        std::fs::remove_file(&path).unwrap();
+        let err = local_stream(&local_track(&path)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::NotFound);
     }
 
     #[test]

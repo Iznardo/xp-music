@@ -18,6 +18,14 @@ XP Music imita a Windows Media Player 9: una barra lateral con las tareas, el co
 
 El desplegable de arriba a la derecha muestra la lista que suena y permite cambiar a otra, activar el orden aleatorio o la radio (reproducción automática al terminar la cola).
 
+## Mi música
+
+XP Music también reproduce la música guardada en tu equipo, con o sin cuenta de YouTube Music. En la Biblioteca, abre **Mi música** y pulsa **Agregar carpeta…** (o usa la pestaña **Mi música** de Opciones). Se incluyen las subcarpetas, y las canciones se listan por canción, álbum y artista según sus etiquetas y portadas.
+
+Formatos admitidos: MP3, M4A/AAC (incluido ALAC), FLAC, Ogg Vorbis, WAV y AIFF. Los archivos Opus todavía no son compatibles. La biblioteca se vuelve a revisar al iniciar y cada vez que pulsas **Volver a buscar**; solo se leen de nuevo los archivos nuevos o modificados.
+
+Las canciones locales y las de YouTube pueden compartir la misma cola. Los "Me gusta", las listas, la radio y el historial son funciones de YouTube Music, así que no están disponibles para las canciones locales.
+
 ## Atajos de teclado
 
 | Atajo | Acción |

@@ -72,6 +72,8 @@ pub struct Settings {
     pub discord_presence: bool,
     /// Global shortcuts (006). Format `Ctrl+Alt+P`; `None` = no shortcut.
     pub hotkeys: HotkeySettings,
+    /// Folders of "My music" (local files), absolute paths.
+    pub local_folders: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq, Default)]
@@ -104,6 +106,7 @@ impl Default for Settings {
             pause_on_lock: false,
             discord_presence: false,
             hotkeys: HotkeySettings::default(),
+            local_folders: Vec::new(),
         }
     }
 }

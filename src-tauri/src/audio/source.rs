@@ -387,6 +387,47 @@ impl Drop for HttpRangeSource {
     }
 }
 
+/// `MediaSource` over a file on disk (local music). `MediaSourceStream` already
+/// buffers the reads, so there is nothing to download or keep around here.
+pub struct FileSource {
+    file: std::fs::File,
+    len: u64,
+}
+
+impl FileSource {
+    pub fn open(path: &std::path::Path) -> io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let len = file.metadata()?.len();
+        Ok(Self { file, len })
+    }
+
+    pub fn len(&self) -> u64 {
+        self.len
+    }
+}
+
+impl Read for FileSource {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.file.read(buf)
+    }
+}
+
+impl Seek for FileSource {
+    fn seek(&mut self, to: SeekFrom) -> io::Result<u64> {
+        self.file.seek(to)
+    }
+}
+
+impl symphonia::core::io::MediaSource for FileSource {
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        Some(self.len)
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test_server {
     //! Minimal HTTP server with Range support for tests.
@@ -489,6 +530,47 @@ mod tests {
         let mut tail = Vec::new();
         src.read_to_end(&mut tail).unwrap();
         assert_eq!(&tail[..], &data[data.len() - 10..]);
+    }
+
+    #[test]
+    fn file_source_reads_and_seeks() {
+        use symphonia::core::io::MediaSource;
+        let data = pattern(70_000);
+        let dir = crate::local::fixtures::temp_dir("file-source");
+        let path = dir.join("audio.bin");
+        std::fs::write(&path, &data).unwrap();
+
+        let mut src = FileSource::open(&path).unwrap();
+        assert_eq!(src.len(), data.len() as u64);
+        assert_eq!(src.byte_len(), Some(data.len() as u64));
+        assert!(src.is_seekable());
+
+        let mut buf = vec![0u8; 1000];
+        src.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf[..], &data[..1000]);
+
+        src.seek(SeekFrom::Start(65_000)).unwrap();
+        src.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf[..], &data[65_000..66_000]);
+
+        src.seek(SeekFrom::Current(-2000)).unwrap();
+        src.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf[..], &data[64_000..65_000]);
+
+        assert_eq!(
+            src.seek(SeekFrom::End(-10)).unwrap(),
+            data.len() as u64 - 10
+        );
+        let mut tail = Vec::new();
+        src.read_to_end(&mut tail).unwrap();
+        assert_eq!(&tail[..], &data[data.len() - 10..]);
+        assert_eq!(
+            src.read(&mut buf).unwrap(),
+            0,
+            "past the end there is nothing"
+        );
+
+        assert!(FileSource::open(&dir.join("missing.mp3")).is_err());
     }
 
     #[test]

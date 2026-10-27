@@ -14,7 +14,35 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::units::Time;
 
 use super::resolver::ResolvedStream;
-use super::source::{HttpRangeSource, SourceError, SourceProbe};
+use super::source::{FileSource, HttpRangeSource, SourceError, SourceProbe};
+use crate::domain::TrackId;
+
+/// What the engine plays: a YouTube stream already resolved or a file on disk.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MediaStream {
+    Remote(ResolvedStream),
+    Local {
+        track_id: TrackId,
+        path: std::path::PathBuf,
+        duration_ms: Option<u32>,
+    },
+}
+
+impl MediaStream {
+    pub fn track_id(&self) -> &TrackId {
+        match self {
+            Self::Remote(s) => &s.track_id,
+            Self::Local { track_id, .. } => track_id,
+        }
+    }
+
+    pub fn duration_ms(&self) -> Option<u32> {
+        match self {
+            Self::Remote(s) => s.duration_ms,
+            Self::Local { duration_ms, .. } => *duration_ms,
+        }
+    }
+}
 
 /// Why decoding failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +71,25 @@ fn classify(e: SymError) -> DecodeFailure {
     }
 }
 
+/// Where to measure how much audio is available ahead of the read position.
+enum Buffered {
+    Http(SourceProbe),
+    Local,
+}
+
+/// Duration stated by the container (local files without a duration tag).
+pub(crate) fn track_duration_ms(track: &symphonia::core::formats::Track) -> Option<u32> {
+    let time = match (track.time_base, track.duration) {
+        (Some(tb), Some(d)) => tb.calc_duration(d)?,
+        _ => {
+            let rate = track.codec_params.as_ref()?.audio()?.sample_rate?;
+            let frames = track.num_frames?;
+            return u32::try_from(frames * 1000 / rate.max(1) as u64).ok();
+        }
+    };
+    u32::try_from(time.as_millis()).ok()
+}
+
 pub struct Decoding {
     format: Box<dyn FormatReader>,
     decoder: Box<dyn AudioDecoder>,
@@ -54,33 +101,52 @@ pub struct Decoding {
     pending: Vec<f32>,
     decoded: Vec<f32>,
     resampled: Vec<f32>,
-    probe: SourceProbe,
+    probe: Buffered,
     /// Bytes per millisecond, to estimate how much is in the buffer.
     bytes_per_ms: f64,
     pub duration_ms: Option<u32>,
 }
 
 impl Decoding {
-    /// Blocking (network): open from a helper thread, not from the engine.
+    /// Blocking (network or disk): open from a helper thread, not from the engine.
     pub fn open(
         client: Client,
-        stream: &ResolvedStream,
+        stream: &MediaStream,
         start_ms: u32,
         out_rate: u32,
         out_ch: u16,
     ) -> Result<Self, DecodeFailure> {
-        let source = HttpRangeSource::open(
-            client,
-            &stream.url,
-            stream.user_agent.as_deref(),
-            stream.content_length,
-            stream.available_at,
-            stream.upgrade.clone(),
-        )?;
-        let probe = source.probe();
-        let mss = MediaSourceStream::new(Box::new(source), Default::default());
         let mut hint = Hint::new();
-        hint.with_extension("m4a");
+        let (mss, probe, byte_len, duration_ms) = match stream {
+            MediaStream::Remote(stream) => {
+                let source = HttpRangeSource::open(
+                    client,
+                    &stream.url,
+                    stream.user_agent.as_deref(),
+                    stream.content_length,
+                    stream.available_at,
+                    stream.upgrade.clone(),
+                )?;
+                let probe = Buffered::Http(source.probe());
+                hint.with_extension("m4a");
+                let mss = MediaSourceStream::new(Box::new(source), Default::default());
+                (mss, probe, stream.content_length, stream.duration_ms)
+            }
+            MediaStream::Local {
+                path, duration_ms, ..
+            } => {
+                let source = FileSource::open(path).map_err(|e| {
+                    tracing::warn!(error = %e, "could not open the local file");
+                    DecodeFailure::Format
+                })?;
+                let len = source.len();
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    hint.with_extension(&ext.to_ascii_lowercase());
+                }
+                let mss = MediaSourceStream::new(Box::new(source), Default::default());
+                (mss, Buffered::Local, Some(len), *duration_ms)
+            }
+        };
         let format = symphonia::default::get_probe()
             .probe(
                 &hint,
@@ -103,8 +169,9 @@ impl Decoding {
             .make_audio_decoder(&params, &AudioDecoderOptions::default())
             .map_err(classify)?;
 
-        let duration_ms = stream.duration_ms;
-        let bytes_per_ms = match (stream.content_length, duration_ms) {
+        // Without a known duration (untagged local file), the container's.
+        let duration_ms = duration_ms.or_else(|| track_duration_ms(track));
+        let bytes_per_ms = match (byte_len, duration_ms) {
             (Some(len), Some(d)) if d > 0 => len as f64 / d as f64,
             _ => 16.0, // ~128 kbps
         };
@@ -148,9 +215,14 @@ impl Decoding {
         Ok(())
     }
 
-    /// Estimate of how much is downloaded ahead, in ms.
+    /// Estimate of how much is downloaded ahead, in ms. A file on disk is all there.
     pub fn buffered_ms(&self) -> u32 {
-        (self.probe.buffered_ahead() as f64 / self.bytes_per_ms).min(u32::MAX as f64) as u32
+        match &self.probe {
+            Buffered::Http(p) => {
+                (p.buffered_ahead() as f64 / self.bytes_per_ms).min(u32::MAX as f64) as u32
+            }
+            Buffered::Local => self.duration_ms.unwrap_or(u32::MAX),
+        }
     }
 
     /// Decodes the next packet and appends to `out` the samples already
@@ -269,7 +341,70 @@ pub fn http_client() -> Client {
 
 #[cfg(test)]
 mod tests {
-    use super::map_channels;
+    use super::*;
+    use crate::local::fixtures::{mp3_with_id3, temp_dir, wav};
+
+    fn local(path: std::path::PathBuf, duration_ms: Option<u32>) -> MediaStream {
+        MediaStream::Local {
+            track_id: TrackId::local(&path),
+            path,
+            duration_ms,
+        }
+    }
+
+    fn decode_all(dec: &mut Decoding) -> usize {
+        let mut out = Vec::new();
+        while dec.next_chunk(&mut out).unwrap() {}
+        out.len()
+    }
+
+    #[test]
+    fn decodes_and_seeks_a_local_file() {
+        let dir = temp_dir("decode-local");
+        let path = dir.join("tone.WAV");
+        std::fs::write(&path, wav(44_100, 2, 88_200)).unwrap();
+
+        // No duration tag: the container's is used. 44.1 kHz → 48 kHz resampled.
+        let mut dec =
+            Decoding::open(http_client(), &local(path.clone(), None), 0, 48_000, 2).expect("opens");
+        assert_eq!(dec.duration_ms, Some(2000));
+        assert_eq!(dec.buffered_ms(), 2000, "a file on disk is all buffered");
+        let whole = decode_all(&mut dec) / 2;
+        assert!(whole.abs_diff(96_000) < 2_000, "frames: {whole}");
+
+        dec.seek(1500).unwrap();
+        let rest = decode_all(&mut dec) / 2;
+        assert!(
+            rest.abs_diff(24_000) < 2_000,
+            "frames after the seek: {rest}"
+        );
+
+        let started = Decoding::open(http_client(), &local(path, None), 1000, 48_000, 1).unwrap();
+        let mut started = started;
+        let half = decode_all(&mut started);
+        assert!(half.abs_diff(48_000) < 2_000, "mono, from 1 s: {half}");
+    }
+
+    #[test]
+    fn decodes_mp3_behind_an_id3_tag() {
+        let dir = temp_dir("decode-mp3");
+        let path = dir.join("song.mp3");
+        std::fs::write(&path, mp3_with_id3("T", "A", "B", 1, true)).unwrap();
+        let mut dec =
+            Decoding::open(http_client(), &local(path, Some(1000)), 0, 44_100, 2).expect("opens");
+        assert!(decode_all(&mut dec) > 0);
+    }
+
+    #[test]
+    fn missing_or_bogus_files_fail_cleanly() {
+        let dir = temp_dir("decode-bad");
+        let bogus = dir.join("bogus.flac");
+        std::fs::write(&bogus, b"definitely not flac").unwrap();
+        for path in [dir.join("missing.mp3"), bogus] {
+            let r = Decoding::open(http_client(), &local(path, None), 0, 48_000, 2);
+            assert!(matches!(r, Err(DecodeFailure::Format)));
+        }
+    }
 
     #[test]
     fn channel_mapping() {

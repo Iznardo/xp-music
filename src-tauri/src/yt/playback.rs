@@ -65,6 +65,13 @@ impl YtReporter {
 impl PlaybackReporter for YtReporter {
     fn on_track_started(&self, id: TrackId) {
         *self.0.current.lock().unwrap() = Some(id.clone());
+        // A local file: YouTube has no loudness for it nor a history to record it in.
+        if id.is_local() {
+            if let Some(p) = self.0.player.get().and_then(Weak::upgrade) {
+                p.set_gain_db(0.0);
+            }
+            return;
+        }
         let inner = Arc::clone(&self.0);
         tauri::async_runtime::spawn(async move {
             let started = Instant::now();

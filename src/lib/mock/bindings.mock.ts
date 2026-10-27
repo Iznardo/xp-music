@@ -12,6 +12,10 @@ import type {
   BrowserProfile,
   InsertPosition,
   LikeStatus,
+  LocalAlbum,
+  LocalArtist,
+  LocalFilter,
+  LocalScanStatus,
   MediaItem,
   Page,
   PlayerState,
@@ -58,6 +62,7 @@ function makeEvent<T>(name: string) {
 
 export const events = {
   authChanged: makeEvent<AuthStatus>("auth://changed"),
+  localScan: makeEvent<LocalScanStatus>("local://scan"),
   playerError: makeEvent<AppError>("player://error"),
   playerPosition: makeEvent<{ positionMs: number; bufferedMs: number }>("player://position"),
   playerState: makeEvent<PlayerState>("player://state"),
@@ -185,6 +190,7 @@ let settings: Settings = {
   pauseOnLock: false,
   discordPresence: false,
   hotkeys: { playPause: null, next: null, previous: null, show: null },
+  localFolders: [],
 };
 
 let queue: QueueSnapshot = { tracks: allTracks.slice(0, 12), currentIndex: 2, source: "Manual", autoplay: true, shuffle: false, repeat: "Off" };
@@ -261,6 +267,19 @@ function fakeViz() {
 let auth: AuthStatus = { SignedIn: { name: "Alex Rivera", handle: "@alexrivera", photo: null } };
 
 const v = <T>(x: T) => Promise.resolve(x);
+
+/// "My music" in the preview: some of the made-up songs, as if they were on disk.
+const MUSIC_DIR = "C:\\Users\\alex\\Music";
+function localTracks(): Track[] {
+  if (!settings.localFolders.length) return [];
+  return allTracks.slice(0, 24).map((t) => ({
+    ...t,
+    id: `local:${MUSIC_DIR}\\${t.title}.mp3`,
+    artists: t.artists.map((a) => ({ ...a, id: null })),
+    album: t.album ? { ...t.album, id: null } : null,
+    likeStatus: null,
+  }));
+}
 
 // ------------------------------------------------------------------ commands
 
@@ -372,6 +391,47 @@ export const commands = {
     queue = { ...queue, autoplay: e };
     emitQueue();
     return v(undefined);
+  },
+  localFolders: () => v(settings.localFolders),
+  localAddFolder: () => {
+    const folders = [...new Set([...settings.localFolders, MUSIC_DIR])];
+    return commands.settingsSet({ ...settings, localFolders: folders }).then(() => {
+      void events.localScan.emit({ scanning: true, done: 0, total: localTracks().length });
+      setTimeout(() => void events.localScan.emit({ scanning: false, done: localTracks().length, total: localTracks().length }), 600);
+      return { status: "ok" as const, data: folders };
+    });
+  },
+  localRemoveFolder: (path: string) => {
+    const folders = settings.localFolders.filter((f) => f !== path);
+    return commands.settingsSet({ ...settings, localFolders: folders }).then(() => ({ status: "ok" as const, data: folders }));
+  },
+  localRescan: () => v(undefined),
+  localScanStatus: () => v<LocalScanStatus>({ scanning: false, done: 0, total: 0 }),
+  localTracks: (f: LocalFilter) =>
+    ok(
+      localTracks().filter((t) =>
+        f === "All" ? true : "Artist" in f ? t.artists[0]?.name === f.Artist : t.album?.name === f.Album.title && t.artists[0]?.name === f.Album.artist,
+      ),
+    ),
+  localAlbums: () => {
+    const by = new Map<string, LocalAlbum>();
+    for (const t of localTracks()) {
+      const key = `${t.artists[0]?.name}|${t.album?.name}`;
+      const a = by.get(key) ?? { title: t.album?.name ?? "", artist: t.artists[0]?.name ?? "", year: 2004, trackCount: 0, thumbnails: t.thumbnails };
+      a.trackCount++;
+      by.set(key, a);
+    }
+    return ok([...by.values()]);
+  },
+  localArtists: () => {
+    const by = new Map<string, LocalArtist>();
+    for (const t of localTracks()) {
+      const name = t.artists[0]?.name ?? "";
+      const a = by.get(name) ?? { name, albumCount: 1, trackCount: 0, thumbnails: t.thumbnails };
+      a.trackCount++;
+      by.set(name, a);
+    }
+    return ok([...by.values()]);
   },
   authStatus: () => v(auth),
   authSignIn: () => ok([{ source: "App", index: 0, name: "Usuario de prueba", handle: "@prueba", photo: null }]),

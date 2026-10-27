@@ -4,6 +4,7 @@ mod audio;
 mod commands;
 mod domain;
 mod error;
+mod local;
 mod logging;
 mod os;
 mod player;
@@ -64,6 +65,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::queue_move,
             commands::queue_clear,
             commands::queue_set_autoplay,
+            commands::local_folders,
+            commands::local_add_folder,
+            commands::local_remove_folder,
+            commands::local_rescan,
+            commands::local_scan_status,
+            commands::local_tracks,
+            commands::local_albums,
+            commands::local_artists,
             commands::auth_status,
             commands::auth_sign_in,
             commands::auth_detect_browsers,
@@ -115,6 +124,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             player::types::PlayerError,
             yt::service::AuthStatus,
             yt::service::CacheUpdated,
+            local::LocalScanStatus,
             viz::VizFrame,
             updater::UpdateInfo,
         ])
@@ -189,6 +199,7 @@ pub fn run() {
         }
     }
     let thumbs = ThumbCache::new(dirs.thumbs.clone(), Arc::clone(&db));
+    let cover_db = Arc::clone(&db);
     let data_dir = dirs.data.clone();
 
     let app = tauri::Builder::default()
@@ -203,6 +214,8 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // Only used from Rust (folder picker for "My music"): no JS permissions.
+        .plugin(tauri_plugin_dialog::init())
         // Without a public key (development build) `update_check` rejects it before using it.
         .plugin(
             tauri_plugin_updater::Builder::new()
@@ -213,6 +226,11 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol("thumb", move |_ctx, request, responder| {
             let thumbs = Arc::clone(&thumbs);
             std::thread::spawn(move || responder.respond(thumbs.handle(&request)));
+        })
+        // Covers of local songs: http://cover.localhost/<encoded path>
+        .register_asynchronous_uri_scheme_protocol("cover", move |_ctx, request, responder| {
+            let db = Arc::clone(&cover_db);
+            std::thread::spawn(move || responder.respond(local::handle_cover(&db, &request)));
         })
         // WMP skins: http://skin.localhost/frame/… and /wmz/<id>
         .register_asynchronous_uri_scheme_protocol("skin", |_ctx, request, responder| {
@@ -247,6 +265,12 @@ pub fn run() {
             app.manage(viz::VizService::new(handle.clone(), Arc::clone(&player)));
             app.manage(Arc::clone(&yt));
             app.manage(Arc::clone(&player));
+            let local = local::LocalLibrary::new(Some(handle.clone()), Arc::clone(&db));
+            // Nothing runs for users without folders; with folders, an incremental pass.
+            if !local.folders().is_empty() {
+                local.rescan();
+            }
+            app.manage(local);
 
             tools::spawn_warmup();
             tools::spawn_daily_check();

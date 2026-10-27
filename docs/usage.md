@@ -18,6 +18,14 @@ XP Music imitates Windows Media Player 9: a side bar with the tasks, the content
 
 The drop-down at the top right shows the playlist that is playing and lets you switch to another one, turn on shuffle, or turn on radio (automatic playback when the queue ends).
 
+## My music
+
+XP Music also plays music stored on your computer, with or without a YouTube Music account. In the Library, open **My music** and press **Add folder…** (or use the **My music** tab in Options). Subfolders are included, and the songs are listed by song, album and artist using their tags and cover art.
+
+Supported formats: MP3, M4A/AAC (including ALAC), FLAC, Ogg Vorbis, WAV and AIFF. Opus files are not supported yet. The library is rescanned at startup and whenever you press **Rescan**; only new or changed files are read again.
+
+Local songs and YouTube songs can share the same queue. Likes, playlists, radio and the listening history are YouTube Music features, so they are not available for local songs.
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |

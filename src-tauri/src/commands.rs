@@ -10,7 +10,8 @@ use crate::domain::{
     AlbumDetail, AlbumSummary, ArtistDetail, ArtistSummary, BrowseId, LikeStatus, MediaItem, Page,
     PlaylistDetail, PlaylistId, PlaylistSummary, Privacy, SearchFilter, Section, Track, TrackId,
 };
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult, ErrorCode};
+use crate::local::{LocalAlbum, LocalArtist, LocalFilter, LocalLibrary, LocalScanStatus};
 use crate::player::service::PlayerService;
 use crate::player::types::{
     AudioDevice, InsertPosition, PlayerState, QueueSnapshot, QueueSource, RepeatMode,
@@ -36,9 +37,14 @@ pub fn settings_get(state: State<'_, AppState>) -> AppResult<Settings> {
 pub fn settings_set(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
+    local: Local<'_>,
     settings: Settings,
 ) -> AppResult<Settings> {
+    let folders_before = Settings::load(&state.db)?.local_folders;
     let saved = settings.save(&state.db)?;
+    if saved.local_folders != folders_before {
+        local.rescan();
+    }
     crate::os::apply_settings(&app, &saved);
     if let Err(e) = saved.clone().emit(&app) {
         tracing::warn!(error = %e, "could not emit settings://changed");
@@ -198,6 +204,96 @@ pub fn queue_set_autoplay(player: Player<'_>, enabled: bool) {
     player.queue_set_autoplay(enabled);
 }
 
+// ---------------------------------------------------------------- my music (local files)
+
+type Local<'a> = State<'a, Arc<LocalLibrary>>;
+
+#[tauri::command]
+#[specta::specta]
+pub fn local_folders(local: Local<'_>) -> Vec<String> {
+    local.folders()
+}
+
+/// Asks for one or more folders with the system dialog and adds them to the library.
+/// Returns the resulting list (unchanged if cancelled).
+#[tauri::command]
+#[specta::specta]
+pub async fn local_add_folder(app: tauri::AppHandle, local: Local<'_>) -> AppResult<Vec<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_title(tr!("Add a music folder", "Agregar una carpeta de música"))
+            .blocking_pick_folders()
+    })
+    .await
+    .map_err(|e| AppError::internal(e.to_string()))?;
+    let mut folders = local.folders();
+    let new: Vec<String> = picked
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|f| f.into_path().ok())
+        .map(|p| p.display().to_string())
+        .filter(|p| !folders.contains(p))
+        .collect();
+    if new.is_empty() {
+        return Ok(folders);
+    }
+    folders.extend(new);
+    local.inner().set_folders(folders)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn local_remove_folder(local: Local<'_>, path: String) -> AppResult<Vec<String>> {
+    let folders = local.folders().into_iter().filter(|f| *f != path).collect();
+    local.inner().set_folders(folders)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn local_rescan(local: Local<'_>) {
+    local.inner().rescan();
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn local_scan_status(local: Local<'_>) -> LocalScanStatus {
+    local.status()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn local_tracks(state: State<'_, AppState>, filter: LocalFilter) -> AppResult<Vec<Track>> {
+    crate::local::tracks(&state.db, &filter)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn local_albums(state: State<'_, AppState>) -> AppResult<Vec<LocalAlbum>> {
+    crate::local::albums(&state.db)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn local_artists(state: State<'_, AppState>) -> AppResult<Vec<LocalArtist>> {
+    crate::local::artists(&state.db)
+}
+
+/// Likes and playlists are YouTube's: a local file cannot go there.
+fn youtube_only(ids: &[TrackId]) -> AppResult<()> {
+    if ids.iter().any(TrackId::is_local) {
+        return Err(AppError::new(
+            ErrorCode::InvalidInput,
+            tr!(
+                "Songs from your computer cannot be sent to YouTube Music.",
+                "Las canciones de tu equipo no se pueden enviar a YouTube Music."
+            ),
+        ));
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------- YouTube Music session
 
 type YtState<'a> = State<'a, Arc<YtService>>;
@@ -350,6 +446,7 @@ pub async fn yt_search_suggestions(yt: YtState<'_>, query: String) -> AppResult<
 #[tauri::command]
 #[specta::specta]
 pub async fn yt_radio(yt: YtState<'_>, seed: TrackId) -> AppResult<Vec<Track>> {
+    youtube_only(std::slice::from_ref(&seed))?;
     yt.radio(seed).await
 }
 
@@ -363,6 +460,7 @@ pub async fn yt_rate(
     id: TrackId,
     status: LikeStatus,
 ) -> AppResult<()> {
+    youtube_only(std::slice::from_ref(&id))?;
     yt.rate(id.clone(), status).await?;
     player.set_like(&id, status);
     Ok(())
@@ -375,6 +473,7 @@ pub async fn yt_add_to_playlist(
     playlist: PlaylistId,
     tracks: Vec<TrackId>,
 ) -> AppResult<()> {
+    youtube_only(&tracks)?;
     yt.add_to_playlist(playlist, tracks).await
 }
 

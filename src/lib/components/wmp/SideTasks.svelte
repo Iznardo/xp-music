@@ -17,7 +17,8 @@
     {
       label: t.side.library,
       active: router.tab === "library" && !isLib("liked") && !isLib("history"),
-      go: () => router.go({ name: "library", section: "playlists" }),
+      // Without a YouTube session, the library is the music on this computer.
+      go: () => router.go(auth.signedIn ? { name: "library", section: "playlists" } : { name: "local", view: "songs" }),
     },
     { label: t.side.liked, active: isLib("liked"), go: () => router.go({ name: "library", section: "liked" }) },
     { label: t.side.history, active: isLib("history"), go: () => router.go({ name: "library", section: "history" }) },

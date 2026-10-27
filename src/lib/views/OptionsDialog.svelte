@@ -3,6 +3,7 @@
   import { commands, type AudioDevice, type Language, type Settings, type Theme, type ToolVersions, type VizPreset } from "../bindings";
   import { settings } from "../stores/settings.svelte";
   import { auth } from "../stores/auth.svelte";
+  import { local } from "../stores/local.svelte";
   import { ui } from "../stores/ui.svelte";
   import { updates } from "../stores/updates.svelte";
   import { t } from "../i18n.svelte";
@@ -10,7 +11,7 @@
   import DialogFrame from "../components/xp/DialogFrame.svelte";
   import { VIZ_ORDER } from "../viz/presets";
 
-  type Tab = "player" | "audio" | "keys" | "account" | "viz" | "about";
+  type Tab = "player" | "audio" | "keys" | "library" | "account" | "viz" | "about";
   type HotkeyName = keyof Settings["hotkeys"];
   const hotkeyNames: HotkeyName[] = ["playPause", "next", "previous", "show"];
 
@@ -60,7 +61,8 @@
   async function apply() {
     if (!draft) return;
     const deviceChanged = draft.outputDevice !== settings.current?.outputDevice;
-    await settings.update(draft);
+    // The folders are changed on their own (and right away): the draft's may be stale.
+    await settings.update({ ...draft, localFolders: local.folders });
     if (deviceChanged) await commands.playerSetDevice(draft.outputDevice);
   }
   async function accept() {
@@ -76,7 +78,7 @@
   }
 </script>
 
-<DialogFrame title={t.options.title} onclose={close} width={430}>
+<DialogFrame title={t.options.title} onclose={close} width={490}>
   {#if draft}
     <div class="tabs" role="tablist">
       {#each Object.entries(t.options.tabs) as [id, label]}
@@ -132,6 +134,24 @@
           <legend>{t.tabs.library}</legend>
           <label><input type="checkbox" bind:checked={draft.normalizeVolume} /> {t.options.normalize}</label>
           <label><input type="checkbox" bind:checked={draft.reportHistory} /> {t.options.reportHistory}</label>
+        </fieldset>
+      {:else if tab === "library"}
+        <fieldset>
+          <legend>{t.local.folders}</legend>
+          {#if local.folders.length}
+            <ul class="folders">
+              {#each local.folders as f (f)}
+                <li><span title={f}>{f}</span><button class="xp-btn" onclick={() => local.removeFolder(f)}>{t.local.remove}</button></li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="hint">{t.local.noFolders}</p>
+          {/if}
+          <div class="row">
+            <button class="xp-btn" onclick={() => local.addFolder()}>{t.local.addFolder}</button>
+            <button class="xp-btn" disabled={local.scan.scanning || !local.folders.length} onclick={() => local.rescan()}>{t.local.rescan}</button>
+          </div>
+          <p class="hint">{local.scan.scanning ? t.local.scanning(local.scan.done, local.scan.total) : t.local.foldersHint}</p>
         </fieldset>
       {:else if tab === "account"}
         <fieldset>
@@ -243,6 +263,26 @@
   }
   .about p {
     margin: 2px 0;
+  }
+  .folders {
+    margin: 0 0 4px;
+    padding: 0;
+    list-style: none;
+    max-height: 120px;
+    overflow: auto;
+  }
+  .folders li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+  }
+  .folders span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .brand {
     display: flex;

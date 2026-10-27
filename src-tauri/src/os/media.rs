@@ -193,10 +193,12 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
                             .map(|a| a.name.as_str())
                             .collect::<Vec<_>>()
                             .join(", ");
-                        // The largest cover, straight from YouTube.
+                        // The largest cover, straight from YouTube. A local song's is only
+                        // reachable through the app's own protocol: none for the system.
                         let cover = t
                             .thumbnails
                             .iter()
+                            .filter(|x| x.url.starts_with("http"))
                             .max_by_key(|x| x.width)
                             .map(|x| x.url.clone());
                         let _ = c.set_metadata(MediaMetadata {

@@ -15,9 +15,8 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use reqwest::blocking::Client;
 
-use super::decoder::{DecodeFailure, Decoding, http_client};
+use super::decoder::{DecodeFailure, Decoding, MediaStream, http_client};
 use super::output::{Output, PcmTap, perceptual_amplitude};
-use super::resolver::ResolvedStream;
 use crate::domain::TrackId;
 use crate::error::AppError;
 
@@ -28,12 +27,12 @@ const MIN_FREE_SAMPLES: usize = 4096;
 #[derive(Debug)]
 pub enum EngineCmd {
     Load {
-        stream: ResolvedStream,
+        stream: MediaStream,
         start_ms: u32,
         autoplay: bool,
     },
     Preload {
-        stream: ResolvedStream,
+        stream: MediaStream,
     },
     Play,
     Pause,
@@ -359,7 +358,7 @@ impl Engine {
         }
     }
 
-    fn load(&mut self, stream: ResolvedStream, start_ms: u32, autoplay: bool) {
+    fn load(&mut self, stream: MediaStream, start_ms: u32, autoplay: bool) {
         self.generation += 1;
         self.want_playing = autoplay;
         if !self.ensure_output() {
@@ -371,7 +370,7 @@ impl Engine {
             && self
                 .next
                 .as_ref()
-                .is_some_and(|n| n.track_id == stream.track_id)
+                .is_some_and(|n| &n.track_id == stream.track_id())
         {
             let next = self.next.take().expect("preload");
             self.start_active(next, 0, false);
@@ -389,14 +388,14 @@ impl Engine {
             let result = Decoding::open(client, &stream, start_ms, out_rate, out_ch);
             let _ = tx.send(Opened::Load {
                 generation,
-                track_id: stream.track_id,
+                track_id: stream.track_id().clone(),
                 start_ms,
                 result,
             });
         });
     }
 
-    fn preload(&mut self, stream: ResolvedStream) {
+    fn preload(&mut self, stream: MediaStream) {
         if !self.ensure_output() {
             return;
         }
@@ -409,7 +408,7 @@ impl Engine {
         thread::spawn(move || {
             let result = Decoding::open(client, &stream, 0, out_rate, out_ch);
             let _ = tx.send(Opened::Preload {
-                track_id: stream.track_id,
+                track_id: stream.track_id().clone(),
                 result,
             });
         });
@@ -733,7 +732,9 @@ mod tests {
     fn test_muted() -> bool {
         std::env::var_os("XP_MUSIC_TEST_AUDIBLE").is_none()
     }
-    use crate::audio::resolver::{FormatPreference, StreamResolver, ToolPaths, YtDlpResolver};
+    use crate::audio::resolver::{
+        FormatPreference, ResolvedStream, StreamResolver, ToolPaths, YtDlpResolver,
+    };
 
     fn wait_for(
         rx: &Receiver<EngineEvent>,
@@ -758,6 +759,81 @@ mod tests {
         None
     }
 
+    /// Local files through the real output (muted): start, seek, PCM for the
+    /// visualization, gapless into a second file and the end.
+    /// `cargo test --lib -- --ignored --nocapture engine_local`.
+    #[test]
+    #[ignore]
+    fn engine_local_files_play_seek_and_chain() {
+        use crate::local::fixtures::{temp_dir, wav};
+        use ringbuf::traits::Observer;
+        let dir = temp_dir("engine-local");
+        let stream = |name: &str, secs: u32| {
+            let path = dir.join(name);
+            std::fs::write(&path, wav(44_100, 2, 44_100 * secs)).unwrap();
+            MediaStream::Local {
+                track_id: TrackId::local(&path),
+                path,
+                duration_ms: None,
+            }
+        };
+        let (a, b) = (stream("a.wav", 4), stream("b.wav", 2));
+        let (tx, rx) = unbounded();
+        let engine = EngineHandle::spawn(tx);
+        engine.send(EngineCmd::SetVolume {
+            volume: 0.5,
+            muted: test_muted(),
+        });
+        engine.send(EngineCmd::SetTap(true));
+        let t0 = Instant::now();
+        engine.send(EngineCmd::Load {
+            stream: a.clone(),
+            start_ms: 0,
+            autoplay: true,
+        });
+        let started = wait_for(&rx, Duration::from_secs(5), |e| {
+            matches!(e, EngineEvent::TrackStarted { .. })
+        })
+        .expect("did not start");
+        println!("first sound: {} ms", t0.elapsed().as_millis());
+        assert!(
+            matches!(
+                started,
+                EngineEvent::TrackStarted {
+                    duration_ms: Some(4000),
+                    ..
+                }
+            ),
+            "{started:?}"
+        );
+
+        engine.send(EngineCmd::Seek(2500));
+        wait_for(
+            &rx,
+            Duration::from_secs(5),
+            |e| matches!(e, EngineEvent::Position { position_ms, .. } if *position_ms >= 2600),
+        )
+        .expect("the seek does not play");
+        let tap = engine.take_tap().expect("PCM tap for the visualization");
+        assert!(tap.consumer.occupied_len() > 0, "no audio reaches the tap");
+
+        engine.send(EngineCmd::Preload { stream: b.clone() });
+        let mut ended_a = false;
+        wait_for(&rx, Duration::from_secs(5), |e| {
+            ended_a |= matches!(e, EngineEvent::Ended { track_id } if track_id == a.track_id());
+            matches!(e, EngineEvent::TrackStarted { track_id, gapless: true, .. } if track_id == b.track_id())
+        })
+        .expect("the second file did not follow");
+        assert!(!ended_a, "there was a gap between the files");
+        wait_for(
+            &rx,
+            Duration::from_secs(5),
+            |e| matches!(e, EngineEvent::Ended { track_id } if track_id == b.track_id()),
+        )
+        .expect("the end was not reported");
+        engine.shutdown();
+    }
+
     /// Visualization with real music (muted): audio reaches the tap even with
     /// the volume at 0 and beats are detected, also after releasing and
     /// retaking the tap. `cargo test --lib -- --ignored --nocapture viz_real`.
@@ -778,7 +854,7 @@ mod tests {
         });
         engine.send(EngineCmd::SetTap(true));
         engine.send(EngineCmd::Load {
-            stream: s,
+            stream: MediaStream::Remote(s),
             start_ms: 30_000,
             autoplay: true,
         });
@@ -848,7 +924,7 @@ mod tests {
         // 1) First sound with the URL already resolved (same as cached): target < 1 s.
         let t0 = Instant::now();
         engine.send(EngineCmd::Load {
-            stream: a.clone(),
+            stream: MediaStream::Remote(a.clone()),
             start_ms: 0,
             autoplay: true,
         });
@@ -880,7 +956,9 @@ mod tests {
         );
 
         // 3) Preload and gapless transition: the first track must not send `Ended`.
-        engine.send(EngineCmd::Preload { stream: b.clone() });
+        engine.send(EngineCmd::Preload {
+            stream: MediaStream::Remote(b.clone()),
+        });
         let mut ended_a = false;
         let started_b = wait_for(&rx, Duration::from_secs(20), |e| {
             if matches!(e, EngineEvent::Ended { .. }) {
@@ -950,7 +1028,7 @@ mod tests {
             muted: test_muted(),
         });
         engine.send(EngineCmd::Load {
-            stream: failing,
+            stream: MediaStream::Remote(failing),
             start_ms: 0,
             autoplay: true,
         });
@@ -984,7 +1062,7 @@ mod tests {
 
         // What the service would do: re-resolve and load at the same position.
         engine.send(EngineCmd::Load {
-            stream: healthy,
+            stream: MediaStream::Remote(healthy),
             start_ms: position_ms,
             autoplay: true,
         });

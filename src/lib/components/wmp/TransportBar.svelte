@@ -6,7 +6,7 @@
   import { player } from "../../stores/player.svelte";
   import { ui } from "../../stores/ui.svelte";
   import { router } from "../../router.svelte";
-  import { artistNames, fmtTime, playlistChoices, setLike } from "../../actions";
+  import { artistNames, fmtTime, isLocal, playlistChoices, setLike } from "../../actions";
   import { t } from "../../i18n.svelte";
   import Slider from "../xp/Slider.svelte";
   import { place, radii, type Piece, type Rect } from "../../skin";
@@ -25,6 +25,8 @@
 
   const track = $derived(st?.track ?? null);
   const liked = $derived(track?.likeStatus === "Like");
+  // Likes and playlists are YouTube's: not for songs on disk.
+  const ytOnly = $derived(!track || isLocal(track));
 
   function addMenu(e: MouseEvent) {
     if (!track) return;
@@ -172,14 +174,14 @@
   <button
     class="flat heart"
     class:on={liked}
-    disabled={!track}
+    disabled={ytOnly}
     title={liked ? t.menu.unlike : t.menu.like}
     aria-pressed={liked}
     onclick={() => track && setLike(track, !liked)}
   >
     <svg viewBox="0 0 16 16"><path d="M8 13.5S2 9.8 2 5.8C2 4 3.4 2.7 5 2.7c1.3 0 2.4.8 3 1.9.6-1.1 1.7-1.9 3-1.9 1.6 0 3 1.3 3 3.1 0 4-6 7.7-6 7.7z" stroke="currentColor" stroke-width="1.3" style:fill={liked ? "currentColor" : "none"} /></svg>
   </button>
-  <button class="flat" disabled={!track} title={t.menu.addToPlaylist} aria-label={t.menu.addToPlaylist} aria-haspopup="menu" onclick={addMenu}>
+  <button class="flat" disabled={ytOnly} title={t.menu.addToPlaylist} aria-label={t.menu.addToPlaylist} aria-haspopup="menu" onclick={addMenu}>
     <svg viewBox="0 0 16 16"><path d="M2 4h8M2 8h8M2 12h5M12 9v6M9 12h6" stroke="currentColor" stroke-width="1.4" style:fill="none" /></svg>
   </button>
   <button

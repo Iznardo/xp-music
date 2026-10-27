@@ -40,6 +40,18 @@ export const commands = {
 	queueMove: (from: number, to: number) => __TAURI_INVOKE<void>("queue_move", { from, to }),
 	queueClear: () => __TAURI_INVOKE<void>("queue_clear"),
 	queueSetAutoplay: (enabled: boolean) => __TAURI_INVOKE<void>("queue_set_autoplay", { enabled }),
+	localFolders: () => __TAURI_INVOKE<string[]>("local_folders"),
+	/**
+	 *  Asks for one or more folders with the system dialog and adds them to the library.
+	 *  Returns the resulting list (unchanged if cancelled).
+	 */
+	localAddFolder: () => typedError<string[], AppError>(__TAURI_INVOKE("local_add_folder")),
+	localRemoveFolder: (path: string) => typedError<string[], AppError>(__TAURI_INVOKE("local_remove_folder", { path })),
+	localRescan: () => __TAURI_INVOKE<void>("local_rescan"),
+	localScanStatus: () => __TAURI_INVOKE<LocalScanStatus>("local_scan_status"),
+	localTracks: (filter: LocalFilter) => typedError<Track[], AppError>(__TAURI_INVOKE("local_tracks", { filter })),
+	localAlbums: () => typedError<LocalAlbum[], AppError>(__TAURI_INVOKE("local_albums")),
+	localArtists: () => typedError<LocalArtist[], AppError>(__TAURI_INVOKE("local_artists")),
 	authStatus: () => __TAURI_INVOKE<AuthStatus>("auth_status"),
 	/**  Opens the Google sign-in window and returns the accounts of that session. */
 	authSignIn: () => typedError<SessionAccount[], AppError>(__TAURI_INVOKE("auth_sign_in")),
@@ -122,6 +134,7 @@ export const commands = {
 /** Events */
 export const events = {
 	authChanged: makeEvent<AuthStatus>("auth://changed"),
+	localScan: makeEvent<LocalScanStatus>("local://scan"),
 	playerError: makeEvent<PlayerError>("player://error"),
 	playerPosition: makeEvent<PositionUpdate>("player://position"),
 	playerState: makeEvent<PlayerState>("player://state"),
@@ -245,6 +258,35 @@ export type Language = "en" | "es";
 
 export type LikeStatus = "Like" | "Dislike" | "Indifferent";
 
+export type LocalAlbum = {
+	/**  Empty = untagged. */
+	title: string,
+	artist: string,
+	year: number | null,
+	trackCount: number,
+	thumbnails: Thumbnail[],
+};
+
+export type LocalArtist = {
+	/**  Empty = untagged. */
+	name: string,
+	albumCount: number,
+	trackCount: number,
+	thumbnails: Thumbnail[],
+};
+
+/**  Which songs to list. */
+export type LocalFilter = "All" | ({ Artist: string }) & { Album?: never } | ({ Album: {
+	artist: string,
+	title: string,
+} }) & { Artist?: never };
+
+export type LocalScanStatus = {
+	scanning: boolean,
+	done: number,
+	total: number,
+};
+
 /**  Item of a Home, artist or search section. */
 export type MediaItem = ({ Track: Track }) & { Album?: never; Artist?: never; Playlist?: never } | ({ Playlist: PlaylistSummary }) & { Album?: never; Artist?: never; Track?: never } | ({ Album: AlbumSummary }) & { Artist?: never; Playlist?: never; Track?: never } | ({ Artist: ArtistSummary }) & { Album?: never; Playlist?: never; Track?: never };
 
@@ -307,7 +349,9 @@ export type QueueSnapshot = {
 };
 
 /**  Where the queue came from (for autoplay and the UI). */
-export type QueueSource = ({ Playlist: PlaylistId }) & { Album?: never; Radio?: never; Search?: never } | ({ Album: BrowseId }) & { Playlist?: never; Radio?: never; Search?: never } | ({ Radio: TrackId }) & { Album?: never; Playlist?: never; Search?: never } | ({ Search: string }) & { Album?: never; Playlist?: never; Radio?: never } | "Library" | "Manual";
+export type QueueSource = ({ Playlist: PlaylistId }) & { Album?: never; Radio?: never; Search?: never } | ({ Album: BrowseId }) & { Playlist?: never; Radio?: never; Search?: never } | ({ Radio: TrackId }) & { Album?: never; Playlist?: never; Search?: never } | ({ Search: string }) & { Album?: never; Playlist?: never; Radio?: never } | "Library" | 
+/**  "My music" (files on disk). */
+"Local" | "Manual";
 
 export type RepeatMode = "Off" | "All" | "One";
 
@@ -351,6 +395,8 @@ export type Settings = {
 	discordPresence: boolean,
 	/**  Global shortcuts (006). Format `Ctrl+Alt+P`; `None` = no shortcut. */
 	hotkeys: HotkeySettings,
+	/**  Folders of "My music" (local files), absolute paths. */
+	localFolders: string[],
 };
 
 export type SkinInfo = {
@@ -390,7 +436,10 @@ export type Track = {
 	setVideoId: string | null,
 };
 
-/**  YouTube `videoId` (11 characters). */
+/**
+ *  YouTube `videoId` (11 characters) or a file on disk as `local:<absolute path>`.
+ *  A videoId never contains `:`, so the two cannot collide.
+ */
 export type TrackId = string;
 
 export type UiSound = 

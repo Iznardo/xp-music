@@ -7,10 +7,9 @@
   import { appWindow } from "../platform";
   import Visualization from "../viz/Visualization.svelte";
   import { VIZ_ORDER } from "../viz/presets";
-  import { artistNames, fmtTime, trackMenu } from "../actions";
+  import { artistNames, fmtTime, goAlbum as goAlbumOf, goArtist as goArtistOf, trackMenu } from "../actions";
   import { player } from "../stores/player.svelte";
   import { ui } from "../stores/ui.svelte";
-  import { router } from "../router.svelte";
   import { thumbSrc } from "../thumb";
   import { t } from "../i18n.svelte";
   import ListView from "../components/xp/ListView.svelte";
@@ -55,12 +54,10 @@
   ];
 
   function goArtist() {
-    const a = st?.track?.artists.find((x) => x.id);
-    if (a?.id) router.go({ name: "artist", id: a.id });
+    if (st?.track) goArtistOf(st.track);
   }
   function goAlbum() {
-    const id = st?.track?.album?.id;
-    if (id) router.go({ name: "album", id });
+    if (st?.track) goAlbumOf(st.track);
   }
 </script>
 

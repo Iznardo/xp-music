@@ -29,7 +29,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data: thumb: http://thumb.localhost https://*.googleusercontent.com https://*.ggpht.com https://i.ytimg.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src skin: http://skin.localhost"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data: thumb: http://thumb.localhost cover: http://cover.localhost https://*.googleusercontent.com https://*.ggpht.com https://i.ytimg.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src skin: http://skin.localhost"
     }
   },
   "bundle": {
