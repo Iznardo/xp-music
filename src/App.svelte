@@ -20,7 +20,7 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "./lib/skin";
+  import { SKIN, outlinePath, place, sidePodPath, skinLayout, tabLayerPath } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/i18n.svelte";
   import logo from "./assets/logo.webp";
@@ -52,6 +52,7 @@
   const L = $derived(winW && winH ? skinLayout(winW, winH, !ui.sideCollapsed) : null);
   const outline = $derived(L ? outlinePath(L) : "");
   const sidePod = $derived(L ? sidePodPath(L) : null);
+  const tabLayer = $derived(L ? tabLayerPath(L) : null);
   let outlineEl = $state<SVGPathElement>();
 
   // The outline (with its joins) is the shape for clicks: clicks on transparent areas
@@ -172,12 +173,24 @@
           <!-- Beyond the side panel (the pod) the light tone continues. -->
           <stop offset="1" class="sf-mid" />
         </linearGradient>
-        <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 1} x2="0" y2={winH}>
-          <!-- No effect above the pod; inside it, highlight on top and shadow below. -->
+        <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 30} x2="0" y2={winH}>
+          <!-- No effect above the pod; the highlight fades in over the 30px above it (no
+               visible step), then turns into a shadow towards the bottom. -->
           <stop offset="0" stop-color="#fff" stop-opacity="0" />
-          <stop offset="0.01" stop-color="#fff" stop-opacity="0.1" />
+          <stop offset={30 / (SKIN.pod.h + 30)} stop-color="#fff" stop-opacity="0.1" />
           <stop offset="1" stop-color="#000" stop-opacity="0.1" />
         </linearGradient>
+        <!-- Playlist tab layer: raised control colors, fading into the shell at the bottom. -->
+        <linearGradient id="tab-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={L.content.y}>
+          <stop offset="0" class="tb-1" />
+          <stop offset="0.6" class="tb-2" />
+          <stop offset="1" class="tb-2" stop-opacity="0" />
+        </linearGradient>
+        <linearGradient id="tab-edge" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={L.content.y}>
+          <stop offset="0.4" class="tb-edge" />
+          <stop offset="1" class="tb-edge" stop-opacity="0" />
+        </linearGradient>
+        <clipPath id="outline-clip"><path d={outline} /></clipPath>
       </defs>
       <path d={outline} bind:this={outlineEl} class="shell-fill" />
       {#if sidePod}
@@ -185,6 +198,15 @@
         <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
         <!-- Top-to-bottom highlight over the controls area, seamless. -->
         <path d={sidePod} fill="url(#side-shade)" />
+      {/if}
+      {#if tabLayer}
+        <!-- The tab is its own layer over the body: lighter, with a rim and a shadow on its S. -->
+        <g clip-path="url(#outline-clip)">
+          <path d={tabLayer.fill} fill="url(#tab-fill)" />
+          <!-- Shadow only on the rim: under the faded fill it would show through. -->
+          <path d={tabLayer.edge} fill="none" stroke="url(#tab-edge)" class="tab-rim" />
+          <path d={tabLayer.edge} fill="none" stroke="#fff" stroke-opacity="0.5" transform="translate(1.5 0)" />
+        </g>
       {/if}
     </svg>
     {#if L.side}
@@ -298,6 +320,18 @@
   }
   :global(.sf-edge) {
     stop-color: var(--side-bottom);
+  }
+  :global(.tb-1) {
+    stop-color: var(--btn-1);
+  }
+  :global(.tb-2) {
+    stop-color: var(--btn-2);
+  }
+  :global(.tb-edge) {
+    stop-color: var(--btn-border);
+  }
+  .tab-rim {
+    filter: drop-shadow(-2px 1px 2px rgb(0 0 0 / 0.35));
   }
   :global(.sf-mid) {
     stop-color: var(--side-top);

@@ -108,8 +108,7 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
       `L ${c.p0[0]} ${t(c.p0[1])}`,
       `C ${c.c1[0]} ${t(c.c1[1])} ${c.c2[0]} ${t(c.c2[1])} ${c.p3[0]} ${t(c.p3[1])}`,
       // Beyond its width, the side panel only occupies the top strip (the rise).
-      `L ${c.p3[0]} ${s.topBar}`,
-      `L ${s.sideW} ${s.topBar}`,
+      shoulder(c.p3[0], 0),
       `L ${s.sideW} ${t(tp.p3[1])}`,
       "Z",
     ].join(" ");
@@ -147,6 +146,14 @@ function sideCurve(bodyY: number) {
     c2: [to - m, bodyY] as const,
     p3: [to, bodyY] as const,
   };
+}
+
+/// Where the rise ends, the side panel's color curves down in an S to its right edge
+/// across the top strip (as in WMP 9) instead of being cut vertically.
+function shoulder(x: number, top: number): string {
+  const { sideW, topBar } = SKIN;
+  const mid = top + topBar / 2;
+  return `C ${x} ${mid} ${sideW} ${mid} ${sideW} ${top + topBar}`;
 }
 
 /// S narrowing of the side panel's lower part: from the left edge (vertical)
@@ -189,8 +196,7 @@ export function sidePodPath(l: SkinLayout): string {
     `A ${k} ${k} 0 0 1 ${k} ${SKIN.sideTop}`,
     `L ${c.p0[0]} ${c.p0[1]}`,
     `C ${c.c1[0]} ${c.c1[1]} ${c.c2[0]} ${c.c2[1]} ${c.p3[0]} ${c.p3[1]}`,
-    `L ${c.p3[0]} ${side.y + SKIN.topBar}`,
-    `L ${SKIN.sideW} ${side.y + SKIN.topBar}`,
+    shoulder(c.p3[0], side.y),
     `L ${SKIN.sideW} ${pod.y}`,
     `L ${cr} ${pod.y}`,
     `A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`,
@@ -199,6 +205,19 @@ export function sidePodPath(l: SkinLayout): string {
     `C ${tp.c2[0]} ${tp.c2[1]} ${tp.c1[0]} ${tp.c1[1]} ${tp.p0[0]} ${tp.p0[1]}`,
     "Z",
   ].join(" ");
+}
+
+/// Playlist tab as its own layer over the body (as in WMP 9): from the end of the top
+/// strip it rises in an S to the top edge and covers the rest of the strip. `edge` is
+/// just the S, for its rim. Clip it with the outline (its top-right corner is square).
+export function tabLayerPath(l: SkinLayout): { fill: string; edge: string } {
+  const x0 = l.topBar.x + l.topBar.w;
+  const y0 = l.content.y;
+  const x1 = l.tab.x + 12;
+  const m = (x1 - x0) / 2;
+  const edge = `M ${x0} ${y0} C ${x0 + m} ${y0} ${x1 - m} 0 ${x1} 0`;
+  const right = l.tab.x + l.tab.w;
+  return { edge, fill: `${edge} L ${right} 0 L ${right} ${y0} Z` };
 }
 
 /// Concave fillet between the horizontal line `y = line` (the shape lies above) and
@@ -217,7 +236,6 @@ function lineCircleFillet(line: number, cx: number, cy: number, r: number, f: nu
 /// region.
 export function outlinePath(l: SkinLayout): string {
   const { body, tab, pod, side } = l;
-  const bx = body.x;
   const by = body.y;
   const bb = body.y + body.h;
   const right = body.x + body.w;
