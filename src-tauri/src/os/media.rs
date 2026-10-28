@@ -14,7 +14,9 @@ use std::time::Duration;
 
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
+    SeekDirection,
 };
+use tauri::AppHandle;
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 #[cfg(windows)]
@@ -96,6 +98,7 @@ pub enum MediaMsg {
 
 /// Starts the thread. On Windows, `pause_on_lock` is queried on every lock.
 pub fn start(
+    app: AppHandle,
     player: Arc<PlayerService>,
     pause_on_lock: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Sender<MediaMsg> {
@@ -117,12 +120,12 @@ pub fn start(
     }
     thread::Builder::new()
         .name("os-media".into())
-        .spawn(move || run(player, rx))
+        .spawn(move || run(app, player, rx))
         .expect("media controls thread");
     tx
 }
 
-fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
+fn run(app: AppHandle, player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
     #[cfg(windows)]
     let hwnd = {
         let Some(hwnd) = create_hidden_window() else {
@@ -160,6 +163,26 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
             MediaControlEvent::SetPosition(MediaPosition(d)) => {
                 p.seek(d.as_millis().min(u32::MAX as u128) as u32)
             }
+            // MPRIS `Volume` writes (DMS, playerctl volume, ...).
+            MediaControlEvent::SetVolume(v) => p.set_volume(v as f32),
+            // MPRIS `Seek(offset)` (`playerctl position 10+`, ...).
+            MediaControlEvent::SeekBy(dir, d) => {
+                let pos = p.state().position_ms;
+                let d = d.as_millis().min(u32::MAX as u128) as u32;
+                p.seek(match dir {
+                    SeekDirection::Forward => pos.saturating_add(d),
+                    SeekDirection::Backward => pos.saturating_sub(d),
+                })
+            }
+            // Same as the tray menu's "Show" and "Exit".
+            MediaControlEvent::Raise => {
+                let a = app.clone();
+                let _ = app.run_on_main_thread(move || super::show_main(&a));
+            }
+            MediaControlEvent::Quit => {
+                let a = app.clone();
+                let _ = app.run_on_main_thread(move || super::quit(&a));
+            }
             _ => {}
         });
         if let Err(e) = res {
@@ -169,6 +192,8 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
 
     let mut last_track: Option<String> = None;
     let mut last_status: Option<PlaybackStatus> = None;
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut last_volume: Option<f32> = None;
     loop {
         // Messages for the hidden window (session lock).
         // SAFETY: standard message loop of the thread that owns the window.
@@ -221,6 +246,12 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
                         PlaybackStatus::Idle | PlaybackStatus::Error => MediaPlayback::Stopped,
                     };
                     let _ = c.set_playback(pb);
+                }
+                // Only MPRIS exposes a volume property.
+                #[cfg(all(unix, not(target_os = "macos")))]
+                if Some(s.volume) != last_volume {
+                    last_volume = Some(s.volume);
+                    let _ = c.set_volume(s.volume as f64);
                 }
             }
             Err(RecvTimeoutError::Timeout) => {}

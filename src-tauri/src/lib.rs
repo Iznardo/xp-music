@@ -281,7 +281,7 @@ pub fn run() {
                 tracing::error!(error = %e, "could not create the tray icon");
             }
             let lock_db = Arc::clone(&db);
-            let media = os::media::start(Arc::clone(&player), move || {
+            let media = os::media::start(handle.clone(), Arc::clone(&player), move || {
                 settings::Settings::load(&lock_db)
                     .map(|s| s.pause_on_lock)
                     .unwrap_or(false)
