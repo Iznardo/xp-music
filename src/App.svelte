@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { MediaQuery } from "svelte/reactivity";
   import TitleBar from "./lib/components/xp/TitleBar.svelte";
   import ContextMenu from "./lib/components/xp/ContextMenu.svelte";
   import Dialogs from "./lib/components/xp/Dialogs.svelte";
@@ -34,7 +35,13 @@
     document.title = title;
   });
 
-  // The theme is applied on <html> so every CSS variable sees it.
+  // Theme and light/dark mode go on <html> so every CSS variable sees them.
+  const systemDark = new MediaQuery("(prefers-color-scheme: dark)");
+  $effect(() => {
+    const appearance = settings.current?.appearance ?? "System";
+    const dark = appearance === "Dark" || (appearance === "System" && systemDark.current);
+    document.documentElement.dataset.mode = dark ? "dark" : "light";
+  });
   $effect(() => {
     document.documentElement.dataset.theme = (settings.current?.theme ?? "Blue").toLowerCase();
   });
@@ -318,8 +325,8 @@
     flex-direction: column;
     min-width: 0;
     background: var(--surface);
-    border: 1px solid #5b6fa6;
-    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+    border: 1px solid var(--content-border);
+    box-shadow: 0 0 0 1px var(--content-halo);
     overflow: hidden;
   }
   .content.dark {
@@ -336,8 +343,8 @@
     place-items: center;
     border: 1px solid var(--skin-edge);
     border-radius: 5px 0 0 5px;
-    background: linear-gradient(to right, #fff, var(--shell-3));
-    color: var(--skin-deep);
+    background: linear-gradient(to right, var(--shell-1), var(--shell-3));
+    color: var(--shell-ink);
     cursor: pointer;
   }
   .handle svg {
@@ -352,7 +359,7 @@
     height: 14px;
     cursor: nwse-resize;
     background:
-      linear-gradient(135deg, transparent 0 55%, #6d82b8 55% 62%, transparent 62% 70%, #6d82b8 70% 77%, transparent 77% 85%, #6d82b8 85% 92%, transparent 92%);
+      linear-gradient(135deg, transparent 0 55%, var(--wmp-line) 55% 62%, transparent 62% 70%, var(--wmp-line) 70% 77%, transparent 77% 85%, var(--wmp-line) 85% 92%, transparent 92%);
   }
   .about {
     display: flex;

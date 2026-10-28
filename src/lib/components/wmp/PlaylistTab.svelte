@@ -87,8 +87,8 @@
     padding: 0 0 0 4px;
     border: 1px solid var(--btn-soft-border);
     border-radius: 2px;
-    background: #fff;
-    color: #000;
+    background: var(--view-bg);
+    color: var(--text);
     font: 12px var(--font-ui);
     text-align: left;
     box-shadow: inset 1px 1px 2px rgb(0 0 40 / 0.2);
@@ -107,7 +107,7 @@
     text-overflow: ellipsis;
   }
   .count {
-    color: #666;
+    color: var(--text-faint);
     font-size: 10px;
   }
   .arrow {
@@ -136,7 +136,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--skin-deep);
+    color: var(--shell-ink);
     cursor: pointer;
   }
   .win button:hover {

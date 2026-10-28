@@ -319,15 +319,15 @@
     padding: 0 8px;
     border: 1px solid var(--skin-edge);
     border-radius: 3px;
-    background: linear-gradient(to bottom, #fff, #e3e8f3 60%, #c3cde2);
-    color: #000;
+    background: var(--np-header);
+    color: var(--text);
   }
   .q-title {
     flex: 1;
     font-weight: bold;
   }
   .q-count {
-    color: #555;
+    color: var(--text-muted);
   }
   .queue footer {
     display: flex;

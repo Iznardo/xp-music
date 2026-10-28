@@ -106,8 +106,8 @@
     flex: 1;
     min-width: 0;
     overflow-y: auto;
-    border: 1px solid #7f9db9;
-    background: #fff;
+    border: 1px solid var(--input-border);
+    background: var(--view-bg);
   }
   .list button {
     display: block;
@@ -123,12 +123,12 @@
     cursor: default;
   }
   .list button.sel {
-    background: #316ac5;
+    background: var(--selection);
     color: #fff;
   }
   .empty {
     margin: 8px;
-    color: #555;
+    color: var(--text-muted);
   }
   .side {
     display: flex;
@@ -138,7 +138,7 @@
   .preview {
     position: relative;
     overflow: hidden;
-    border: 1px solid #7f9db9;
+    border: 1px solid var(--input-border);
     background: repeating-conic-gradient(#e4e4e4 0 25%, #fff 0 50%) 0 0 / 12px 12px;
   }
   .preview iframe {
@@ -160,7 +160,7 @@
     display: grid;
     place-items: center;
     margin: 0;
-    color: #555;
+    color: var(--text-muted);
   }
   .name {
     margin: 0;
@@ -175,6 +175,6 @@
   }
   .count {
     flex: 1;
-    color: #555;
+    color: var(--text-muted);
   }
 </style>

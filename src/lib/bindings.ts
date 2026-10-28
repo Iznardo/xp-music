@@ -194,6 +194,11 @@ export type AppError = {
 	recoverable: boolean,
 };
 
+/**  Light or dark variant of the color scheme; combines with any `Theme`. */
+export type Appearance = 
+/**  Follow the system preference (`prefers-color-scheme`). */
+"System" | "Light" | "Dark";
+
 export type ArtistDetail = {
 	summary: ArtistSummary,
 	description: string | null,
@@ -373,6 +378,7 @@ export type SessionAccount = {
 
 export type Settings = {
 	theme: Theme,
+	appearance: Appearance,
 	/**  `None` = follow the system language. */
 	language: Language | null,
 	/**  0.0..=1.0 */

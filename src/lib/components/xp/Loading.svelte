@@ -30,20 +30,20 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    color: #444;
+    color: var(--text-muted);
   }
   .err {
     font-weight: bold;
-    color: #a01010;
+    color: var(--error);
   }
   /* XP indeterminate progress bar: green blocks that advance. */
   .marquee {
     position: relative;
     width: 160px;
     height: 14px;
-    border: 1px solid #686868;
+    border: 1px solid var(--input-border);
     border-radius: 3px;
-    background: #fff;
+    background: var(--view-bg);
     overflow: hidden;
     box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.2);
   }

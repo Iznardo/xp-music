@@ -168,8 +168,8 @@
     cursor: pointer;
   }
   .account:hover {
-    border-color: #a6b9de;
-    background: #eef3fc;
+    border-color: var(--hover-border);
+    background: var(--hover-bg);
   }
   .account img,
   .avatar {
@@ -185,14 +185,14 @@
     font-weight: bold;
   }
   .help {
-    color: #555;
+    color: var(--text-muted);
     margin: 4px 0 !important;
   }
   .warn {
-    color: #8a4b00;
+    color: var(--warn);
   }
   .err {
-    color: #a01010;
+    color: var(--error);
   }
   .buttons {
     display: flex;

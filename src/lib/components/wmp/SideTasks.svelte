@@ -125,7 +125,8 @@
     padding: 0 6px;
     border: 1px solid var(--skin-edge);
     border-radius: 9px;
-    background: #fff;
+    background: var(--view-bg);
+    color: var(--text);
     font: inherit;
     outline: none;
   }

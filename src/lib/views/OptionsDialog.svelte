@@ -1,6 +1,6 @@
 <script lang="ts">
   // Options in the style of an XP property sheet (FR-004-14).
-  import { commands, type AudioDevice, type Language, type Settings, type Theme, type ToolVersions, type VizPreset } from "../bindings";
+  import { commands, type Appearance, type AudioDevice, type Language, type Settings, type Theme, type ToolVersions, type VizPreset } from "../bindings";
   import { settings } from "../stores/settings.svelte";
   import { auth } from "../stores/auth.svelte";
   import { local } from "../stores/local.svelte";
@@ -54,6 +54,7 @@
   }
 
   const themes: Theme[] = ["Blue", "Olive", "Silver"];
+  const appearances: Appearance[] = ["System", "Light", "Dark"];
   // Each language is named in itself, so it can be found whatever the current one is.
   const languages: [Language, string][] = [["en", "English"], ["es", "Español"]];
   const vizs: VizPreset[] = VIZ_ORDER;
@@ -91,6 +92,12 @@
           <legend>{t.options.theme}</legend>
           {#each themes as th}
             <label><input type="radio" name="theme" checked={draft.theme === th} onchange={() => draft && (draft.theme = th)} /> {t.options.themes[th]}</label>
+          {/each}
+        </fieldset>
+        <fieldset>
+          <legend>{t.options.appearance}</legend>
+          {#each appearances as ap}
+            <label><input type="radio" name="appearance" checked={draft.appearance === ap} onchange={() => draft && (draft.appearance = ap)} /> {t.options.appearances[ap]}</label>
           {/each}
         </fieldset>
         <fieldset>
@@ -220,17 +227,17 @@
     position: relative;
     top: 1px;
     padding: 3px 8px;
-    border: 1px solid #919b9c;
+    border: 1px solid var(--tab-border);
     border-bottom: 0;
     border-radius: 3px 3px 0 0;
-    background: linear-gradient(to bottom, #fff, #ecebe5 80%, #d8d2c6);
+    background: var(--ctl-face);
     font: inherit;
   }
   .tab.active {
     z-index: 1;
     padding-bottom: 5px;
     margin-top: -2px;
-    background: #fcfcfe;
+    background: var(--view-bg);
     box-shadow: inset 0 2px #f9b63c;
   }
   .page {
@@ -239,8 +246,8 @@
     gap: 8px;
     min-height: 220px;
     padding: 10px;
-    border: 1px solid #919b9c;
-    background: #fcfcfe;
+    border: 1px solid var(--tab-border);
+    background: var(--view-bg);
   }
   fieldset label {
     display: flex;
@@ -259,7 +266,7 @@
   }
   .hint {
     margin: 6px 0 0;
-    color: #555;
+    color: var(--text-muted);
   }
   .about p {
     margin: 2px 0;

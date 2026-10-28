@@ -22,6 +22,16 @@ pub enum Theme {
     Silver,
 }
 
+/// Light or dark variant of the color scheme; combines with any `Theme`.
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Appearance {
+    /// Follow the system preference (`prefers-color-scheme`).
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
 #[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum AudioQuality {
     /// itag 140
@@ -50,6 +60,7 @@ pub enum VizPreset {
 #[tauri_specta(event_name = "settings://changed")]
 pub struct Settings {
     pub theme: Theme,
+    pub appearance: Appearance,
     /// `None` = follow the system language.
     pub language: Option<Language>,
     /// 0.0..=1.0
@@ -89,6 +100,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: Theme::Blue,
+            appearance: Appearance::System,
             language: None,
             volume: 0.8,
             normalize_volume: true,
@@ -210,6 +222,7 @@ mod tests {
     fn old_json_without_new_fields_is_valid() {
         let s = Settings::from_stored_json(r#"{"theme":"Silver"}"#);
         assert_eq!(s.theme, Theme::Silver);
+        assert_eq!(s.appearance, Appearance::System);
         assert_eq!(s.volume, 0.8);
     }
 

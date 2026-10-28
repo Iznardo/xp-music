@@ -99,12 +99,57 @@
   --wmp-active-glow: rgb(230 232 245 / 0.5);
 }
 
+/* Content area (classic XP controls, lists, views). Shared by the light themes; a
+   theme only overrides what it changes (see [data-theme="dark"] at the end).
+   Components must use these instead of literal colors. */
 :root {
+  --control-scheme: light; /* color-scheme of native controls (select popups, checkboxes) */
   --surface: #ece9d8;
   --surface-light: #fbfaf6;
   --border-dark: #aca899;
   --text: #000;
   --text-muted: #555;
+  --text-faint: #707070;
+  --text-disabled: #aca899;
+  --heading: #0b2c6b;
+  --link: #0b3c99;
+  --legend: #0046d5;
+  --error: #a01010;
+  --warn: #8a4b00;
+  --view-bg: #fff; /* lists, inputs, menus, tab pages */
+  --view-alt: #f5f6fa; /* background behind views */
+  --row-alt: #f7f9fd;
+  --pane-1: #fbfcff; /* light panels (tree pane, detail header), top/left */
+  --pane-2: #e6edf8;
+  --rule: #a9bbd9; /* separators and panel borders */
+  --input-border: #7f9db9;
+  --fieldset-border: #d0d0bf;
+  --tab-border: #919b9c;
+  --hover-bg: #eef3fc;
+  --hover-border: #c4d3ee;
+  --sel-soft: #dde7f8; /* selection without focus */
+  --art-bg: linear-gradient(135deg, #e7ecf5, #c4cee2);
+  --art-border: #a6b2c8;
+  --ctl-face: linear-gradient(to bottom, #ffffff 0%, #ecebe6 86%, #d6d0c5 100%);
+  --ctl-face-pressed: linear-gradient(to bottom, #cdcac3, #e3e3db 8%, #f2f1ec);
+  --ctl-border: #003c74;
+  --ctl-border-disabled: #c9c7ba;
+  --list-header: linear-gradient(to bottom, #ffffff, #f1efe2 80%, #e2ddc9);
+  --list-header-border: #c7c5b2;
+  --list-col-border: #dbd8c7;
+  --rail-bg: #e5e4dc;
+  --rail-shadow: #9d9c99;
+  --rail-light: #fff;
+  --scroll-track: linear-gradient(to right, #eeede5, #f3f1e8);
+  --scroll-thumb: linear-gradient(to right, #c8d6fb, #b9cbf3 50%, #a9bfed);
+  --scroll-thumb-hover: linear-gradient(to right, #d9e4fd, #cbdaf8 50%, #bccdf3);
+  --scroll-button: linear-gradient(to bottom, #c8d6fb, #a9bfed);
+  --scroll-edge: #9eb4e6;
+  --scroll-border: #fff;
+  --content-border: #5b6fa6;
+  --content-halo: rgb(255 255 255 / 0.6);
+  --np-header: linear-gradient(to bottom, #fff, #e3e8f3 60%, #c3cde2);
+  --toggle-on: #148a14;
   --font-ui: Tahoma, "Segoe UI", sans-serif;
   --font-title: "Trebuchet MS", Tahoma, sans-serif;
 }
@@ -115,8 +160,9 @@
   --skin-hi: #9cc0ff;
   --skin-top: #4f86e8;
   --skin-mid: #2a5bc9;
+  --tint: #2a5bc9; /* seed hue for the dark mode (see the end) */
   --skin-low: #163a94;
-  --skin-deep: #0c2367;
+  --shell-ink: #0c2367; /* icons and glyphs drawn on the shell */
   --skin-edge: #06143f;
   --side-top: #6d9cf0;
   --side-bottom: #2d5cc4;
@@ -147,8 +193,9 @@
   --skin-hi: #d8e6b4;
   --skin-top: #a3b874;
   --skin-mid: #7d934c;
+  --tint: #7d934c;
   --skin-low: #5a6e30;
-  --skin-deep: #3d4c1f;
+  --shell-ink: #3d4c1f;
   --skin-edge: #1f2810;
   --side-top: #b6c98a;
   --side-bottom: #75893f;
@@ -176,8 +223,9 @@
   --skin-hi: #ffffff;
   --skin-top: #d7d8e2;
   --skin-mid: #aeb0c0;
+  --tint: #8a8c9f;
   --skin-low: #8a8c9f;
-  --skin-deep: #5d5f70;
+  --shell-ink: #5d5f70;
   --skin-edge: #33343f;
   --side-top: #e6e7ee;
   --side-bottom: #9fa1b3;
@@ -210,4 +258,110 @@
   --dark-list-text: #cfdcff;
   --dark-list-sel: #23407f;
   --dark-list-current: #5cff5c;
+}
+
+/* Dark mode: <html data-mode="dark">, combinable with any theme. Neutral content
+   plus a frame derived from the theme's --tint, so a new theme gets its dark variant
+   for free. If a theme looks off, override it with :root[data-theme="x"][data-mode="dark"]
+   after this block. */
+:root[data-mode="dark"] {
+  /* Frame: the theme's hue, darkened but still glossy. */
+  --skin-hi: color-mix(in oklab, var(--tint) 55%, #9aa0ad);
+  --skin-top: color-mix(in oklab, var(--tint) 50%, #2a2c33);
+  --skin-mid: color-mix(in oklab, var(--tint) 45%, #22242a);
+  --skin-low: color-mix(in oklab, var(--tint) 30%, #18191d);
+  --skin-edge: #050608;
+  --shell-ink: color-mix(in oklab, var(--tint) 25%, #e6ebf5);
+  --side-top: color-mix(in oklab, var(--tint) 60%, #2e3038);
+  --side-bottom: color-mix(in oklab, var(--tint) 40%, #16171b);
+  --shell-1: color-mix(in oklab, var(--tint) 30%, #4a4d55);
+  --shell-2: color-mix(in oklab, var(--tint) 25%, #303238);
+  --shell-3: color-mix(in oklab, var(--tint) 20%, #25272c);
+  --shell-4: color-mix(in oklab, var(--tint) 15%, #1c1d21);
+  --side-text: #eef1f8;
+  --side-text-shadow: 0 1px 1px rgb(0 0 0 / 0.7);
+  --side-line: rgb(255 255 255 / 0.3);
+  --side-line-shadow: rgb(0 0 0 / 0.5);
+  --btn-1: color-mix(in oklab, var(--tint) 25%, #7a808d);
+  --btn-2: color-mix(in oklab, var(--tint) 20%, #50545f);
+  --btn-3: color-mix(in oklab, var(--tint) 15%, #34373f);
+  --btn-4: color-mix(in oklab, var(--tint) 10%, #222429);
+  --btn-ink: #e3e8f3;
+  --btn-border: #0c0d11;
+  --btn-soft-border: color-mix(in oklab, var(--tint) 25%, #555b69);
+  --selection: color-mix(in oklab, var(--tint) 75%, #1a1b1f);
+  --title-grad: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--tint) 55%, #8a90a0) 0%,
+    color-mix(in oklab, var(--tint) 55%, #2a2d35) 8%,
+    color-mix(in oklab, var(--tint) 50%, #24272e) 40%,
+    color-mix(in oklab, var(--tint) 55%, #2c3038) 88%,
+    color-mix(in oklab, var(--tint) 45%, #15171c) 100%
+  );
+  --title-grad-inactive: linear-gradient(to bottom, #4a4f5a 0%, #3a3d46 40%, #34373f 88%, #2c2e35 100%);
+  --frame: color-mix(in oklab, var(--tint) 40%, #15171c);
+  --frame-inactive: #3a3d45;
+  --title-text: #eef1f8;
+  --title-text-shadow: 1px 1px #000;
+
+  /* Content: neutral; only borders, hovers and selection keep the hue. */
+  --control-scheme: dark;
+  --surface: #2b2d33;
+  --surface-light: #34363d;
+  --border-dark: #4a4d55;
+  --text: #e4e7ee;
+  --text-muted: #a9b0bf;
+  --text-faint: #8a91a0;
+  --text-disabled: #646873;
+  --heading: #9fc0ff; /* blue in every theme, as in light mode */
+  --link: #8fb6ff;
+  --legend: #8fb6ff;
+  --error: #ff8a80;
+  --warn: #ffc069;
+  --view-bg: #1e2026;
+  --view-alt: #24262c;
+  --row-alt: #23262d;
+  --pane-1: #2a2d35;
+  --pane-2: #22252c;
+  --rule: color-mix(in oklab, var(--tint) 25%, #353840);
+  --input-border: color-mix(in oklab, var(--tint) 25%, #4a4e58);
+  --fieldset-border: #44474f;
+  --tab-border: #4a4d55;
+  --hover-bg: color-mix(in oklab, var(--tint) 18%, #24262c);
+  --hover-border: color-mix(in oklab, var(--tint) 35%, #3a3d45);
+  --sel-soft: color-mix(in oklab, var(--tint) 35%, #1e2026);
+  --art-bg: linear-gradient(135deg, #3a3f4b, #262a33);
+  --art-border: #4a5060;
+  --ctl-face: linear-gradient(to bottom, #4a4e58 0%, #383b44 86%, #2c2e35 100%);
+  --ctl-face-pressed: linear-gradient(to bottom, #25272d, #30333a 8%, #3a3d45);
+  --ctl-border: #12141a;
+  --ctl-border-disabled: #3a3c42;
+  --list-header: linear-gradient(to bottom, #3a3d45, #2e3037 80%, #26282e);
+  --list-header-border: #18191d;
+  --list-col-border: #3a3c43;
+  --rail-bg: #15161a;
+  --rail-shadow: #000;
+  --rail-light: #4a4e58;
+  --scroll-track: #1e2026;
+  --scroll-thumb: linear-gradient(
+    to right,
+    color-mix(in oklab, var(--tint) 30%, #4a4e58),
+    color-mix(in oklab, var(--tint) 25%, #3a3d46)
+  );
+  --scroll-thumb-hover: linear-gradient(
+    to right,
+    color-mix(in oklab, var(--tint) 35%, #5a5e68),
+    color-mix(in oklab, var(--tint) 30%, #484b54)
+  );
+  --scroll-button: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--tint) 30%, #4a4e58),
+    color-mix(in oklab, var(--tint) 25%, #3a3d46)
+  );
+  --scroll-edge: #2a2e38;
+  --scroll-border: #1e2026;
+  --content-border: #0c0d11;
+  --content-halo: rgb(255 255 255 / 0.08);
+  --np-header: linear-gradient(to bottom, #3a3d45, #2e3037 60%, #26282e);
+  --toggle-on: #5cd65c;
 }

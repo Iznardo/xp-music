@@ -51,14 +51,14 @@
   h3 {
     margin: 10px 0 4px;
     font-size: 12px;
-    color: #0b2c6b;
-    border-bottom: 1px solid #a9bbd9;
+    color: var(--heading);
+    border-bottom: 1px solid var(--rule);
   }
   .top {
     display: flex;
   }
   .desc {
-    color: #444;
+    color: var(--text-muted);
     line-height: 1.45;
     max-width: 70ch;
   }
