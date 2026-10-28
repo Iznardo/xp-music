@@ -160,6 +160,8 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
             MediaControlEvent::SetPosition(MediaPosition(d)) => {
                 p.seek(d.as_millis().min(u32::MAX as u128) as u32)
             }
+            // MPRIS `Volume` writes (DMS, playerctl volume, ...).
+            MediaControlEvent::SetVolume(v) => p.set_volume(v as f32),
             _ => {}
         });
         if let Err(e) = res {
@@ -169,6 +171,8 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
 
     let mut last_track: Option<String> = None;
     let mut last_status: Option<PlaybackStatus> = None;
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut last_volume: Option<f32> = None;
     loop {
         // Messages for the hidden window (session lock).
         // SAFETY: standard message loop of the thread that owns the window.
@@ -221,6 +225,12 @@ fn run(player: Arc<PlayerService>, rx: Receiver<MediaMsg>) {
                         PlaybackStatus::Idle | PlaybackStatus::Error => MediaPlayback::Stopped,
                     };
                     let _ = c.set_playback(pb);
+                }
+                // Only MPRIS exposes a volume property.
+                #[cfg(all(unix, not(target_os = "macos")))]
+                if Some(s.volume) != last_volume {
+                    last_volume = Some(s.volume);
+                    let _ = c.set_volume(s.volume as f64);
                 }
             }
             Err(RecvTimeoutError::Timeout) => {}
