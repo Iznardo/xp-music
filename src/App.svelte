@@ -20,7 +20,8 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { SKIN, outlinePath, place, sidePodEdge, sidePodPath, skinLayout, tabLayerPath } from "./lib/skin";
+  import { SKIN, outlinePath, place, skinLayout } from "./lib/skin";
+  import Shell from "./lib/components/wmp/Shell.svelte";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/i18n.svelte";
   import logo from "./assets/logo.webp";
@@ -51,9 +52,6 @@
   let winH = $state(0);
   const L = $derived(winW && winH ? skinLayout(winW, winH, !ui.sideCollapsed) : null);
   const outline = $derived(L ? outlinePath(L) : "");
-  const sidePod = $derived(L ? sidePodPath(L) : null);
-  const tabLayer = $derived(L ? tabLayerPath(L) : null);
-  const podEdge = $derived(L ? sidePodEdge(L) : null);
   let outlineEl = $state<SVGPathElement>();
 
   // The outline (with its joins) is the shape for clicks: clicks on transparent areas
@@ -158,59 +156,7 @@
 {:else}
 <div class="skin" class:maximized class:inactive={!active} bind:clientWidth={winW} bind:clientHeight={winH}>
   {#if L}
-    <!-- Shell: the full outline with its joins, behind the pieces. -->
-    <svg class="shell" width={winW} height={winH} aria-hidden="true">
-      <defs>
-        <linearGradient id="shell-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" class="sh-1" />
-          <stop offset="0.25" class="sh-2" />
-          <stop offset="0.75" class="sh-3" />
-          <stop offset="1" class="sh-4" />
-        </linearGradient>
-        <!-- Side panel and pod: the same color end to end (they are one piece). -->
-        <linearGradient id="side-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={SKIN.sideW} y2="0">
-          <stop offset="0" class="sf-edge" />
-          <stop offset="0.55" class="sf-mid" />
-          <!-- Beyond the side panel (the pod) the light tone continues. -->
-          <stop offset="1" class="sf-mid" />
-        </linearGradient>
-        <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 30} x2="0" y2={winH}>
-          <!-- No effect above the pod; the highlight fades in over the 30px above it (no
-               visible step), then turns into a shadow towards the bottom. -->
-          <stop offset="0" stop-color="#fff" stop-opacity="0" />
-          <stop offset={30 / (SKIN.pod.h + 30)} stop-color="#fff" stop-opacity="0.1" />
-          <stop offset="1" stop-color="#000" stop-opacity="0.1" />
-        </linearGradient>
-        <!-- Playlist tab layer: raised control colors, fading into the shell at the bottom. -->
-        <linearGradient id="tab-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={L.content.y}>
-          <stop offset="0" class="tb-1" />
-          <stop offset="0.6" class="tb-2" />
-          <stop offset="1" class="tb-2" stop-opacity="0" />
-        </linearGradient>
-        <linearGradient id="tab-edge" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={L.content.y}>
-          <stop offset="0.4" class="tb-edge" />
-          <stop offset="1" class="tb-edge" stop-opacity="0" />
-        </linearGradient>
-        {#if sidePod}<clipPath id="side-pod-clip"><path d={sidePod} /></clipPath>{/if}
-        <clipPath id="outline-clip"><path d={outline} /></clipPath>
-      </defs>
-      <path d={outline} bind:this={outlineEl} class="shell-fill" />
-      {#if sidePod}
-        <!-- The same-colored stroke hides the light thread of the silver underneath at the edge. -->
-        <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
-        <!-- Top-to-bottom highlight over the controls area, seamless. -->
-        <path d={sidePod} fill="url(#side-shade)" />
-      {/if}
-      {#if tabLayer}
-        <!-- The tab is its own layer over the body: lighter, with a rim and a shadow on its S. -->
-        <g clip-path="url(#outline-clip)">
-          <path d={tabLayer.fill} fill="url(#tab-fill)" />
-          <!-- Shadow only on the rim: under the faded fill it would show through. -->
-          <path d={tabLayer.edge} fill="none" stroke="url(#tab-edge)" class="tab-rim" />
-          <path d={tabLayer.edge} fill="none" stroke="#fff" stroke-opacity="0.5" transform="translate(1.5 0)" />
-        </g>
-      {/if}
-    </svg>
+    <Shell {L} w={winW} h={winH} bind:outlineEl />
     {#if L.side}
       <div
         class="piece side"
@@ -254,18 +200,6 @@
       {/if}
     </main>
 
-    {#if sidePod && podEdge}
-      <!-- Raised edge of the side panel + pod, above the content so its rim lies on the
-           content's halo. Same depth as the tab's S, as one line: a highlight on the piece's
-           side (a wide stroke clipped to the inside, whatever the edge's direction), then
-           the rim on top, casting its shadow. -->
-      <svg class="shell overlay" width={winW} height={winH} aria-hidden="true">
-        <g clip-path="url(#outline-clip)">
-          <path d={podEdge} fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="3" clip-path="url(#side-pod-clip)" />
-          <path d={podEdge} fill="none" class="pod-rim" />
-        </g>
-      </svg>
-    {/if}
     <TransportBar pod={L.pod} bar={L.bar} />
     {#if !maximized}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -306,20 +240,8 @@
   .skin.inactive .piece {
     filter: saturate(0.8);
   }
-  .shell {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-  .overlay {
-    z-index: 6;
-  }
-  .skin.maximized .shell {
+  .skin.maximized :global(:is(.shell, .shell-edge)) {
     display: none;
-  }
-  .shell-fill {
-    fill: url(#shell-fill);
   }
   .piece {
     position: absolute;
@@ -330,41 +252,6 @@
   .side {
     z-index: 1;
     border: 0;
-  }
-  :global(.sh-1) {
-    stop-color: var(--shell-1);
-  }
-  :global(.sh-2) {
-    stop-color: var(--shell-2);
-  }
-  :global(.sh-3) {
-    stop-color: var(--shell-3);
-  }
-  :global(.sh-4) {
-    stop-color: var(--shell-4);
-  }
-  :global(.sf-edge) {
-    stop-color: var(--side-bottom);
-  }
-  :global(.tb-1) {
-    stop-color: var(--btn-1);
-  }
-  :global(.tb-2) {
-    stop-color: var(--btn-2);
-  }
-  :global(.tb-edge) {
-    stop-color: var(--btn-border);
-  }
-  .tab-rim {
-    filter: drop-shadow(-2px 1px 2px rgb(0 0 0 / 0.35));
-  }
-  /* On the dark frame a strong highlight reads as an outline, not a sheen. */
-  .pod-rim {
-    stroke: var(--btn-border);
-    filter: drop-shadow(2px 1px 2px rgb(0 0 0 / 0.35));
-  }
-  :global(.sf-mid) {
-    stop-color: var(--side-top);
   }
   /* Body and tab paint nothing of their own: the silver comes from the shell, so
      there are no seams between them. */
