@@ -29,7 +29,8 @@ class UiStore {
   message = $state<{ title: string; text: string; kind: MessageKind; buttons: string[]; resolve: (b: string) => void } | null>(null);
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   optionsOpen = $state(false);
-  aboutOpen = $state(false);
+  /// Open Options directly on the About tab (consumed by the dialog).
+  optionsAbout = $state(false);
   loginOpen = $state(false);
   prompt = $state<{ title: string; label: string; value: string; resolve: (v: string | null) => void } | null>(null);
   /// Status bar text (left of the transport).

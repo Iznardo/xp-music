@@ -208,6 +208,7 @@ ${notes}` : ""}
       upToDate: "yt-dlp ya está al día.",
       updated: (v: string) => `yt-dlp actualizado a ${v}.`,
       openLogs: "Abrir carpeta de registros",
+      credits: "Hecho con Rust, Tauri y Svelte. Usa yt-dlp (Unlicense) y Deno (MIT).",
       notice: "XP Music no está afiliado a Microsoft ni a Google. Windows y YouTube son marcas de sus respectivos propietarios.",
       appUpdates: "Actualizaciones de XP Music",
       checkApp: "Buscar actualizaciones",
@@ -282,7 +283,5 @@ ${msg}`,
     no: "No",
     newPlaylistTitle: "Nueva lista de reproducción",
     newPlaylistLabel: "Nombre de la lista:",
-    aboutText:
-      "Reproductor de YouTube Music con aspecto de Windows XP.\nHecho con Rust, Tauri y Svelte.\n\nNo está afiliado a Google, YouTube ni Microsoft.\nUsa yt-dlp (Unlicense) y Deno (MIT).",
   },
 };
