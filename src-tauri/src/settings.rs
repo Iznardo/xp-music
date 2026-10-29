@@ -64,6 +64,9 @@ pub struct Settings {
     pub report_history: bool,
     /// `None` = no visualization.
     pub visualization: Option<VizPreset>,
+    /// Name of a user visualization (`visualizations/<name>.frag`). It wins over
+    /// `visualization` while the file exists.
+    pub custom_visualization: Option<String>,
     pub xp_sounds: bool,
     pub notifications: bool,
     /// Pause when the Windows session is locked (006).
@@ -101,6 +104,7 @@ impl Default for Settings {
             launch_at_login: false,
             report_history: true,
             visualization: Some(VizPreset::Water),
+            custom_visualization: None,
             xp_sounds: true,
             notifications: true,
             pause_on_lock: false,

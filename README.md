@@ -42,6 +42,7 @@ The details (SmartScreen and Gatekeeper warnings, Linux requirements, Arch, Nix,
 - [Install](docs/install.md)
 - [Usage](docs/usage.md): views, shortcuts, visualizations and options.
 - [Windows Media Player skins](docs/skins.md)
+- [Custom visualizations](docs/visualizations.md)
 - [FAQ](docs/faq.md)
 - [Building](docs/building.md)
 - [Releasing](docs/releasing.md) (maintainer)

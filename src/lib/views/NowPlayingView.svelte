@@ -6,7 +6,8 @@
   import { settings } from "../stores/settings.svelte";
   import { appWindow } from "../platform";
   import Visualization from "../viz/Visualization.svelte";
-  import { VIZ_ORDER } from "../viz/presets";
+  import { vizEntries } from "../viz/presets";
+  import { customViz } from "../viz/custom.svelte";
   import { artistNames, fmtTime, goAlbum as goAlbumOf, goArtist as goArtistOf, trackMenu } from "../actions";
   import { player } from "../stores/player.svelte";
   import { ui } from "../stores/ui.svelte";
@@ -22,13 +23,16 @@
   const small = $derived(thumbSrc(st?.track?.thumbnails, 48));
 
   // Visualization (005): "Cover" = cover only.
+  // A user visualization wins while its file exists; if it disappears, the preset is used.
   const preset = $derived<VizPreset>(settings.current?.visualization ?? "Cover");
-  const showViz = $derived(preset !== "Cover" && !!st?.track);
+  const custom = $derived(customViz.find(settings.current?.customVisualization));
+  const showViz = $derived((!!custom || preset !== "Cover") && !!st?.track);
+  const entries = $derived(vizEntries(customViz.list.map((v) => v.name)));
+  const currentId = $derived(custom ? `custom:${custom.name}` : preset);
 
   function step(dir: 1 | -1) {
-    const i = VIZ_ORDER.indexOf(preset);
-    const next = VIZ_ORDER[(i + dir + VIZ_ORDER.length) % VIZ_ORDER.length]!;
-    void settings.update({ visualization: next });
+    const i = entries.findIndex((e) => e.id === currentId);
+    void settings.update(entries[(i + dir + entries.length) % entries.length]!.patch);
   }
 
   let clickTimer: ReturnType<typeof setTimeout> | undefined;
@@ -83,7 +87,7 @@
       onkeydown={(e) => e.key === "Escape" && fullscreen && toggleFullscreen()}
     >
       {#if showViz}
-        {#key preset}<Visualization {preset} />{/key}
+        {#key custom ?? preset}<Visualization {preset} source={custom?.source} />{/key}
       {:else if st?.track}
         <div class="glow" style:background-image={cover ? `url("${cover}")` : undefined}></div>
         <div class="art">{#if cover}<img src={cover} alt="" />{/if}</div>
@@ -99,7 +103,7 @@
           <svg viewBox="0 0 10 10"><path d="M3 1.5 7.5 5 3 8.5z" /></svg>
         </button>
       </div>
-      <span class="preset">{t.options.vizNames[preset]}</span>
+      <span class="preset">{custom?.name ?? t.options.vizNames[preset]}</span>
       <span class="grow"></span>
       {#if st?.track}
         <button class="album" onclick={goAlbum} disabled={!st.track.album?.id}>

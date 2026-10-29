@@ -109,6 +109,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             skins::skins_open_dir,
             ui_state::ui_log,
             ui_state::viz_set_active,
+            viz::custom::viz_custom_list,
+            viz::custom::viz_custom_open_dir,
             tools::tools_versions,
             tools::tools_update_now,
             tools::tools_open_logs_dir,

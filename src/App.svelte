@@ -9,6 +9,7 @@
   import Lazy from "./lib/components/Lazy.svelte";
   import { commands } from "./lib/bindings";
   import { player } from "./lib/stores/player.svelte";
+  import { customViz } from "./lib/viz/custom.svelte";
   import { settings } from "./lib/stores/settings.svelte";
   import { auth } from "./lib/stores/auth.svelte";
   import { library } from "./lib/stores/library.svelte";
@@ -100,6 +101,7 @@
     void router.restore();
     void commands.windowIsCompact().then((c) => (ui.compact = c));
     void settings.init();
+    void customViz.refresh();
     void player.init();
     void library.init();
     void local.init();
