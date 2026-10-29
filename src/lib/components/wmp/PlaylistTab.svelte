@@ -139,6 +139,11 @@
     color: var(--shell-ink);
     cursor: pointer;
   }
+  /* Over the dark frame the thin glyphs need full white and a cut-out shadow to read. */
+  :global([data-mode="dark"]) .win button {
+    color: #fff;
+    filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.9));
+  }
   .win button:hover {
     color: #fff;
     background: var(--skin-mid);

@@ -272,20 +272,26 @@
   --skin-low: color-mix(in oklab, var(--tint) 30%, #18191d);
   --skin-edge: #050608;
   --shell-ink: color-mix(in oklab, var(--tint) 25%, #e6ebf5);
-  --side-top: color-mix(in oklab, var(--tint) 60%, #2e3038);
-  --side-bottom: color-mix(in oklab, var(--tint) 40%, #16171b);
-  --shell-1: color-mix(in oklab, var(--tint) 30%, #4a4d55);
-  --shell-2: color-mix(in oklab, var(--tint) 25%, #303238);
-  --shell-3: color-mix(in oklab, var(--tint) 20%, #25272c);
-  --shell-4: color-mix(in oklab, var(--tint) 15%, #1c1d21);
+  /* Side panel and pod: lit inner tone vs. darker outer edge, the same contrast as in
+     light mode, so they read as a rounded volume and not a flat cut-out. */
+  --side-top: color-mix(in oklab, var(--tint) 65%, #4c5262);
+  --side-bottom: color-mix(in oklab, var(--tint) 50%, #191b21);
+  /* Shell: the same hue as the side panel and pod, dimmer, so they read as one material. */
+  --shell-1: color-mix(in oklab, var(--tint) 45%, #4e5260);
+  --shell-2: color-mix(in oklab, var(--tint) 40%, #30333c);
+  --shell-3: color-mix(in oklab, var(--tint) 35%, #262830);
+  --shell-4: color-mix(in oklab, var(--tint) 30%, #1d1f25);
   --side-text: #eef1f8;
   --side-text-shadow: 0 1px 1px rgb(0 0 0 / 0.7);
   --side-line: rgb(255 255 255 / 0.3);
   --side-line-shadow: rgb(0 0 0 / 0.5);
-  --btn-1: color-mix(in oklab, var(--tint) 25%, #7a808d);
-  --btn-2: color-mix(in oklab, var(--tint) 20%, #50545f);
-  --btn-3: color-mix(in oklab, var(--tint) 15%, #34373f);
-  --btn-4: color-mix(in oklab, var(--tint) 10%, #222429);
+  /* Dark glossy metal: tinted gunmetal with a glass highlight on the upper half
+     (--btn-gloss, layered over every round/pill button; none in light mode). */
+  --btn-1: color-mix(in oklab, var(--tint) 30%, #6a7182);
+  --btn-2: color-mix(in oklab, var(--tint) 30%, #3f4452);
+  --btn-3: color-mix(in oklab, var(--tint) 25%, #2a2d36);
+  --btn-4: color-mix(in oklab, var(--tint) 20%, #16181d);
+  --btn-gloss: linear-gradient(to bottom, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0.1) 48%, transparent 52%);
   --btn-ink: #e3e8f3;
   --btn-border: #0c0d11;
   --btn-soft-border: color-mix(in oklab, var(--tint) 25%, #555b69);
@@ -360,8 +366,9 @@
   );
   --scroll-edge: #2a2e38;
   --scroll-border: #1e2026;
-  --content-border: #0c0d11;
-  --content-halo: rgb(255 255 255 / 0.08);
+  /* Recessed bezel: black inner line, lit tinted rim against the shell. */
+  --content-border: #07080b;
+  --content-halo: color-mix(in oklab, var(--tint) 45%, #7c8498);
   --np-header: linear-gradient(to bottom, #3a3d45, #2e3037 60%, #26282e);
   --toggle-on: #5cd65c;
 }

@@ -48,7 +48,7 @@
     border-radius: 50%;
     border: 1px solid var(--skin-edge);
     color: var(--shell-ink);
-    background: radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
     box-shadow: inset 0 -2px 3px rgb(0 0 40 / 0.25), 0 1px 1px rgb(0 0 40 / 0.35);
     cursor: pointer;
   }
@@ -56,7 +56,7 @@
     width: 21px;
     height: 21px;
     color: #fff;
-    background: radial-gradient(circle at 50% 30%, var(--accent-1) 0%, var(--accent-2) 45%, var(--accent-3) 100%);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 30%, var(--accent-1) 0%, var(--accent-2) 45%, var(--accent-3) 100%);
   }
   .menu svg {
     width: 12px;
