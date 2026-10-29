@@ -60,9 +60,11 @@ export class Images {
       if (color) {
         const [r, g, b] = color;
         const px = data.data;
+        // JPEG never gives back the exact key color (Professional, Xbox use .jpg buttons with #ff00ff).
+        const tol = ext === "jpg" || ext === "jpeg" ? 48 : 0;
         let changed = false;
         for (let i = 0; i < px.length; i += 4) {
-          if (px[i] === r && px[i + 1] === g && px[i + 2] === b) {
+          if (Math.abs(px[i] - r) <= tol && Math.abs(px[i + 1] - g) <= tol && Math.abs(px[i + 2] - b) <= tol) {
             px[i + 3] = 0;
             changed = true;
           }
