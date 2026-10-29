@@ -180,6 +180,11 @@
           <stop offset={30 / (SKIN.pod.h + 30)} stop-color="#fff" stop-opacity="0.1" />
           <stop offset="1" stop-color="#000" stop-opacity="0.1" />
         </linearGradient>
+        <!-- Collapsed side panel: the pod's top edge would show as a step on the left strip. -->
+        <linearGradient id="pod-fade" x1="0" y1="0" x2="0" y2="1">
+          <stop class="sf-edge" stop-opacity="0" />
+          <stop offset="1" class="sf-edge" />
+        </linearGradient>
         <!-- Playlist tab layer: raised control colors, fading into the shell at the bottom. -->
         <linearGradient id="tab-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={L.content.y}>
           <stop offset="0" class="tb-1" />
@@ -198,6 +203,11 @@
         <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
         <!-- Top-to-bottom highlight over the controls area, seamless. -->
         <path d={sidePod} fill="url(#side-shade)" />
+        {#if !L.side}
+          <!-- Same 30px fade above the pod as with the side panel, so the left strip has no step. -->
+          <rect x="0" y={L.pod.y - 30} width={L.content.x + 1} height="30" fill="url(#pod-fade)" />
+          <rect x="0" y={L.pod.y - 30} width={L.content.x + 1} height="30" fill="url(#side-shade)" />
+        {/if}
       {/if}
       {#if tabLayer}
         <!-- The tab is its own layer over the body: lighter, with a rim and a shadow on its S. -->
