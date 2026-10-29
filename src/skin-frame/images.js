@@ -57,12 +57,14 @@ export class Images {
       ctx.drawImage(bitmap, 0, 0);
       bitmap.close();
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let changed = false;
       if (color) {
         const [r, g, b] = color;
         const px = data.data;
-        let changed = false;
+        // JPEG never gives back the exact key color (Professional, Xbox use .jpg buttons with #ff00ff).
+        const tol = ext === "jpg" || ext === "jpeg" ? 48 : 0;
         for (let i = 0; i < px.length; i += 4) {
-          if (px[i] === r && px[i + 1] === g && px[i + 2] === b) {
+          if (Math.abs(px[i] - r) <= tol && Math.abs(px[i + 1] - g) <= tol && Math.abs(px[i + 2] - b) <= tol) {
             px[i + 3] = 0;
             changed = true;
           }
@@ -72,7 +74,11 @@ export class Images {
           ctx.putImageData(data, 0, 0);
         }
       }
-      const url = URL.createObjectURL(await canvas.convertToBlob());
+      // A GIF with no key color goes out as it came: re-encoding it through the canvas would freeze
+      // it on the first frame (the Xbox intro starts black and ends transparent).
+      // Known limit: an animated GIF that also has key-colored pixels still comes out frozen (it would need per-frame keying).
+      const blob = ext === "gif" && !changed ? new Blob([/** @type {BlobPart} */ (raw)], { type: MIME.gif }) : await canvas.convertToBlob();
+      const url = URL.createObjectURL(blob);
       return { url, w: canvas.width, h: canvas.height, data, canvas };
     } catch {
       this.missing.add(name);
