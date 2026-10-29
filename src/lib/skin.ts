@@ -207,6 +207,31 @@ export function sidePodPath(l: SkinLayout): string {
   ].join(" ");
 }
 
+/// Raised edges of the side panel + pod piece, for the same rim/highlight/shadow as the
+/// tab's S: the side panel's top edge (rise and shoulder over the top strip) and the
+/// pod's top edge and right arc. Starts at the content's left edge so the collapsed
+/// left strip shows no line.
+export function sidePodEdges(l: SkinLayout): string[] {
+  const { side, pod } = l;
+  const pr = pod.h / 2;
+  const cr = pod.x + pod.w - pr;
+  const edges = [`M ${l.content.x} ${pod.y} L ${cr} ${pod.y} A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`];
+  if (side) {
+    const c = sideCurve(side.y);
+    const k = SKIN.sideCorner;
+    edges.push(
+      [
+        `M 0 ${SKIN.sideTop + k}`,
+        `A ${k} ${k} 0 0 1 ${k} ${SKIN.sideTop}`,
+        `L ${c.p0[0]} ${c.p0[1]}`,
+        `C ${c.c1[0]} ${c.c1[1]} ${c.c2[0]} ${c.c2[1]} ${c.p3[0]} ${c.p3[1]}`,
+        shoulder(c.p3[0], side.y),
+      ].join(" "),
+    );
+  }
+  return edges;
+}
+
 /// Playlist tab as its own layer over the body (as in WMP 9): from the end of the top
 /// strip it rises in an S to the top edge and covers the rest of the strip. `edge` is
 /// just the S, for its rim. Clip it with the outline (its top-right corner is square).

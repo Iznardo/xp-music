@@ -20,7 +20,7 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { SKIN, outlinePath, place, sidePodPath, skinLayout, tabLayerPath } from "./lib/skin";
+  import { SKIN, outlinePath, place, sidePodEdges, sidePodPath, skinLayout, tabLayerPath } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/i18n.svelte";
   import logo from "./assets/logo.webp";
@@ -53,6 +53,7 @@
   const outline = $derived(L ? outlinePath(L) : "");
   const sidePod = $derived(L ? sidePodPath(L) : null);
   const tabLayer = $derived(L ? tabLayerPath(L) : null);
+  const podEdges = $derived(L ? sidePodEdges(L) : []);
   let outlineEl = $state<SVGPathElement>();
 
   // The outline (with its joins) is the shape for clicks: clicks on transparent areas
@@ -195,6 +196,15 @@
           <stop offset="0.4" class="tb-edge" />
           <stop offset="1" class="tb-edge" stop-opacity="0" />
         </linearGradient>
+        <!-- Side panel and pod edges: same rim as the tab, fading towards the bottom. -->
+        <linearGradient id="pod-edge" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0.4" class="tb-edge" />
+          <stop offset="1" class="tb-edge" stop-opacity="0" />
+        </linearGradient>
+        <linearGradient id="pod-light" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0.3" class="pod-hi" />
+          <stop offset="1" stop-color="#fff" stop-opacity="0" />
+        </linearGradient>
         <clipPath id="outline-clip"><path d={outline} /></clipPath>
       </defs>
       <path d={outline} bind:this={outlineEl} class="shell-fill" />
@@ -208,6 +218,15 @@
           <rect x="0" y={L.pod.y - 30} width={L.content.x + 1} height="30" fill="url(#pod-fade)" />
           <rect x="0" y={L.pod.y - 30} width={L.content.x + 1} height="30" fill="url(#side-shade)" />
         {/if}
+      {/if}
+      {#if podEdges.length}
+        <!-- Same depth as the tab's S: rim with a shadow cast on the body, inner highlight. -->
+        <g clip-path="url(#outline-clip)">
+          {#each podEdges as d}
+            <path {d} fill="none" stroke="url(#pod-edge)" class="pod-rim" />
+            <path {d} fill="none" stroke="url(#pod-light)" transform="translate(-1 1.5)" />
+          {/each}
+        </g>
       {/if}
       {#if tabLayer}
         <!-- The tab is its own layer over the body: lighter, with a rim and a shadow on its S. -->
@@ -342,6 +361,17 @@
   }
   .tab-rim {
     filter: drop-shadow(-2px 1px 2px rgb(0 0 0 / 0.35));
+  }
+  /* On the dark frame a strong highlight reads as an outline, not a sheen. */
+  :global(.pod-hi) {
+    stop-color: #fff;
+    stop-opacity: 0.5;
+  }
+  :global([data-mode="dark"] .pod-hi) {
+    stop-opacity: 0.1;
+  }
+  .pod-rim {
+    filter: drop-shadow(2px 1px 2px rgb(0 0 0 / 0.35));
   }
   :global(.sf-mid) {
     stop-color: var(--side-top);
