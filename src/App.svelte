@@ -247,7 +247,15 @@
       </div>
     {/if}
     <div class="piece body" style={place(L.body)} data-tauri-drag-region></div>
-    <div class="piece tab" style={place(L.tab)}><PlaylistTab {maximized} /></div>
+    <!-- Extended left over the tab's S, so its rise (right of the curve, above the strip)
+         drags too; what lies left of the curve is outside the window shape. -->
+    <div
+      class="piece tab"
+      style="{place({ ...L.tab, x: L.tab.x - SKIN.tabSlope, w: L.tab.w + SKIN.tabSlope })};padding-left:{SKIN.tabSlope}px"
+      data-tauri-drag-region
+    >
+      <PlaylistTab {maximized} />
+    </div>
     <div class="topbar" style={place(L.topBar)}><TitleBar /></div>
     <button
       class="handle"
