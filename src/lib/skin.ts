@@ -39,8 +39,6 @@ export const SKIN = {
   topBar: 28,
   /// Gap below the body: only the pill reaches the very bottom.
   bottomGap: 26,
-  /// Body's bottom bar (controls to the right of the pill).
-  bottomBar: 58,
   pod: { dx: 22, w: 360, h: 88 },
   /// With a side panel, its lower part narrows in an S over this height and
   /// ends directly at the pill's bottom-left corner (side panel and controls,
@@ -94,7 +92,10 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
     r: [0, pr, pr, s.podCorner],
   };
   const contentTop = bodyY + s.topBar;
-  const contentBottom = bodyBottom - s.bottomBar;
+  // The content ends where the pill starts: the pill's top edge is the content's bottom
+  // edge, so the raised line runs along it. The bottom bar (right of the pill) spans the
+  // same height.
+  const contentBottom = podY;
   let sideClip: string | null = null;
   if (side) {
     const c = sideCurve(bodyY);
@@ -151,10 +152,9 @@ function sideCurve(bodyY: number) {
 
 /// Where the rise ends, the side panel's color curves down in an S to its right edge
 /// across the top strip (as in WMP 9) instead of being cut vertically.
-function shoulder(x: number, top: number): string {
-  const { sideW, topBar } = SKIN;
-  const mid = top + topBar / 2;
-  return `C ${x} ${mid} ${sideW} ${mid} ${sideW} ${top + topBar}`;
+function shoulder(x: number, top: number, end: number = SKIN.sideW): string {
+  const mid = top + SKIN.topBar / 2;
+  return `C ${x} ${mid} ${end} ${mid} ${end} ${top + SKIN.topBar}`;
 }
 
 /// S narrowing of the side panel's lower part: from the left edge (vertical)
@@ -178,17 +178,8 @@ export function sidePodPath(l: SkinLayout): string {
   const pr = pod.h / 2;
   const cr = pod.x + pod.w - pr;
   const bk = pod.r[3];
-  if (!side) {
-    // Without a side panel, just the pill (flush with the left edge).
-    return [
-      `M ${pod.x} ${pod.y}`,
-      `L ${cr} ${pod.y}`,
-      `A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`,
-      `L ${pod.x + bk} ${pod.y + pod.h}`,
-      `A ${bk} ${bk} 0 0 1 ${pod.x} ${pod.y + pod.h - bk}`,
-      "Z",
-    ].join(" ");
-  }
+  // Without a side panel, just the pill (flush with the left edge).
+  if (!side) return pillPath(pod);
   const c = sideCurve(side.y);
   const tp = taperCurve(pod);
   const k = SKIN.sideCorner;
@@ -208,29 +199,46 @@ export function sidePodPath(l: SkinLayout): string {
   ].join(" ");
 }
 
-/// Raised edges of the side panel + pod piece, for the same rim/highlight/shadow as the
-/// tab's S: the side panel's top edge (rise and shoulder over the top strip) and the
-/// pod's top edge and right arc. Starts at the content's left edge so the collapsed
-/// left strip shows no line.
-export function sidePodEdges(l: SkinLayout): string[] {
-  const { side, pod } = l;
+/// The pill alone: square top-left, round right end, bottom-left corner.
+function pillPath(pod: Piece): string {
   const pr = pod.h / 2;
   const cr = pod.x + pod.w - pr;
-  const edges = [`M ${l.content.x} ${pod.y} L ${cr} ${pod.y} A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`];
-  if (side) {
-    const c = sideCurve(side.y);
-    const k = SKIN.sideCorner;
-    edges.push(
-      [
-        `M 0 ${SKIN.sideTop + k}`,
-        `A ${k} ${k} 0 0 1 ${k} ${SKIN.sideTop}`,
-        `L ${c.p0[0]} ${c.p0[1]}`,
-        `C ${c.c1[0]} ${c.c1[1]} ${c.c2[0]} ${c.c2[1]} ${c.p3[0]} ${c.p3[1]}`,
-        shoulder(c.p3[0], side.y),
-      ].join(" "),
-    );
-  }
-  return edges;
+  const bk = pod.r[3];
+  return [
+    `M ${pod.x} ${pod.y}`,
+    `L ${cr} ${pod.y}`,
+    `A ${pr} ${pr} 0 0 1 ${cr} ${pod.y + pod.h}`,
+    `L ${pod.x + bk} ${pod.y + pod.h}`,
+    `A ${bk} ${bk} 0 0 1 ${pod.x} ${pod.y + pod.h - bk}`,
+    "Z",
+  ].join(" ");
+}
+
+/// Raised edge of the side panel + pod, for the same rim/highlight/shadow as the tab's S.
+/// Drawn above the content, on its halo: the rim replaces it, so each side of the content
+/// reads highlight, rim, the content's black border. With the side panel, one line: the
+/// shoulder over the top strip (mirror of the tab's cut), down beside the content, along
+/// the pod's top (the content's bottom) and around its right arc. Collapsed, the pod
+/// alone: its top edge from the window's left edge. The outer silhouette gets none:
+/// there is nothing behind it to cast on.
+export function sidePodEdge(l: SkinLayout): string {
+  const { side, pod, content } = l;
+  const pr = pod.h / 2;
+  const cr = pod.x + pod.w - pr;
+  // Half a pixel in, on the content's bottom halo; the arc keeps the same inset.
+  const y = pod.y + 0.5;
+  const r = pr - 0.5;
+  // The arc ends where it meets the body's bottom (the fillet's start): below, it is the
+  // window's silhouette, which gets no line (it would end clipped and jagged).
+  const cy = pod.y + pr;
+  const [fx, fy] = lineCircleFillet(l.body.y + l.body.h, cr, cy, pr, SKIN.podFillet, 1).onCircle;
+  const end = (v: number, c: number) => +(c + ((v - c) * r) / pr).toFixed(2);
+  const top = `L ${cr} ${y} A ${r} ${r} 0 0 1 ${end(fx, cr)} ${end(fy, cy)}`;
+  if (!side) return `M 0 ${y} ${top}`;
+  const c = sideCurve(side.y);
+  const x = content.x - 0.5;
+  // The shoulder lands on that line, so the S flows straight into it (no jog at the corner).
+  return `M ${c.p3[0]} ${c.p3[1]} ${shoulder(c.p3[0], side.y, x)} L ${x} ${y} ${top}`;
 }
 
 /// Playlist tab as its own layer over the body (as in WMP 9): from the end of the top

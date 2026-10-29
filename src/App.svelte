@@ -20,7 +20,7 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { SKIN, outlinePath, place, sidePodEdges, sidePodPath, skinLayout, tabLayerPath } from "./lib/skin";
+  import { SKIN, outlinePath, place, sidePodEdge, sidePodPath, skinLayout, tabLayerPath } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/i18n.svelte";
   import logo from "./assets/logo.webp";
@@ -53,7 +53,7 @@
   const outline = $derived(L ? outlinePath(L) : "");
   const sidePod = $derived(L ? sidePodPath(L) : null);
   const tabLayer = $derived(L ? tabLayerPath(L) : null);
-  const podEdges = $derived(L ? sidePodEdges(L) : []);
+  const podEdge = $derived(L ? sidePodEdge(L) : null);
   let outlineEl = $state<SVGPathElement>();
 
   // The outline (with its joins) is the shape for clicks: clicks on transparent areas
@@ -181,11 +181,6 @@
           <stop offset={30 / (SKIN.pod.h + 30)} stop-color="#fff" stop-opacity="0.1" />
           <stop offset="1" stop-color="#000" stop-opacity="0.1" />
         </linearGradient>
-        <!-- Collapsed side panel: the pod's top edge would show as a step on the left strip. -->
-        <linearGradient id="pod-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop class="sf-edge" stop-opacity="0" />
-          <stop offset="1" class="sf-edge" />
-        </linearGradient>
         <!-- Playlist tab layer: raised control colors, fading into the shell at the bottom. -->
         <linearGradient id="tab-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={L.content.y}>
           <stop offset="0" class="tb-1" />
@@ -196,15 +191,7 @@
           <stop offset="0.4" class="tb-edge" />
           <stop offset="1" class="tb-edge" stop-opacity="0" />
         </linearGradient>
-        <!-- Side panel and pod edges: same rim as the tab, fading towards the bottom. -->
-        <linearGradient id="pod-edge" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0.4" class="tb-edge" />
-          <stop offset="1" class="tb-edge" stop-opacity="0" />
-        </linearGradient>
-        <linearGradient id="pod-light" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0.3" class="pod-hi" />
-          <stop offset="1" stop-color="#fff" stop-opacity="0" />
-        </linearGradient>
+        {#if sidePod}<clipPath id="side-pod-clip"><path d={sidePod} /></clipPath>{/if}
         <clipPath id="outline-clip"><path d={outline} /></clipPath>
       </defs>
       <path d={outline} bind:this={outlineEl} class="shell-fill" />
@@ -213,20 +200,6 @@
         <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
         <!-- Top-to-bottom highlight over the controls area, seamless. -->
         <path d={sidePod} fill="url(#side-shade)" />
-        {#if !L.side}
-          <!-- Same 30px fade above the pod as with the side panel, so the left strip has no step. -->
-          <rect x="0" y={L.pod.y - 30} width={L.content.x + 1} height="30" fill="url(#pod-fade)" />
-          <rect x="0" y={L.pod.y - 30} width={L.content.x + 1} height="30" fill="url(#side-shade)" />
-        {/if}
-      {/if}
-      {#if podEdges.length}
-        <!-- Same depth as the tab's S: rim with a shadow cast on the body, inner highlight. -->
-        <g clip-path="url(#outline-clip)">
-          {#each podEdges as d}
-            <path {d} fill="none" stroke="url(#pod-edge)" class="pod-rim" />
-            <path {d} fill="none" stroke="url(#pod-light)" transform="translate(-1 1.5)" />
-          {/each}
-        </g>
       {/if}
       {#if tabLayer}
         <!-- The tab is its own layer over the body: lighter, with a rim and a shadow on its S. -->
@@ -281,6 +254,18 @@
       {/if}
     </main>
 
+    {#if sidePod && podEdge}
+      <!-- Raised edge of the side panel + pod, above the content so its rim lies on the
+           content's halo. Same depth as the tab's S, as one line: a highlight on the piece's
+           side (a wide stroke clipped to the inside, whatever the edge's direction), then
+           the rim on top, casting its shadow. -->
+      <svg class="shell overlay" width={winW} height={winH} aria-hidden="true">
+        <g clip-path="url(#outline-clip)">
+          <path d={podEdge} fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="3" clip-path="url(#side-pod-clip)" />
+          <path d={podEdge} fill="none" class="pod-rim" />
+        </g>
+      </svg>
+    {/if}
     <TransportBar pod={L.pod} bar={L.bar} />
     {#if !maximized}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -327,6 +312,9 @@
     z-index: 0;
     pointer-events: none;
   }
+  .overlay {
+    z-index: 6;
+  }
   .skin.maximized .shell {
     display: none;
   }
@@ -371,14 +359,8 @@
     filter: drop-shadow(-2px 1px 2px rgb(0 0 0 / 0.35));
   }
   /* On the dark frame a strong highlight reads as an outline, not a sheen. */
-  :global(.pod-hi) {
-    stop-color: #fff;
-    stop-opacity: 0.5;
-  }
-  :global([data-mode="dark"] .pod-hi) {
-    stop-opacity: 0.1;
-  }
   .pod-rim {
+    stroke: var(--btn-border);
     filter: drop-shadow(2px 1px 2px rgb(0 0 0 / 0.35));
   }
   :global(.sf-mid) {
