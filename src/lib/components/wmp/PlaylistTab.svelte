@@ -73,9 +73,10 @@
   .tab {
     height: 100%;
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 9px 8px 0 10px;
+    /* One row, centered in the tab: combo and window buttons share a midline. */
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 10px;
   }
   .combo {
     flex: 1;
@@ -126,7 +127,6 @@
   .win {
     display: flex;
     gap: 1px;
-    margin-top: -5px;
   }
   .win button {
     display: grid;

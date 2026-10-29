@@ -30,9 +30,10 @@ export const SKIN = {
   tabRise: 22,
   tabW: 286,
   tabH: 44,
-  /// The body's top edge rises in an S up to the tab: it starts this far before
-  /// the tab and reaches the top this far inside it.
-  tabSlope: 90,
+  /// The tab's S: one curve from the content's top edge up to the window's top edge,
+  /// spanning this width. The body's outline follows its upper part, so the tab layer
+  /// and the window edge share a single cut.
+  tabSlope: 80,
   tabInset: 34,
   /// Body's top strip (menu button and round buttons).
   topBar: 28,
@@ -128,7 +129,7 @@ export function skinLayout(w: number, h: number, sideOpen: boolean): SkinLayout 
     // With a side panel, the strip starts where its rise ends.
     topBar: (() => {
       const x = sideOpen ? s.sideSlope.to : bodyX;
-      return { x, y: bodyY, w: w - s.tabW - x, h: s.topBar };
+      return { x, y: bodyY, w: tabCurve(tab, contentTop).p0[0] - x, h: s.topBar };
     })(),
     bar: { x: podRight, y: contentBottom, w: w - podRight, h: bodyBottom - contentBottom },
   };
@@ -236,13 +237,42 @@ export function sidePodEdges(l: SkinLayout): string[] {
 /// strip it rises in an S to the top edge and covers the rest of the strip. `edge` is
 /// just the S, for its rim. Clip it with the outline (its top-right corner is square).
 export function tabLayerPath(l: SkinLayout): { fill: string; edge: string } {
-  const x0 = l.topBar.x + l.topBar.w;
-  const y0 = l.content.y;
-  const x1 = l.tab.x + 12;
-  const m = (x1 - x0) / 2;
-  const edge = `M ${x0} ${y0} C ${x0 + m} ${y0} ${x1 - m} 0 ${x1} 0`;
+  const c = tabCurve(l.tab, l.content.y);
+  const edge = `M ${c.p0[0]} ${c.p0[1]} C ${c.c1[0]} ${c.c1[1]} ${c.c2[0]} ${c.c2[1]} ${c.p3[0]} 0`;
   const right = l.tab.x + l.tab.w;
-  return { edge, fill: `${edge} L ${right} 0 L ${right} ${y0} Z` };
+  return { edge, fill: `${edge} L ${right} 0 L ${right} ${c.p0[1]} Z` };
+}
+
+type Pt = readonly [number, number];
+
+/// The tab's S, from the content's top edge (`bottom`) up to the window's top edge,
+/// with horizontal tangents at both ends. It ends just inside the tab, so the combo
+/// sits where the curve has already flattened out.
+function tabCurve(tab: Piece, bottom: number) {
+  const x1 = tab.x + 12;
+  const x0 = x1 - SKIN.tabSlope;
+  const m = SKIN.tabSlope / 2;
+  return { p0: [x0, bottom] as Pt, c1: [x0 + m, bottom] as Pt, c2: [x1 - m, 0] as Pt, p3: [x1, 0] as Pt };
+}
+
+/// Part of a cubic (y decreasing along it) from where it crosses `y` to its end
+/// (de Casteljau split).
+function cubicFromY(c: { p0: Pt; c1: Pt; c2: Pt; p3: Pt }, y: number) {
+  const lerp = (a: Pt, b: Pt, t: number): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 40; i++) {
+    const t = (lo + hi) / 2;
+    const u = 1 - t;
+    const yt = u ** 3 * c.p0[1] + 3 * u * u * t * c.c1[1] + 3 * u * t * t * c.c2[1] + t ** 3 * c.p3[1];
+    if (yt > y) lo = t;
+    else hi = t;
+  }
+  const t = (lo + hi) / 2;
+  const b = lerp(c.c1, c.c2, t);
+  const e = lerp(b, lerp(c.c2, c.p3, t), t);
+  const start = lerp(lerp(lerp(c.p0, c.c1, t), b, t), e, t);
+  return { start, c1: e, c2: lerp(c.c2, c.p3, t), end: c.p3 };
 }
 
 /// Concave fillet between the horizontal line `y = line` (the shape lies above) and
@@ -270,10 +300,8 @@ export function outlinePath(l: SkinLayout): string {
   const fR = lineCircleFillet(bb, cr, cy, pr, SKIN.podFillet, 1);
   const n = (v: number) => +v.toFixed(2);
   const d: string[] = [];
-  // S curve from the body to the tab.
-  const s0 = tab.x - SKIN.tabInset - SKIN.tabSlope;
-  const s3 = tab.x;
-  const sm = (s3 - s0) * 0.5;
+  // Body → tab: the upper part of the tab's own S (one cut for both).
+  const ts = cubicFromY(tabCurve(tab, l.content.y), by);
   if (side) {
     const c = sideCurve(by);
     const k = SKIN.sideCorner;
@@ -287,8 +315,8 @@ export function outlinePath(l: SkinLayout): string {
     d.push(`M 0 ${by + body.r[0]}`, `A ${body.r[0]} ${body.r[0]} 0 0 1 ${body.r[0]} ${by}`);
   }
   d.push(
-    `L ${s0} ${by}`,
-    `C ${s0 + sm} ${by} ${s3 - sm} 0 ${s3} 0`,
+    `L ${n(ts.start[0])} ${by}`,
+    `C ${n(ts.c1[0])} ${n(ts.c1[1])} ${n(ts.c2[0])} ${n(ts.c2[1])} ${ts.end[0]} 0`,
     `L ${right - tab.r[1]} 0`,
     `A ${tab.r[1]} ${tab.r[1]} 0 0 1 ${right} ${tab.r[1]}`,
     // Square bottom-right corner (resize grip).
