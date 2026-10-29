@@ -91,6 +91,22 @@ const KEYWORDS = new Set(
     "break continue default throw finally this null true false class super import export yield await debugger").split(" "),
 );
 
+/**
+ * The view to draw. WMP 8/9 skins start with a preview view (just a bitmap, for the skin chooser)
+ * and sometimes a control view with no elements; their onload scripts hop to the real one with
+ * `theme.currentViewID = …` / `openView(…)`. We have one view per frame, so we resolve it here.
+ * If the first view already draws something it is the skin (the usual case); otherwise it is the
+ * one called main… (Halo 2 has an "upgrade your player" view before it) or the first that draws.
+ * @param {WmsNode} theme
+ */
+function pickView(theme) {
+  const views = theme.children.filter((c) => c.tag === "view");
+  const drawable = (/** @type {WmsNode} */ v) => v.children.some((c) => c.tag !== "script" && c.tag !== "video" && !HOLDERS.has(c.tag));
+  if (views[0] && drawable(views[0])) return views[0];
+  const real = views.filter(drawable);
+  return real.find((v) => /^main/i.test(v.attrs.id ?? "")) ?? real[0] ?? views[0] ?? findTag(theme, "view");
+}
+
 export class Runtime {
   /**
    * @param {ReturnType<typeof import("./zip.js").openZip>} zip
@@ -159,7 +175,7 @@ export class Runtime {
     const theme = findTag(root, "theme") ?? root;
     this.title = theme.attrs.title ?? "";
     for (const s of theme.children.filter((c) => c.tag === "script")) this.scripts.push(s.text);
-    const viewNode = findTag(theme, "view");
+    const viewNode = pickView(theme);
     if (!viewNode) throw new Error("The skin has no view.");
 
     const view = new View(this, viewNode);

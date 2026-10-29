@@ -48,7 +48,9 @@ export function openZip(buf) {
 
   async function inflate(entry) {
     const off = entry.offset;
-    if (dv.getUint32(off, true) !== 0x04034b50) throw new Error(`Corrupted entry: ${entry.name}`);
+    // Some skins (NFS Underground, Splinter Cell) clobber the local header signature of the first
+    // entry; WMP ignores it, so do we: sizes and offsets come from the central directory.
+    if (off + 30 > u8.length) throw new Error(`Corrupted entry: ${entry.name}`);
     const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
     const data = u8.subarray(start, start + entry.size);
     if (entry.method === 0) return data;
