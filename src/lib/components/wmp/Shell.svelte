@@ -51,8 +51,15 @@
       <stop offset="0.4" class="tb-edge" />
       <stop offset="1" class="tb-edge" stop-opacity="0" />
     </linearGradient>
-    <clipPath id="side-pod-clip"><path d={sidePod} /></clipPath>
-    <clipPath id="outline-clip"><path d={outline} /></clipPath>
+    <!-- Masks, not clip paths: masks are antialiased everywhere, while clip paths can be
+         drawn hard-edged (jagged steps where they cut a line: the tab's S at the top
+         edge, the raised edge's highlight). -->
+    <mask id="outline-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={w} height={h}>
+      <path d={outline} fill="#fff" />
+    </mask>
+    <mask id="side-pod-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={w} height={h}>
+      <path d={sidePod} fill="#fff" />
+    </mask>
   </defs>
   <path d={outline} bind:this={outlineEl} fill="url(#shell-fill)" />
   <!-- The same-colored stroke hides the light thread of the silver underneath at the edge. -->
@@ -60,7 +67,7 @@
   <!-- Top-to-bottom highlight over the controls area, seamless. -->
   <path d={sidePod} fill="url(#side-shade)" />
   <!-- The tab is its own layer over the body: lighter, with a rim and a shadow on its S. -->
-  <g clip-path="url(#outline-clip)">
+  <g mask="url(#outline-mask)">
     <path d={tabLayer.fill} fill="url(#tab-fill)" />
     <!-- Shadow only on the rim: under the faded fill it would show through. -->
     <path d={tabLayer.edge} fill="none" stroke="url(#tab-edge)" class="tab-rim" />
@@ -70,11 +77,22 @@
 
 <!-- Raised edge of the side panel + pod, above the content so its rim lies on the
      content's halo. Same depth as the tab's S, as one line: a highlight on the piece's
-     side (a wide stroke clipped to the inside, whatever the edge's direction), then the
+     side (a wide stroke masked to the inside, whatever the edge's direction), then the
      rim on top, casting its shadow. -->
 <svg class="shell-edge" width={w} height={h} aria-hidden="true">
-  <g clip-path="url(#outline-clip)">
-    <path d={podEdge} fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="3" clip-path="url(#side-pod-clip)" />
+  <defs>
+    <!-- Inside the window outline, fading out before the body's bottom, where the pod's
+         arc becomes the window's silhouette. -->
+    <linearGradient id="edge-fade" gradientUnits="userSpaceOnUse" x1="0" y1={L.body.y + L.body.h - 16} x2="0" y2={L.body.y + L.body.h}>
+      <stop offset="0" stop-color="#fff" />
+      <stop offset="1" stop-color="#fff" stop-opacity="0" />
+    </linearGradient>
+    <mask id="edge-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={w} height={h}>
+      <path d={outline} fill="url(#edge-fade)" />
+    </mask>
+  </defs>
+  <g mask="url(#edge-mask)">
+    <path d={podEdge} fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="3" mask="url(#side-pod-mask)" />
     <path d={podEdge} fill="none" class="pod-rim" />
   </g>
 </svg>
