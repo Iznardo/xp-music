@@ -105,8 +105,8 @@
   --border-dark: #aca899;
   --text: #000;
   --text-muted: #555;
-  --font-ui: Tahoma, "Segoe UI", sans-serif;
-  --font-title: "Trebuchet MS", Tahoma, sans-serif;
+  --font-ui: "XP UI", Tahoma, "Segoe UI", sans-serif;
+  --font-title: "Trebuchet MS", "XP UI", Tahoma, sans-serif;
 }
 
 /* WMP 9 skin (asymmetric frame). Per theme; the remaining colors come from --wmp-*. */
