@@ -5,10 +5,15 @@ import { REPO } from "./content";
 import { classify, type Build } from "./builds";
 
 export type Theme = "blue" | "olive" | "silver";
+/** Same values as the app's setting (and its texts). */
+export type Appearance = "System" | "Light" | "Dark";
+const APPEARANCES: Appearance[] = ["System", "Light", "Dark"];
+const saved = localStorage.getItem("xp-appearance") as Appearance;
 
 export const site = $state({
   hash: location.hash,
   theme: (document.documentElement.dataset.theme ?? "blue") as Theme,
+  appearance: APPEARANCES.includes(saved) ? saved : "System",
   preset: 0,
   sideCollapsed: false,
   optionsOpen: false,
@@ -31,6 +36,20 @@ export function route(hash: string) {
   const [section = "", doc = ""] = hash.replace(/^#\/?/, "").split("/");
   const slug = decodeURIComponent(doc);
   return { section: LEGACY[section] ?? section, doc: LEGACY[slug] ?? slug };
+}
+
+// Light or dark: the chosen one, or the system's (followed live).
+const systemDark = matchMedia("(prefers-color-scheme: dark)");
+function applyMode() {
+  const dark = site.appearance === "Dark" || (site.appearance === "System" && systemDark.matches);
+  document.documentElement.dataset.mode = dark ? "dark" : "light";
+}
+systemDark.addEventListener("change", applyMode);
+
+export function setAppearance(a: Appearance) {
+  site.appearance = a;
+  localStorage.setItem("xp-appearance", a);
+  applyMode();
 }
 
 export function setTheme(t: Theme) {

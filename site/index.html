@@ -43,9 +43,11 @@
       }
     </script>
     <script>
-      // Theme and language before painting, so they do not flicker. The language logic
+      // Theme, appearance and language before painting, so they do not flicker. The language logic
       // mirrors src/lib/locale.ts and src/i18n.svelte.ts, which take over once loaded.
       document.documentElement.dataset.theme = { olive: "olive", silver: "silver" }[localStorage.getItem("xp-theme")] || "blue";
+      var mode = localStorage.getItem("xp-appearance");
+      document.documentElement.dataset.mode = mode === "Dark" || (mode !== "Light" && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
       var saved = localStorage.getItem("xp-lang");
       document.documentElement.lang = saved === "en" || saved === "es" ? saved : /^es([-_.@:]|$)/i.test((navigator.languages || [navigator.language])[0] || "") ? "es" : "en";
     </script>

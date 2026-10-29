@@ -104,6 +104,8 @@ export const es: Dict = {
     title: "Opciones",
     theme: "Combinación de colores",
     themes: { blue: "Azul (predeterminado)", olive: "Verde oliva", silver: "Plateado" },
+    appearance: app.options.appearance,
+    appearances: app.options.appearances,
     language: "Idioma",
     languageAuto: "Automático (idioma del navegador)",
     ok: "Aceptar",
