@@ -1,5 +1,18 @@
 /* The window is transparent and undecorated: the app draws the frame. */
 
+/* The system's Tahoma where there is one (Windows, macOS); otherwise (most Linux) Wine's
+   metric-compatible clone, so the interface keeps its layout and gets a real bold. */
+@font-face {
+  font-family: "XP UI";
+  font-weight: 400;
+  src: local("Tahoma"), url("../assets/fonts/tahoma.woff2") format("woff2");
+}
+@font-face {
+  font-family: "XP UI";
+  font-weight: 700;
+  src: local("Tahoma Bold"), local("Tahoma-Bold"), url("../assets/fonts/tahomabd.woff2") format("woff2");
+}
+
 *,
 *::before,
 *::after {
