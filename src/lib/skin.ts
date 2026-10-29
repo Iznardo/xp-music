@@ -33,7 +33,7 @@ export const SKIN = {
   /// The tab's S: one curve from the content's top edge up to the window's top edge,
   /// spanning this width. The body's outline follows its upper part, so the tab layer
   /// and the window edge share a single cut.
-  tabSlope: 80,
+  tabSlope: 100,
   tabInset: 34,
   /// Body's top strip (menu button and round buttons).
   topBar: 28,
