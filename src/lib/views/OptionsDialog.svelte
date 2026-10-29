@@ -9,7 +9,8 @@
   import { t } from "../i18n.svelte";
   import logo from "../../assets/logo.webp";
   import DialogFrame from "../components/xp/DialogFrame.svelte";
-  import { VIZ_ORDER } from "../viz/presets";
+  import { vizEntries } from "../viz/presets";
+  import { customViz } from "../viz/custom.svelte";
 
   type Tab = "player" | "audio" | "keys" | "library" | "account" | "viz" | "about";
   type HotkeyName = keyof Settings["hotkeys"];
@@ -56,7 +57,29 @@
   const themes: Theme[] = ["Blue", "Olive", "Silver"];
   // Each language is named in itself, so it can be found whatever the current one is.
   const languages: [Language, string][] = [["en", "English"], ["es", "Español"]];
-  const vizs: VizPreset[] = VIZ_ORDER;
+  const vizs = $derived(vizEntries(customViz.list.map((v) => v.name)));
+  const vizLabel = (v: (typeof vizs)[number]) => v.patch.customVisualization ?? t.options.vizNames[v.patch.visualization!];
+  let vizQuery = $state("");
+  const vizShown = $derived(vizs.filter((v) => vizLabel(v).toLowerCase().includes(vizQuery.trim().toLowerCase())));
+  let vizList = $state<HTMLDivElement>();
+  const vizOn = (id: string) => (draft?.customVisualization && customViz.find(draft.customVisualization) ? `custom:${draft.customVisualization}` : draft?.visualization) === id;
+  const vizCurrent = $derived(vizs.find((v) => vizOn(v.id)));
+  function vizPick(v: (typeof vizs)[number]) {
+    if (draft) Object.assign(draft, v.patch);
+  }
+  // Single-select listbox: the arrows move the selection, as in the skin chooser.
+  function vizKey(e: KeyboardEvent) {
+    const n = vizShown.length;
+    const at = vizShown.findIndex((v) => v === vizCurrent);
+    const to = { ArrowDown: Math.min(n - 1, at + 1), ArrowUp: Math.max(0, at - 1), Home: 0, End: n - 1 }[e.key];
+    if (to === undefined || !n) return;
+    e.preventDefault();
+    vizPick(vizShown[to]!);
+  }
+  // The active row must be in view when the tab opens, the list is filtered or the arrows move.
+  $effect(() => {
+    if (tab === "viz") void vizCurrent, vizShown, vizList?.querySelector("[aria-selected=true]")?.scrollIntoView({ block: "nearest" });
+  });
 
   async function apply() {
     if (!draft) return;
@@ -170,9 +193,19 @@
       {:else if tab === "viz"}
         <fieldset>
           <legend>{t.options.viz}</legend>
-          {#each vizs as v}
-            <label><input type="radio" name="viz" checked={draft.visualization === v} onchange={() => draft && (draft.visualization = v)} /> {t.options.vizNames[v]}</label>
-          {/each}
+          <input class="wide vizsearch" type="search" placeholder={t.options.vizSearch} bind:value={vizQuery} />
+          <div class="vizlist" role="listbox" tabindex="0" aria-label={t.options.viz} bind:this={vizList} onkeydown={vizKey}>
+            {#each vizShown as v (v.id)}
+              <button role="option" tabindex="-1" aria-selected={v === vizCurrent} class:sel={v === vizCurrent} onclick={() => vizPick(v)}>{vizLabel(v)}</button>
+            {:else}
+              <p class="hint">{t.options.vizNoMatch}</p>
+            {/each}
+          </div>
+          <p class="hint">{t.options.vizCustomHint}</p>
+          <div class="vizbtns">
+            <button class="xp-btn" onclick={() => void commands.vizCustomOpenDir()}>{t.skins.openFolder}</button>
+            <button class="xp-btn" onclick={() => void customViz.refresh()}>{t.skins.reload}</button>
+          </div>
         </fieldset>
       {:else if tab === "about"}
         <div class="about">
@@ -263,6 +296,38 @@
   }
   .about p {
     margin: 2px 0;
+  }
+  /* The user can add up to 64 visualizations: the list scrolls, the buttons stay. */
+  .vizsearch {
+    margin-bottom: 6px;
+  }
+  .vizbtns {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .vizlist {
+    height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--input-border);
+    background: var(--view-bg);
+  }
+  .vizlist button {
+    display: block;
+    width: 100%;
+    padding: 2px 6px;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+  }
+  .vizlist .sel {
+    background: var(--selection);
+    color: #fff;
   }
   .folders {
     margin: 0 0 4px;

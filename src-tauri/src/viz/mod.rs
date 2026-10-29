@@ -4,6 +4,7 @@
 //! no audio is copied and nothing is computed (NFR-005-02).
 
 pub mod bands;
+pub mod custom;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};

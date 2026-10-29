@@ -115,6 +115,8 @@ export const commands = {
 	uiLog: (level: string, message: string) => __TAURI_INVOKE<void>("ui_log", { level, message }),
 	/**  Enables the analyzer only while the visualization is in view (FR-005-03). */
 	vizSetActive: (active: boolean) => __TAURI_INVOKE<void>("viz_set_active", { active }),
+	vizCustomList: () => typedError<CustomViz[], AppError>(__TAURI_INVOKE("viz_custom_list")),
+	vizCustomOpenDir: () => typedError<null, AppError>(__TAURI_INVOKE("viz_custom_open_dir")),
 	/**  Versions of the app and the tools ("About" tab). */
 	toolsVersions: () => __TAURI_INVOKE<ToolVersions>("tools_versions"),
 	/**  Checks for a new yt-dlp version right now. Returns the installed one if it changed. */
@@ -241,6 +243,13 @@ export type BrowserProfile = {
 
 export type CacheUpdated = {
 	key: string,
+};
+
+export type CustomViz = {
+	/**  File name without `.frag`. */
+	name: string,
+	/**  GLSL source, as is. */
+	source: string,
 };
 
 export type ErrorCode = "NotAuthenticated" | "AuthExpired" | "Network" | "RateLimited" | "ResolveFailed" | "StreamExpired" | "Decode" | "AudioDevice" | "NotFound" | "InvalidInput" | "Storage" | "Internal";
@@ -387,6 +396,11 @@ export type Settings = {
 	reportHistory: boolean,
 	/**  `None` = no visualization. */
 	visualization: VizPreset | null,
+	/**
+	 *  Name of a user visualization (`visualizations/<name>.frag`). It wins over
+	 *  `visualization` while the file exists.
+	 */
+	customVisualization: string | null,
 	xpSounds: boolean,
 	notifications: boolean,
 	/**  Pause when the Windows session is locked (006). */

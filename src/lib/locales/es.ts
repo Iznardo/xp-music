@@ -231,6 +231,9 @@ ${notes}` : ""}
     signOut: "Cerrar sesión",
     connect: "Conectar…",
     viz: "Visualización en Reproducción actual",
+    vizSearch: "Buscar visualizaciones…",
+    vizNoMatch: "Ninguna visualización coincide.",
+    vizCustomHint: "Añade tus propias visualizaciones como archivos de shader .frag en la carpeta de visualizaciones y pulsa Actualizar.",
     vizNames: {
       Water: "Ambiente: Agua",
       Alchemy: "Alquimia: Plasma",
