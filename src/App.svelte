@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { MediaQuery } from "svelte/reactivity";
   import TitleBar from "./lib/components/xp/TitleBar.svelte";
   import ContextMenu from "./lib/components/xp/ContextMenu.svelte";
   import Dialogs from "./lib/components/xp/Dialogs.svelte";
@@ -19,7 +20,8 @@
   import { router } from "./lib/router.svelte";
   import { handleShortcut } from "./lib/menus";
   import { appWindow } from "./lib/platform";
-  import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "./lib/skin";
+  import { SKIN, outlinePath, place, skinLayout } from "./lib/skin";
+  import Shell from "./lib/components/wmp/Shell.svelte";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/i18n.svelte";
   import logo from "./assets/logo.webp";
@@ -34,7 +36,13 @@
     document.title = title;
   });
 
-  // The theme is applied on <html> so every CSS variable sees it.
+  // Theme and light/dark mode go on <html> so every CSS variable sees them.
+  const systemDark = new MediaQuery("(prefers-color-scheme: dark)");
+  $effect(() => {
+    const appearance = settings.current?.appearance ?? "System";
+    const dark = appearance === "Dark" || (appearance === "System" && systemDark.current);
+    document.documentElement.dataset.mode = dark ? "dark" : "light";
+  });
   $effect(() => {
     document.documentElement.dataset.theme = (settings.current?.theme ?? "Blue").toLowerCase();
   });
@@ -44,7 +52,6 @@
   let winH = $state(0);
   const L = $derived(winW && winH ? skinLayout(winW, winH, !ui.sideCollapsed) : null);
   const outline = $derived(L ? outlinePath(L) : "");
-  const sidePod = $derived(L ? sidePodPath(L) : null);
   let outlineEl = $state<SVGPathElement>();
 
   // The outline (with its joins) is the shape for clicks: clicks on transparent areas
@@ -149,37 +156,7 @@
 {:else}
 <div class="skin" class:maximized class:inactive={!active} bind:clientWidth={winW} bind:clientHeight={winH}>
   {#if L}
-    <!-- Shell: the full outline with its joins, behind the pieces. -->
-    <svg class="shell" width={winW} height={winH} aria-hidden="true">
-      <defs>
-        <linearGradient id="shell-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" class="sh-1" />
-          <stop offset="0.25" class="sh-2" />
-          <stop offset="0.75" class="sh-3" />
-          <stop offset="1" class="sh-4" />
-        </linearGradient>
-        <!-- Side panel and pod: the same color end to end (they are one piece). -->
-        <linearGradient id="side-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={SKIN.sideW} y2="0">
-          <stop offset="0" class="sf-edge" />
-          <stop offset="0.55" class="sf-mid" />
-          <!-- Beyond the side panel (the pod) the light tone continues. -->
-          <stop offset="1" class="sf-mid" />
-        </linearGradient>
-        <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 1} x2="0" y2={winH}>
-          <!-- No effect above the pod; inside it, highlight on top and shadow below. -->
-          <stop offset="0" stop-color="#fff" stop-opacity="0" />
-          <stop offset="0.01" stop-color="#fff" stop-opacity="0.1" />
-          <stop offset="1" stop-color="#000" stop-opacity="0.1" />
-        </linearGradient>
-      </defs>
-      <path d={outline} bind:this={outlineEl} class="shell-fill" />
-      {#if sidePod}
-        <!-- The same-colored stroke hides the light thread of the silver underneath at the edge. -->
-        <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
-        <!-- Top-to-bottom highlight over the controls area, seamless. -->
-        <path d={sidePod} fill="url(#side-shade)" />
-      {/if}
-    </svg>
+    <Shell {L} w={winW} h={winH} bind:outlineEl />
     {#if L.side}
       <div
         class="piece side"
@@ -189,7 +166,15 @@
       </div>
     {/if}
     <div class="piece body" style={place(L.body)} data-tauri-drag-region></div>
-    <div class="piece tab" style={place(L.tab)}><PlaylistTab {maximized} /></div>
+    <!-- Extended left over the tab's S, so its rise (right of the curve, above the strip)
+         drags too; what lies left of the curve is outside the window shape. -->
+    <div
+      class="piece tab"
+      style="{place({ ...L.tab, x: L.tab.x - SKIN.tabSlope, w: L.tab.w + SKIN.tabSlope })};padding-left:{SKIN.tabSlope}px"
+      data-tauri-drag-region
+    >
+      <PlaylistTab {maximized} />
+    </div>
     <div class="topbar" style={place(L.topBar)}><TitleBar /></div>
     <button
       class="handle"
@@ -255,17 +240,8 @@
   .skin.inactive .piece {
     filter: saturate(0.8);
   }
-  .shell {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-  .skin.maximized .shell {
+  .skin.maximized :global(:is(.shell, .shell-edge)) {
     display: none;
-  }
-  .shell-fill {
-    fill: url(#shell-fill);
   }
   .piece {
     position: absolute;
@@ -276,24 +252,6 @@
   .side {
     z-index: 1;
     border: 0;
-  }
-  :global(.sh-1) {
-    stop-color: var(--shell-1);
-  }
-  :global(.sh-2) {
-    stop-color: var(--shell-2);
-  }
-  :global(.sh-3) {
-    stop-color: var(--shell-3);
-  }
-  :global(.sh-4) {
-    stop-color: var(--shell-4);
-  }
-  :global(.sf-edge) {
-    stop-color: var(--side-bottom);
-  }
-  :global(.sf-mid) {
-    stop-color: var(--side-top);
   }
   /* Body and tab paint nothing of their own: the silver comes from the shell, so
      there are no seams between them. */
@@ -318,8 +276,8 @@
     flex-direction: column;
     min-width: 0;
     background: var(--surface);
-    border: 1px solid #5b6fa6;
-    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+    border: 1px solid var(--content-border);
+    box-shadow: 0 0 0 1px var(--content-halo);
     overflow: hidden;
   }
   .content.dark {
@@ -336,8 +294,8 @@
     place-items: center;
     border: 1px solid var(--skin-edge);
     border-radius: 5px 0 0 5px;
-    background: linear-gradient(to right, #fff, var(--shell-3));
-    color: var(--skin-deep);
+    background: linear-gradient(to right, var(--shell-1), var(--shell-3));
+    color: var(--shell-ink);
     cursor: pointer;
   }
   .handle svg {
@@ -352,7 +310,7 @@
     height: 14px;
     cursor: nwse-resize;
     background:
-      linear-gradient(135deg, transparent 0 55%, #6d82b8 55% 62%, transparent 62% 70%, #6d82b8 70% 77%, transparent 77% 85%, #6d82b8 85% 92%, transparent 92%);
+      linear-gradient(135deg, transparent 0 55%, var(--wmp-line) 55% 62%, transparent 62% 70%, var(--wmp-line) 70% 77%, transparent 77% 85%, var(--wmp-line) 85% 92%, transparent 92%);
   }
   .about {
     display: flex;

@@ -1,7 +1,8 @@
 <script lang="ts">
   // The website is an XP Music window on an XP desktop: the same WMP 9 shell the app
   // draws (src/lib/skin.ts), with the sections as tasks.
-  import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "../../src/lib/skin";
+  import { SKIN, place, skinLayout } from "../../src/lib/skin";
+  import Shell from "../../src/lib/components/wmp/Shell.svelte";
   import DialogFrame from "../../src/lib/components/xp/DialogFrame.svelte";
   import logo from "../../src/assets/logo.webp";
   import Side from "./Side.svelte";
@@ -11,7 +12,7 @@
   import Screens from "./views/Screens.svelte";
   import Docs from "./views/Docs.svelte";
   import { REPO, SECTIONS } from "./content";
-  import { route, setTheme, site, type Theme } from "./state.svelte";
+  import { route, setAppearance, setTheme, site, type Appearance, type Theme } from "./state.svelte";
   import { i18n, language, locale, setLanguage, t } from "./i18n.svelte";
   import type { Language } from "../../src/lib/locale";
   import { current, next, pause, player, toggle } from "./player.svelte";
@@ -36,8 +37,6 @@
   const mobile = $derived(deskW > 0 && (deskW < 760 || deskH < 500));
   const shown = $derived(mobile || win === "normal" || win === "max");
   const L = $derived(!mobile && winW && winH ? skinLayout(winW, winH, !site.sideCollapsed) : null);
-  const outline = $derived(L ? outlinePath(L) : "");
-  const sidePod = $derived(L ? sidePodPath(L) : null);
 
   let comboOpen = $state(false);
   let comboEl = $state<HTMLElement>();
@@ -49,6 +48,7 @@
   });
 
   const themes = $derived(Object.entries(t.options.themes) as [Theme, string][]);
+  const appearances = $derived(Object.entries(t.options.appearances) as [Appearance, string][]);
   // Each language is named in itself, so it can be found whatever the current one is.
   const languages: [Language, string][] = [["en", "English"], ["es", "Español"]];
 </script>
@@ -106,31 +106,7 @@
           </button>
         </footer>
       {:else if L}
-        <svg class="shell" width={winW} height={winH} aria-hidden="true">
-          <defs>
-            <linearGradient id="shell-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" style="stop-color:var(--shell-1)" />
-              <stop offset="0.25" style="stop-color:var(--shell-2)" />
-              <stop offset="0.75" style="stop-color:var(--shell-3)" />
-              <stop offset="1" style="stop-color:var(--shell-4)" />
-            </linearGradient>
-            <linearGradient id="side-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={SKIN.sideW} y2="0">
-              <stop offset="0" style="stop-color:var(--side-bottom)" />
-              <stop offset="0.55" style="stop-color:var(--side-top)" />
-              <stop offset="1" style="stop-color:var(--side-top)" />
-            </linearGradient>
-            <linearGradient id="side-shade" gradientUnits="userSpaceOnUse" x1="0" y1={L.pod.y - 1} x2="0" y2={winH}>
-              <stop offset="0" stop-color="#fff" stop-opacity="0" />
-              <stop offset="0.01" stop-color="#fff" stop-opacity="0.1" />
-              <stop offset="1" stop-color="#000" stop-opacity="0.1" />
-            </linearGradient>
-          </defs>
-          <path d={outline} fill="url(#shell-fill)" />
-          {#if sidePod}
-            <path d={sidePod} fill="url(#side-fill)" stroke="url(#side-fill)" stroke-width="1.5" />
-            <path d={sidePod} fill="url(#side-shade)" />
-          {/if}
-        </svg>
+        <Shell {L} w={winW} h={winH} />
 
         {#if L.side}
           <div
@@ -145,7 +121,6 @@
           <a class="menu" href="#/" title={t.nav.home} aria-label={t.nav.home}>
             <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" /><circle cx="8" cy="8" r="1.4" /></svg>
           </a>
-          <span class="grow"></span>
           <div class="rounds">
             <button
               title={site.sideCollapsed ? t.nav.showSide : t.nav.hideSide}
@@ -158,6 +133,7 @@
               <svg viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.6" /><circle cx="6" cy="4" r="1.6" /><circle cx="10" cy="8" r="1.6" /><circle cx="6" cy="12" r="1.6" /></svg>
             </button>
           </div>
+          <span class="grow"></span>
         </header>
 
         <div class="tab" style={place(L.tab)}>
@@ -256,6 +232,12 @@
       {/each}
     </fieldset>
     <fieldset>
+      <legend>{t.options.appearance}</legend>
+      {#each appearances as [id, name] (id)}
+        <label class="radio"><input type="radio" name="appearance" checked={site.appearance === id} onchange={() => setAppearance(id)} /> {name}</label>
+      {/each}
+    </fieldset>
+    <fieldset>
       <legend>{t.options.language}</legend>
       <select class="xp-input" value={i18n.choice ?? ""} onchange={(e) => setLanguage((e.currentTarget.value || null) as Language | null)}>
         <option value="">{t.options.languageAuto}</option>
@@ -305,10 +287,8 @@
   .window.max {
     inset: 0;
   }
-  .shell {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
+  /* The window's drop shadow on the desktop. */
+  .window :global(.shell) {
     filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.45));
   }
   .piece,
@@ -337,8 +317,8 @@
     padding: 0;
     border-radius: 50%;
     border: 1px solid var(--skin-edge);
-    color: var(--skin-deep);
-    background: radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
+    color: var(--shell-ink);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
     box-shadow: inset 0 -2px 3px rgb(0 0 40 / 0.25), 0 1px 1px rgb(0 0 40 / 0.35);
     cursor: pointer;
   }
@@ -346,7 +326,7 @@
     width: 21px;
     height: 21px;
     color: #fff;
-    background: radial-gradient(circle at 50% 30%, var(--accent-1) 0%, var(--accent-2) 45%, var(--accent-3) 100%);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 30%, var(--accent-1) 0%, var(--accent-2) 45%, var(--accent-3) 100%);
   }
   .menu svg {
     width: 12px;
@@ -378,9 +358,10 @@
   .tab {
     z-index: 6;
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 9px 8px 0 10px;
+    /* One row, centered in the tab: combo and window buttons share a midline. */
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 10px;
   }
   .combo-wrap {
     position: relative;
@@ -396,8 +377,8 @@
     padding: 0 0 0 4px;
     border: 1px solid var(--btn-soft-border);
     border-radius: 2px;
-    background: #fff;
-    color: #000;
+    background: var(--view-bg);
+    color: var(--text);
     font: 12px var(--font-ui);
     text-align: left;
     box-shadow: inset 1px 1px 2px rgb(0 0 40 / 0.2);
@@ -416,7 +397,7 @@
     text-overflow: ellipsis;
   }
   .count {
-    color: #666;
+    color: var(--text-faint);
     font-size: 10px;
   }
   .arrow {
@@ -441,14 +422,14 @@
     margin: 0;
     padding: 2px;
     list-style: none;
-    background: #fff;
-    border: 1px solid #aca899;
+    background: var(--view-bg);
+    border: 1px solid var(--border-dark);
     box-shadow: 2px 2px 3px rgb(0 0 0 / 0.35);
   }
   .menu-list a {
     display: block;
     padding: 3px 8px 3px 20px;
-    color: #000;
+    color: var(--text);
     text-decoration: none;
   }
   .menu-list a[aria-checked="true"] {
@@ -463,12 +444,11 @@
   .sep {
     height: 1px;
     margin: 3px 2px;
-    background: #aca899;
+    background: var(--border-dark);
   }
   .win {
     display: flex;
     gap: 1px;
-    margin-top: -5px;
   }
   .win button {
     display: grid;
@@ -478,8 +458,13 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--skin-deep);
+    color: var(--shell-ink);
     cursor: pointer;
+  }
+  /* Over the dark frame the thin glyphs need full white and a cut-out shadow to read. */
+  :global([data-mode="dark"]) .win button {
+    color: #fff;
+    filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.9));
   }
   .win button:hover {
     color: #fff;
@@ -502,10 +487,10 @@
     padding: 0;
     display: grid;
     place-items: center;
-    border: 1px solid var(--skin-deep);
-    border-radius: 3px 0 0 3px;
-    background: linear-gradient(to right, #fff, var(--shell-3));
-    color: var(--skin-deep);
+    border: 1px solid var(--skin-edge);
+    border-radius: 5px 0 0 5px;
+    background: linear-gradient(to right, var(--shell-1), var(--shell-3));
+    color: var(--shell-ink);
     cursor: pointer;
   }
   .handle svg {
@@ -520,8 +505,8 @@
     flex-direction: column;
     min-width: 0;
     background: var(--surface);
-    border: 1px solid #5b6fa6;
-    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+    border: 1px solid var(--content-border);
+    box-shadow: 0 0 0 1px var(--content-halo);
     overflow: hidden;
   }
   .content.dark {
@@ -543,7 +528,7 @@
     padding: 0 10px;
     background: linear-gradient(to bottom, var(--shell-1), var(--shell-3));
     border-bottom: 1px solid var(--skin-edge);
-    color: var(--skin-deep);
+    color: var(--shell-ink);
     font: bold 14px var(--font-title);
   }
   .m-side {
@@ -567,7 +552,7 @@
     width: 34px;
     height: 34px;
     color: #fff;
-    background: radial-gradient(circle at 50% 28%, var(--accent-1) 0%, var(--accent-2) 35%, var(--accent-3) 100%);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 28%, var(--accent-1) 0%, var(--accent-2) 35%, var(--accent-3) 100%);
   }
   .m-bar svg {
     width: 13px;

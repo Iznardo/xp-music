@@ -69,7 +69,7 @@ In "Now Playing", the ◀ ▶ arrows (or a click on the stage) switch the visual
 
 In **Options** (or **Tools → Options…**) you can set:
 
-- **Player:** color scheme (Blue, Olive green or Silver), language (automatic by default, or English / Español), minimize to the tray, start minimized or when you sign in, notifications, system sounds, and pause when the computer is locked.
+- **Player:** color scheme (Blue, Olive green or Silver), light or dark appearance (follows the system by default), language (automatic by default, or English / Español), minimize to the tray, start minimized or when you sign in, notifications, system sounds, and pause when the computer is locked.
 - **Keyboard:** global shortcuts.
 - **Audio:** output device, even out the volume between songs, and record plays in the YouTube Music history.
 - **Account:** the connected account; you sign out from here.

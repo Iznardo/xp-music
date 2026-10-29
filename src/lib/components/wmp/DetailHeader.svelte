@@ -41,16 +41,16 @@
     display: flex;
     gap: 14px;
     padding: 10px 12px;
-    background: linear-gradient(to bottom, #fbfcff, #e6edf8);
-    border: 1px solid #a9bbd9;
+    background: linear-gradient(to bottom, var(--pane-1), var(--pane-2));
+    border: 1px solid var(--rule);
     margin-bottom: 6px;
   }
   .art {
     flex: none;
     width: 100px;
     height: 100px;
-    border: 1px solid #7f9db9;
-    background: linear-gradient(135deg, #e7ecf5, #c4cee2);
+    border: 1px solid var(--input-border);
+    background: var(--art-bg);
     box-shadow: 2px 2px 4px rgb(0 0 0 / 0.25);
   }
   .art.round {
@@ -70,7 +70,7 @@
     min-width: 0;
   }
   .kind {
-    color: #5a6f96;
+    color: var(--text-faint);
     text-transform: uppercase;
     font-size: 10px;
     letter-spacing: 0.5px;
@@ -78,16 +78,16 @@
   h1 {
     margin: 0;
     font: bold 18px var(--font-title);
-    color: #0b2c6b;
+    color: var(--heading);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .sub {
-    color: #333;
+    color: var(--text-muted);
   }
   .stats {
-    color: #707070;
+    color: var(--text-faint);
   }
   .actions {
     display: flex;

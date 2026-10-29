@@ -123,8 +123,8 @@
     z-index: 901;
     min-width: 170px;
     padding: 2px;
-    background: #fff;
-    border: 1px solid #aca899;
+    background: var(--view-bg);
+    border: 1px solid var(--border-dark);
     box-shadow: 2px 2px 3px rgb(0 0 0 / 0.35);
     outline: none;
   }
@@ -136,7 +136,7 @@
     padding: 0 6px 0 0;
     border: 0;
     background: none;
-    color: #000;
+    color: var(--text);
     text-align: left;
     font: inherit;
     cursor: default;
@@ -146,7 +146,7 @@
     color: #fff;
   }
   .row:disabled {
-    color: #aca899;
+    color: var(--text-disabled);
   }
   .bold .label {
     font-weight: bold;
@@ -166,6 +166,6 @@
   .sep {
     height: 1px;
     margin: 3px 1px;
-    background: #aca899;
+    background: var(--border-dark);
   }
 </style>

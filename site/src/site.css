@@ -21,7 +21,7 @@ body {
 }
 
 a {
-  color: #0b3c99;
+  color: var(--link);
 }
 
 /* Taskbar per theme. */
@@ -48,6 +48,14 @@ a {
   --tb-tray: linear-gradient(to bottom, #e8e8ee, #cfd0da 50%, #c4c5d1);
 }
 
+/* Callout background in the documentation. */
+:root {
+  --note-bg: #fffbe0;
+}
+:root[data-mode="dark"] {
+  --note-bg: #34301f;
+}
+
 /* Light views (Download, Screenshots, Documentation): like the Library. */
 .view {
   flex: 1;
@@ -55,7 +63,8 @@ a {
   min-width: 0;
   overflow: auto;
   padding: 10px 14px 16px;
-  background: #fff;
+  background: var(--view-bg);
+  color: var(--text);
 }
 .vhead {
   display: flex;
@@ -65,7 +74,7 @@ a {
 }
 .vhead h1 {
   margin: 0;
-  color: #0b2a6e;
+  color: var(--heading);
   font: bold 17px var(--font-title);
 }
 .vhead .grow {
@@ -76,7 +85,7 @@ a {
   place-items: center;
 }
 a.xp-btn {
-  color: #000;
+  color: var(--text);
   text-decoration: none;
 }
 .muted {
@@ -84,7 +93,7 @@ a.xp-btn {
 }
 .view h2 {
   margin: 16px 0 6px;
-  color: #0b2a6e;
+  color: var(--heading);
   font: bold 14px var(--font-title);
 }
 
@@ -94,15 +103,15 @@ a.xp-btn {
   width: 100%;
   max-width: 900px;
   border-collapse: collapse;
-  border: 1px solid #a7b5d6;
+  border: 1px solid var(--rule);
   margin: 6px 0 12px;
 }
 .lv th,
 .md th {
   padding: 3px 6px;
-  border-right: 1px solid #d7d3c4;
-  border-bottom: 3px solid #e2dfd2;
-  background: linear-gradient(to bottom, #fff, #f1efe2);
+  border-right: 1px solid var(--list-col-border);
+  border-bottom: 3px solid var(--list-header-border);
+  background: var(--list-header);
   font-weight: normal;
   text-align: left;
 }
@@ -112,11 +121,11 @@ a.xp-btn {
 }
 .lv tbody tr:nth-child(even),
 .md tbody tr:nth-child(even) {
-  background: #f3f6fc;
+  background: var(--row-alt);
 }
 .lv tbody tr:hover,
 .md tbody tr:hover {
-  background: #e1e8f5;
+  background: var(--hover-bg);
 }
 .lv .num {
   text-align: right;
@@ -131,23 +140,23 @@ a.xp-btn {
 .md h2 {
   margin: 20px 0 6px;
   padding-bottom: 2px;
-  border-bottom: 1px solid #c9d4ec;
+  border-bottom: 1px solid var(--rule);
 }
 .md h3 {
   margin: 14px 0 4px;
-  color: #0b2a6e;
+  color: var(--heading);
 }
 .md code {
   padding: 0 3px;
-  border: 1px solid #e2dfd2;
-  background: #fbfaf6;
+  border: 1px solid var(--fieldset-border);
+  background: var(--surface-light);
   font: 12px Consolas, "Lucida Console", monospace;
 }
 .md pre {
   padding: 8px 10px;
   overflow: auto;
-  border: 1px solid #7f9db9;
-  background: #fff;
+  border: 1px solid var(--input-border);
+  background: var(--view-bg);
   box-shadow: inset 1px 1px 2px rgb(0 0 0 / 0.15);
 }
 .md pre code {
@@ -158,11 +167,11 @@ a.xp-btn {
 .md img {
   max-width: 100%;
   height: auto;
-  border: 1px solid #a7b5d6;
+  border: 1px solid var(--rule);
 }
 .md blockquote {
   margin: 8px 0;
   padding: 6px 10px;
   border-left: 4px solid var(--selection);
-  background: #fffbe0;
+  background: var(--note-bg);
 }

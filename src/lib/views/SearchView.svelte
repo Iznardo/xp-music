@@ -67,7 +67,7 @@
     flex-direction: column;
     min-height: 0;
     padding: 8px;
-    background: #f5f6fa;
+    background: var(--view-alt);
   }
   /* XP tabs: the active one merges with the panel and has the orange border on top. */
   .tabs {
@@ -79,10 +79,10 @@
     position: relative;
     top: 1px;
     padding: 3px 10px;
-    border: 1px solid #919b9c;
+    border: 1px solid var(--tab-border);
     border-bottom: 0;
     border-radius: 3px 3px 0 0;
-    background: linear-gradient(to bottom, #fff, #ecebe5 80%, #d8d2c6);
+    background: var(--ctl-face);
     font: inherit;
     cursor: default;
   }
@@ -93,7 +93,7 @@
     z-index: 1;
     padding-bottom: 5px;
     margin-top: -2px;
-    background: #fcfcfe;
+    background: var(--view-bg);
     box-shadow: inset 0 2px #f9b63c;
   }
   .panel {
@@ -102,8 +102,8 @@
     flex-direction: column;
     min-height: 0;
     padding: 8px;
-    border: 1px solid #919b9c;
-    background: #fcfcfe;
+    border: 1px solid var(--tab-border);
+    background: var(--view-bg);
   }
   .tiles {
     flex: none;
@@ -113,7 +113,7 @@
     overflow: auto;
   }
   .hint {
-    color: #555;
+    color: var(--text-muted);
     text-align: center;
     margin-top: 30px;
   }

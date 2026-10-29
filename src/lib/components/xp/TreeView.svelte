@@ -93,10 +93,10 @@
     display: grid;
     place-items: center;
     padding: 0;
-    border: 1px solid #7a8aa6;
-    background: linear-gradient(to bottom right, #fff, #d8dde8);
+    border: 1px solid var(--input-border);
+    background: linear-gradient(to bottom right, var(--view-bg), var(--pane-2));
     font: 9px/1 Tahoma;
-    color: #233d6e;
+    color: var(--heading);
     cursor: default;
   }
   .label {
@@ -117,11 +117,11 @@
   }
   .label:hover span {
     text-decoration: underline;
-    color: #0b3c99;
+    color: var(--link);
   }
   .label.sel {
-    background: #e1e8f5;
-    border-color: #a6b9de;
+    background: var(--sel-soft);
+    border-color: var(--rule);
   }
   .tree:focus .label.sel {
     background: var(--selection);

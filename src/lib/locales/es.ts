@@ -215,6 +215,8 @@ ${notes}` : ""}
     },
     theme: "Combinación de colores",
     themes: { Blue: "Azul (predeterminado)", Olive: "Verde oliva", Silver: "Plateado" },
+    appearance: "Apariencia",
+    appearances: { System: "Igual que el sistema", Light: "Claro", Dark: "Oscuro" },
     language: "Idioma",
     languageAuto: "Automático (idioma del sistema)",
     xpSounds: "Reproducir sonidos del sistema",

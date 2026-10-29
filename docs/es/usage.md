@@ -69,7 +69,7 @@ En «Reproduciendo», las flechas ◀ ▶ (o un clic en el escenario) cambian de
 
 En **Opciones** (o **Herramientas → Opciones…**) se configura:
 
-- **Reproductor:** combinación de colores (Azul, Verde oliva o Plateado), idioma (automático por defecto, o English / Español), cerrar a la bandeja, iniciar minimizado o al iniciar sesión, notificaciones, sonidos del sistema y pausar al bloquear el equipo.
+- **Reproductor:** combinación de colores (Azul, Verde oliva o Plateado), apariencia clara u oscura (sigue al sistema por defecto), idioma (automático por defecto, o English / Español), cerrar a la bandeja, iniciar minimizado o al iniciar sesión, notificaciones, sonidos del sistema y pausar al bloquear el equipo.
 - **Teclado:** atajos globales.
 - **Audio:** dispositivo de salida, igualar el volumen entre canciones y registrar las escuchas en el historial de YouTube Music.
 - **Cuenta:** la cuenta conectada; desde aquí se cierra la sesión.
