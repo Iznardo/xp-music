@@ -53,24 +53,33 @@ impl QueryResponse {
     }
 }
 
+/// HTTP/2 header list limit advertised to the server. h2 defaults to 16 KiB,
+/// but music.youtube.com can exceed that on authenticated requests (many
+/// Set-Cookie headers), which makes h2 reset the stream.
+const HTTP2_MAX_HEADER_LIST_SIZE: u32 = 256 * 1024;
+
+fn builder() -> reqwest::ClientBuilder {
+    reqwest::Client::builder().http2_max_header_list_size(HTTP2_MAX_HEADER_LIST_SIZE)
+}
+
 impl Client {
     /// Utilises reqwest's default tls choice for the enabled set of options.
     pub fn new() -> Result<Self> {
-        let inner = reqwest::Client::builder().build()?;
+        let inner = builder().build()?;
         Ok(Self { inner })
     }
     #[cfg(feature = "rustls")]
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls")))]
     /// Force the use of rustls
     pub fn new_rustls_tls() -> Result<Self> {
-        let inner = reqwest::Client::builder().use_rustls_tls().build()?;
+        let inner = builder().use_rustls_tls().build()?;
         Ok(Self { inner })
     }
     #[cfg(feature = "native-tls")]
     #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     /// Force the use of native-tls
     pub fn new_native_tls() -> Result<Self> {
-        let inner = reqwest::Client::builder().use_native_tls().build()?;
+        let inner = builder().use_native_tls().build()?;
         Ok(Self { inner })
     }
     #[cfg(feature = "reqwest")]
