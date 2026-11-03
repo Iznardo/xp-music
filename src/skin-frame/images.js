@@ -62,7 +62,10 @@ export class Images {
         const [r, g, b] = color;
         const px = data.data;
         // JPEG never gives back the exact key color (Professional, Xbox use .jpg buttons with #ff00ff).
-        const tol = ext === "jpg" || ext === "jpeg" ? 48 : 0;
+        // Only for saturated keys (#ff00ff, #00ff00…): with a black, white or gray key the tolerance
+        // would also cut out the image's own shadows or highlights.
+        const saturated = Math.max(r, g, b) - Math.min(r, g, b) >= 192;
+        const tol = (ext === "jpg" || ext === "jpeg") && saturated ? 48 : 0;
         for (let i = 0; i < px.length; i += 4) {
           if (Math.abs(px[i] - r) <= tol && Math.abs(px[i + 1] - g) <= tol && Math.abs(px[i + 2] - b) <= tol) {
             px[i + 3] = 0;
