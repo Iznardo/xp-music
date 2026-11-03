@@ -66,6 +66,10 @@ export class El {
     this._visible = true;
     this._enabled = true;
     this._z = 0;
+    /** Added to the z of a control inside a layered subview (see Subview._layerBackground). */
+    this._zBase = 0;
+    /** Own layer for the background, only when something inside has to go behind it. @type {HTMLElement | null} */
+    this._bgEl = null;
     this._alpha = 255;
     this._id = "";
     this._tooltip = "";
@@ -148,7 +152,8 @@ export class El {
   }
   set zindex(v) {
     this._z = num(v);
-    this._dom.style.zIndex = String(this._z);
+    this._dom.style.zIndex = String(this._z + this._zBase);
+    if (this._bgEl) this._bgEl.style.zIndex = String(this._z);
   }
   get alphablend() {
     return this._alpha;
@@ -241,8 +246,9 @@ export class El {
     const name = this._bgName;
     const img = name ? await this._rt.images.get(name, this._key()) : null;
     if (name !== this._bgName) return;
-    this._dom.style.backgroundImage = img ? `url("${img.url}")` : "";
-    this._dom.style.backgroundRepeat = "no-repeat";
+    const target = this._bgEl ?? this._dom;
+    target.style.backgroundImage = img ? `url("${img.url}")` : "";
+    target.style.backgroundRepeat = "no-repeat";
     // The click shape: clippingImage if there is one; otherwise the background.
     let mask = img;
     if (this._clippingImage) mask = (await this._rt.images.get(this._clippingImage, this._clipping || "#ff00ff")) ?? img;
@@ -337,6 +343,29 @@ export class Subview extends El {
   }
   _naturalH() {
     return this._mask?.h ?? this._parent?.height ?? 0;
+  }
+  /**
+   * In WMP the zIndex of a subview is absolute (the whole view), that of a control is relative to
+   * its subview, and the subview's own background sits at the subview's z. So a child subview with
+   * a lower z than its parent is painted BEHIND the parent's background (the Xbox skin hides its
+   * intro animation under the glass of `screenCover` this way). In the DOM a child is always above
+   * the parent's own background, so in that case the background gets its own layer at the parent's z
+   * and the controls inside are lifted by the same amount to stay above it. Called once the children exist.
+   */
+  _layerBackground() {
+    if (this._bgEl || !this._children.some((c) => c instanceof Subview && c._z < this._z)) return;
+    const layer = document.createElement("div");
+    layer.className = "wmp-bg";
+    Object.assign(layer.style, { position: "absolute", left: "0", top: "0", width: "100%", height: "100%", pointerEvents: "none", zIndex: String(this._z) });
+    this._dom.prepend(layer);
+    this._bgEl = layer;
+    this._dom.style.backgroundImage = "";
+    for (const c of this._children) {
+      if (c instanceof Subview) continue;
+      c._zBase = this._z;
+      c.zindex = c._z;
+    }
+    if (this._bgName) void this._loadBackground();
   }
   _target(/** @type {number} */ x, /** @type {number} */ y) {
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return null;

@@ -258,6 +258,7 @@ export class Runtime {
       parent._dom.append(el._dom);
       this.#setup(el, child);
       if (Cls === Subview || Cls === ButtonGroup) this.#build(child, el);
+      if (el instanceof Subview) el._layerBackground();
       if (child.tag in TEXT_TAGS && TEXT_TAGS[/** @type {keyof typeof TEXT_TAGS} */ (child.tag)] && !("value" in child.attrs)) {
         this.#attr(el, "value", /** @type {string} */ (TEXT_TAGS[/** @type {keyof typeof TEXT_TAGS} */ (child.tag)]));
       }
