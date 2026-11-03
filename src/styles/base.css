@@ -84,6 +84,22 @@ legend {
 .xp-input:focus {
   border-color: #3c7fb1;
 }
+/* Drawn by hand: WebKitGTK (Linux) paints native combos with the GTK theme's padding,
+   which clips the text at this height. The arrow is two gradients in currentColor. */
+select.xp-input {
+  appearance: none;
+  border-radius: 0;
+  padding: 0 20px 0 4px;
+  line-height: 19px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right 10px center,
+    right 6px center;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+}
 
 /* XP-style scrollbars (Luna blue). */
 ::-webkit-scrollbar {
