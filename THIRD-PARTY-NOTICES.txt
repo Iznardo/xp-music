@@ -81,6 +81,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
+Wine Tahoma  (https://gitlab.winehq.org/wine/wine/-/tree/master/fonts)  -  LGPL 2.1+
+================================================================================
+
+Used as the interface font on systems without Microsoft's Tahoma (Linux, macOS).
+Copyright (c) 1993-2026 the Wine project authors. The font is based on Bitstream
+Vera Sans, Copyright (c) 2003 Bitstream, Inc., and was renamed in accordance with
+the Bitstream Vera license. It is a separate font file, loaded by the interface
+through @font-face; it can be replaced by any other font. The LGPL text:
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+
+================================================================================
 Other dependencies
 ================================================================================
 
