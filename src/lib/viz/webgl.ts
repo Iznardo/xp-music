@@ -278,6 +278,27 @@ class Feedback implements VizRenderer {
   }
 }
 
+/// User shader: the file is the body that follows the shared header (helpers and
+/// uniforms of `COMMON`), so it only writes `void main()`.
+export class Custom extends Feedback {
+  constructor(canvas: HTMLCanvasElement, source: string) {
+    super(canvas, compiles(`${COMMON}\n${source}`));
+  }
+}
+
+/// Compiles on a scratch canvas and returns `frag`, or throws. A canvas that got a
+/// WebGL context can no longer be 2D, and the fallback to Bars needs it.
+function compiles(frag: string): string {
+  const gl = document.createElement("canvas").getContext("webgl2");
+  if (!gl) throw new Error("WebGL2 unavailable");
+  try {
+    program(gl, frag);
+  } finally {
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+  }
+  return frag;
+}
+
 export class Ambience extends Feedback {
   constructor(canvas: HTMLCanvasElement) {
     super(canvas, AMBIENCE);

@@ -185,6 +185,7 @@ let settings: Settings = {
   launchAtLogin: false,
   reportHistory: true,
   visualization: "Water",
+  customVisualization: null,
   xpSounds: true,
   notifications: true,
   pauseOnLock: false,
@@ -524,6 +525,20 @@ export const commands = {
   // With XP_SKINS_DIR, Vite serves the skins folder (vite.config.ts).
   skinsList: async () => ({ status: "ok" as const, data: (await (await fetch("/skin/list")).json()) as { id: string; name: string; bytes: number }[] }),
   skinsOpenDir: () => ok(null),
+  vizCustomList: () =>
+    ok([
+      {
+        name: "pulse",
+        source: `void main() {
+  vec2 c = uv - 0.5;
+  c.x *= res.x / res.y;
+  vec3 trail = texture(prev, uv).rgb * pow(0.9, step);
+  float ring = smoothstep(0.02, 0.0, abs(length(c) - 0.15 - bass * 0.2));
+  o = vec4(max(trail, hsv(time * 0.05, 0.8, 1.0) * ring), 1.0);
+}`,
+      },
+    ]),
+  vizCustomOpenDir: () => ok(null),
   vizSetActive: (on: boolean) => {
     clearInterval(vizTimer);
     if (on) vizTimer = setInterval(fakeViz, 33);

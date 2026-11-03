@@ -7,13 +7,15 @@
   import { commands, events, type VizPreset } from "../bindings";
   import { EMPTY_FRAME, toData, type VizData, type VizRenderer } from "./types";
   import { Bars, Waves } from "./canvas2d";
-  import { Alchemy, Ambience, Battery, Spiral, Water } from "./webgl";
+  import { Alchemy, Ambience, Battery, Custom, Spiral, Water } from "./webgl";
 
-  let { preset }: { preset: VizPreset } = $props();
+  // `source`: GLSL of a user visualization (wins over `preset`).
+  let { preset, source }: { preset: VizPreset; source?: string } = $props();
   let canvas: HTMLCanvasElement;
 
   function create(c: HTMLCanvasElement): VizRenderer {
     try {
+      if (source) return new Custom(c, source);
       if (preset === "Ambience") return new Ambience(c);
       if (preset === "Battery") return new Battery(c);
       if (preset === "Water") return new Water(c);

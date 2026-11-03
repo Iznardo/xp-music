@@ -42,6 +42,7 @@ Los detalles (avisos de SmartScreen y Gatekeeper, requisitos en Linux, Arch, Nix
 - [Instalar](docs/es/install.md)
 - [Uso](docs/es/usage.md): vistas, atajos, visualizaciones y opciones.
 - [Máscaras de Windows Media Player](docs/es/skins.md)
+- [Visualizaciones propias](docs/es/visualizations.md)
 - [Preguntas frecuentes](docs/es/faq.md)
 - [Compilar](docs/es/building.md)
 - [Publicar una versión](docs/es/releasing.md) (mantenedor)
