@@ -97,7 +97,7 @@ export function menuBar(): { label: string; items: () => MenuItem[] }[] {
     },
     {
       label: t.menuBar.help,
-      items: () => [{ kind: "item", label: t.menuBar.about, action: () => (ui.aboutOpen = true) }],
+      items: () => [{ kind: "item", label: t.menuBar.about, action: () => { ui.optionsAbout = true; ui.optionsOpen = true; } }],
     },
   ];
 }

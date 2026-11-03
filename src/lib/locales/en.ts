@@ -207,6 +207,7 @@ Do you want to install it now? The application will restart.`,
       upToDate: "yt-dlp is already up to date.",
       updated: (v: string) => `yt-dlp updated to ${v}.`,
       openLogs: "Open logs folder",
+      credits: "Built with Rust, Tauri and Svelte. Uses yt-dlp (Unlicense) and Deno (MIT).",
       notice: "XP Music is not affiliated with Microsoft or Google. Windows and YouTube are trademarks of their respective owners.",
       appUpdates: "XP Music updates",
       checkApp: "Check for updates",
@@ -281,8 +282,6 @@ ${msg}`,
     no: "No",
     newPlaylistTitle: "New playlist",
     newPlaylistLabel: "Playlist name:",
-    aboutText:
-      "A YouTube Music player that looks like Windows XP.\nBuilt with Rust, Tauri and Svelte.\n\nNot affiliated with Google, YouTube or Microsoft.\nUses yt-dlp (Unlicense) and Deno (MIT).",
   },
 };
 

@@ -3,7 +3,6 @@
   import TitleBar from "./lib/components/xp/TitleBar.svelte";
   import ContextMenu from "./lib/components/xp/ContextMenu.svelte";
   import Dialogs from "./lib/components/xp/Dialogs.svelte";
-  import DialogFrame from "./lib/components/xp/DialogFrame.svelte";
   import SideTasks from "./lib/components/wmp/SideTasks.svelte";
   import TransportBar from "./lib/components/wmp/TransportBar.svelte";
   import Lazy from "./lib/components/Lazy.svelte";
@@ -22,7 +21,6 @@
   import { SKIN, outlinePath, place, sidePodPath, skinLayout } from "./lib/skin";
   import PlaylistTab from "./lib/components/wmp/PlaylistTab.svelte";
   import { t } from "./lib/i18n.svelte";
-  import logo from "./assets/logo.webp";
   import type { SearchFilter } from "./lib/bindings";
 
   let maximized = $state(false);
@@ -229,19 +227,6 @@
 {#if ui.optionsOpen}<Lazy load={views.options} />{/if}
 {#if ui.loginOpen}<Lazy load={views.login} />{/if}
 {#if skins.pickerOpen}<Lazy load={views.skinPicker} />{/if}
-{#if ui.aboutOpen}
-  <DialogFrame title={t.menuBar.about} onclose={() => (ui.aboutOpen = false)}>
-    <div class="about">
-      <img src={logo} alt="" width="48" height="48" />
-      <div>
-        <b>{t.appName}</b> 0.1.0
-        <p>{t.dialogs.aboutText}</p>
-      </div>
-    </div>
-    <div class="about-buttons"><button class="xp-btn" onclick={() => (ui.aboutOpen = false)}>{t.dialogs.ok}</button></div>
-  </DialogFrame>
-{/if}
-
 <style>
   /* Piecewise WMP 9 skin (see lib/skin.ts). The window is transparent: whatever no
      piece covers is not visible (and the Windows region does not include it either). */
@@ -353,19 +338,5 @@
     cursor: nwse-resize;
     background:
       linear-gradient(135deg, transparent 0 55%, #6d82b8 55% 62%, transparent 62% 70%, #6d82b8 70% 77%, transparent 77% 85%, #6d82b8 85% 92%, transparent 92%);
-  }
-  .about {
-    display: flex;
-    gap: 12px;
-    width: 300px;
-  }
-  .about p {
-    white-space: pre-line;
-    margin: 6px 0 0;
-  }
-  .about-buttons {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 10px;
   }
 </style>

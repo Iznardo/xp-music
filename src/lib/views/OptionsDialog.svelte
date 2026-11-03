@@ -30,7 +30,8 @@
     if (!mods.length && !/^F\d+$/.test(key)) return;
     draft.hotkeys[name] = [...mods, key].join("+");
   }
-  let tab = $state<Tab>("player");
+  let tab = $state<Tab>(ui.optionsAbout ? "about" : "player");
+  ui.optionsAbout = false;
   let draft = $state<Settings | null>(settings.current ? { ...settings.current } : null);
   let devices = $state<AudioDevice[]>([]);
   void commands.playerListDevices().then((d) => (devices = d));
@@ -198,6 +199,7 @@
               {#if updates.message}<p class="hint">{updates.message}</p>{/if}
             {/if}
           </fieldset>
+          <p class="hint">{t.options.about.credits}</p>
           <p class="hint">{t.options.about.notice}</p>
         </div>
       {/if}
