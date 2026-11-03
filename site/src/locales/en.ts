@@ -105,6 +105,8 @@ export const en = {
     title: "Options",
     theme: "Color scheme",
     themes: { blue: "Blue (default)", olive: "Olive green", silver: "Silver" },
+    appearance: app.options.appearance,
+    appearances: app.options.appearances,
     language: "Language",
     languageAuto: "Automatic (browser language)",
     ok: "OK",

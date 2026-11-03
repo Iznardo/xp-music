@@ -175,6 +175,7 @@ try {
 
 let settings: Settings = {
   theme: "Blue",
+  appearance: "System",
   language: null,
   volume: 0.8,
   normalizeVolume: true,

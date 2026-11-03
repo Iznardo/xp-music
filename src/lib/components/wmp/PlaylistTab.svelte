@@ -73,9 +73,10 @@
   .tab {
     height: 100%;
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 9px 8px 0 10px;
+    /* One row, centered in the tab: combo and window buttons share a midline. */
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 10px;
   }
   .combo {
     flex: 1;
@@ -87,8 +88,8 @@
     padding: 0 0 0 4px;
     border: 1px solid var(--btn-soft-border);
     border-radius: 2px;
-    background: #fff;
-    color: #000;
+    background: var(--view-bg);
+    color: var(--text);
     font: 12px var(--font-ui);
     text-align: left;
     box-shadow: inset 1px 1px 2px rgb(0 0 40 / 0.2);
@@ -107,7 +108,7 @@
     text-overflow: ellipsis;
   }
   .count {
-    color: #666;
+    color: var(--text-faint);
     font-size: 10px;
   }
   .arrow {
@@ -126,7 +127,6 @@
   .win {
     display: flex;
     gap: 1px;
-    margin-top: -5px;
   }
   .win button {
     display: grid;
@@ -136,8 +136,13 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--skin-deep);
+    color: var(--shell-ink);
     cursor: pointer;
+  }
+  /* Over the dark frame the thin glyphs need full white and a cut-out shadow to read. */
+  :global([data-mode="dark"]) .win button {
+    color: #fff;
+    filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.9));
   }
   .win button:hover {
     color: #fff;

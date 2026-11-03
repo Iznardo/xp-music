@@ -52,7 +52,7 @@
     flex: 1;
     overflow: auto;
     padding: 8px 14px;
-    background: linear-gradient(to bottom, #fff, #eef3fb 300px);
+    background: linear-gradient(to bottom, var(--view-bg), var(--view-alt) 300px);
   }
   section {
     margin-bottom: 8px;
@@ -60,8 +60,8 @@
   h2 {
     margin: 6px 0 2px;
     font: bold 14px var(--font-title);
-    color: #0b2c6b;
-    border-bottom: 1px solid #b9c8e4;
+    color: var(--heading);
+    border-bottom: 1px solid var(--rule);
     padding-bottom: 2px;
   }
   .more {
@@ -69,7 +69,7 @@
     text-align: center;
   }
   .hint {
-    color: #555;
+    color: var(--text-muted);
     padding: 20px;
     text-align: center;
   }

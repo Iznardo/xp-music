@@ -124,17 +124,17 @@
   h2 {
     margin: 0;
     font: bold 15px var(--font-title);
-    color: #0b2c6b;
+    color: var(--heading);
   }
   .count {
     flex: 1;
-    color: #707070;
+    color: var(--text-faint);
   }
   .scroll {
     flex: 1;
     overflow: auto;
-    background: #fff;
-    border: 1px solid #7f9db9;
+    background: var(--view-bg);
+    border: 1px solid var(--input-border);
   }
   .history {
     flex: 1;
@@ -143,8 +143,8 @@
   h3 {
     margin: 10px 0 4px;
     font-size: 12px;
-    color: #0b2c6b;
-    border-bottom: 1px solid #a9bbd9;
+    color: var(--heading);
+    border-bottom: 1px solid var(--rule);
   }
   .hist-table {
     display: flex;

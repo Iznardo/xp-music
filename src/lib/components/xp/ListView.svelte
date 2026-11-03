@@ -282,24 +282,25 @@
     flex-direction: column;
     min-height: 0;
     flex: 1;
-    background: #fff;
-    border: 1px solid #7f9db9;
+    background: var(--view-bg);
+    border: 1px solid var(--input-border);
     outline: none;
   }
   .header {
     display: grid;
     flex: none;
     height: 22px;
-    background: linear-gradient(to bottom, #ffffff, #f1efe2 80%, #e2ddc9);
-    border-bottom: 1px solid #c7c5b2;
+    background: var(--list-header);
+    border-bottom: 1px solid var(--list-header-border);
     overflow: hidden;
   }
   .col {
     position: relative;
     padding: 0 6px;
     border: 0;
-    border-right: 1px solid #dbd8c7;
+    border-right: 1px solid var(--list-col-border);
     background: none;
+    color: inherit;
     font: inherit;
     white-space: nowrap;
     overflow: hidden;
@@ -307,13 +308,13 @@
     cursor: default;
   }
   .col:hover {
-    background: linear-gradient(to bottom, #fff, #faf9f4);
+    background: var(--view-bg);
     box-shadow: inset 0 -3px #f9b63c;
   }
   .arrow {
     margin-left: 4px;
     font-size: 7px;
-    color: #aca899;
+    color: var(--border-dark);
   }
   .body {
     position: relative;
@@ -333,28 +334,28 @@
     cursor: default;
   }
   .row:nth-child(even) {
-    background: #f7f9fd;
+    background: var(--row-alt);
   }
   .row.current {
     font-weight: bold;
-    color: #0b3c99;
+    color: var(--link);
   }
   .row.sel {
-    background: #ccdaf3;
+    background: var(--sel-soft);
   }
   .listview:focus-within .row.sel {
     background: var(--selection);
     color: #fff;
   }
   .listview:focus-within .row.focus {
-    outline: 1px dotted #000;
+    outline: 1px dotted var(--text);
     outline-offset: -1px;
   }
   .row.drop-before {
-    box-shadow: inset 0 2px #1f4ea6;
+    box-shadow: inset 0 2px var(--selection);
   }
   .row.drop-after {
-    box-shadow: inset 0 -2px #1f4ea6;
+    box-shadow: inset 0 -2px var(--selection);
   }
   .cell {
     padding: 0 6px;
@@ -404,6 +405,6 @@
     position: absolute;
     inset: 20px 0 auto;
     text-align: center;
-    color: #808080;
+    color: var(--text-faint);
   }
 </style>

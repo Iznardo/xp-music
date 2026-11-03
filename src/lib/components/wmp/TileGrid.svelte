@@ -70,20 +70,20 @@
     cursor: default;
   }
   .tile:hover {
-    border-color: #c4d3ee;
-    background: #eef3fc;
+    border-color: var(--hover-border);
+    background: var(--hover-bg);
   }
   .tile:focus {
     outline: none;
-    border-color: #316ac5;
-    background: #dde7f8;
+    border-color: var(--selection);
+    background: var(--sel-soft);
   }
   .art {
     position: relative;
     width: 104px;
     height: 104px;
-    border: 1px solid #a6b2c8;
-    background: linear-gradient(135deg, #e7ecf5, #c4cee2);
+    border: 1px solid var(--art-border);
+    background: var(--art-bg);
     box-shadow: 2px 2px 3px rgb(0 0 0 / 0.18);
   }
   .round .art {
@@ -129,6 +129,6 @@
     margin-top: 5px;
   }
   .sub {
-    color: #6d6d6d;
+    color: var(--text-faint);
   }
 </style>

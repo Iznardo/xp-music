@@ -127,7 +127,7 @@
   .cta .xp-btn {
     display: inline-grid;
     place-items: center;
-    color: #000;
+    color: var(--text);
     text-decoration: none;
   }
   .vizbar {
@@ -201,7 +201,7 @@
     border: 1px solid var(--btn-soft-border);
     border-radius: 3px;
     background: linear-gradient(to bottom, var(--btn-1), var(--btn-3));
-    color: #000;
+    color: var(--btn-ink);
     font-weight: bold;
   }
   .n {

@@ -151,29 +151,29 @@
   h2 {
     margin: 0;
     font: bold 15px var(--font-title);
-    color: #0b2c6b;
+    color: var(--heading);
   }
   .count {
     flex: 1;
-    color: #707070;
+    color: var(--text-faint);
   }
   .scroll {
     flex: 1;
     overflow: auto;
-    background: #fff;
-    border: 1px solid #7f9db9;
+    background: var(--view-bg);
+    border: 1px solid var(--input-border);
   }
   .empty {
     margin: auto;
     max-width: 360px;
     text-align: center;
-    color: #444;
+    color: var(--text-muted);
   }
   .empty p {
     margin: 8px 0 12px;
   }
   .hint {
-    color: #555;
+    color: var(--text-muted);
     padding: 20px;
     text-align: center;
   }

@@ -75,8 +75,8 @@
     top: 7px;
     height: 4px;
     border: 1px solid;
-    border-color: #9d9c99 #fff #fff #9d9c99;
-    background: #e5e4dc;
+    border-color: var(--rail-shadow) var(--rail-light) var(--rail-light) var(--rail-shadow);
+    background: var(--rail-bg);
   }
   .dark .rail {
     border-color: #050a16 #3d5384 #3d5384 #050a16;
@@ -101,7 +101,7 @@
     box-shadow: 0 1px 1px rgb(0 0 0 / 0.4);
   }
   .slider:focus-visible .knob {
-    outline: 1px dotted #000;
+    outline: 1px dotted var(--text);
     outline-offset: 1px;
   }
 </style>

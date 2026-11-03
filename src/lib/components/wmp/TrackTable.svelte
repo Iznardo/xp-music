@@ -79,8 +79,8 @@
     flex: none;
     padding: 4px;
     text-align: center;
-    background: #fff;
-    border: 1px solid #7f9db9;
+    background: var(--view-bg);
+    border: 1px solid var(--input-border);
     border-top: 0;
   }
 </style>

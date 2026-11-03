@@ -53,8 +53,8 @@
     flex: none;
     display: flex;
     flex-direction: column;
-    background: #fff;
-    border-right: 1px solid #a7b5d6;
+    background: var(--view-bg);
+    border-right: 1px solid var(--rule);
   }
   .tree :global(.tree) {
     flex: 1;
@@ -67,7 +67,7 @@
       width: auto;
       max-height: 40%;
       border-right: 0;
-      border-bottom: 1px solid #a7b5d6;
+      border-bottom: 1px solid var(--rule);
     }
   }
 </style>

@@ -108,8 +108,8 @@
     width: 210px;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(to right, #f4f7fd, #e5ecf8);
-    border-right: 1px solid #a6b9de;
+    background: linear-gradient(to right, var(--pane-1), var(--pane-2));
+    border-right: 1px solid var(--rule);
     overflow: auto;
   }
   .content {
@@ -118,11 +118,11 @@
     display: flex;
     flex-direction: column;
     padding: 8px;
-    background: #f5f6fa;
+    background: var(--view-alt);
     overflow: auto;
   }
   .hint {
-    color: #555;
+    color: var(--text-muted);
     padding: 20px;
     text-align: center;
   }

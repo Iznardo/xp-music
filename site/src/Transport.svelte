@@ -90,7 +90,7 @@
   .pod {
     position: absolute;
     z-index: 30;
-    background: linear-gradient(to bottom, #f4f7ff 0%, #d3dcf2 35%, #aebde4 70%, #8ea2d3 100%);
+    background: linear-gradient(to bottom, var(--shell-1), var(--shell-2) 35%, var(--shell-3) 70%, var(--shell-4));
     border: 1px solid var(--skin-edge);
     box-shadow: inset 0 2px 1px rgb(255 255 255 / 0.9), inset 0 -3px 6px rgb(30 50 120 / 0.25), 0 2px 4px rgb(0 0 40 / 0.35);
     user-select: none;
@@ -112,13 +112,13 @@
     border-radius: 50%;
     border: 1px solid var(--btn-border);
     color: var(--btn-ink);
-    background: radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
     box-shadow: inset 0 -4px 6px rgb(20 40 110 / 0.35), 0 0 0 3px rgb(255 255 255 / 0.5), 0 2px 4px rgb(0 0 40 / 0.45);
     cursor: pointer;
   }
   .play.on {
     color: #fff;
-    background: radial-gradient(circle at 50% 28%, var(--accent-1) 0%, var(--accent-2) 35%, var(--accent-3) 100%);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 28%, var(--accent-1) 0%, var(--accent-2) 35%, var(--accent-3) 100%);
   }
   .play svg {
     width: 26px;
@@ -141,7 +141,7 @@
     place-items: center;
     padding: 0;
     color: var(--btn-ink);
-    background: radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
+    background: var(--btn-gloss, none), radial-gradient(circle at 50% 30%, var(--btn-1) 0%, var(--btn-2) 40%, var(--btn-3) 80%, var(--btn-4) 100%);
     border: 1px solid var(--btn-border);
     box-shadow: inset 0 -2px 3px rgb(20 40 110 / 0.25), 0 1px 1px rgb(0 0 40 / 0.35);
     cursor: pointer;
@@ -180,7 +180,7 @@
   .tick {
     width: 10px;
     height: 8px;
-    fill: var(--skin-deep);
+    fill: var(--shell-ink);
     filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.6));
   }
   .seek {
@@ -280,7 +280,7 @@
     background: none;
     border: 1px solid transparent;
     border-radius: 3px;
-    color: var(--skin-deep);
+    color: var(--shell-ink);
     cursor: pointer;
   }
   .flat svg {
@@ -293,7 +293,7 @@
     background: rgb(255 255 255 / 0.35);
   }
   .flat.on {
-    color: #148a14;
+    color: var(--toggle-on);
   }
   .flat.heart:hover {
     color: #d0213f;
